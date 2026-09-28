@@ -414,9 +414,9 @@ function App() {
   }
 
   async function closeBook() {
-    const period = window.prompt('Periode baru (contoh: 2026-10):')
+    const period = window.prompt('Periode baru (contoh: 2026-10). Tunggakan yang belum dibayar otomatis dibawa ke periode ini:')
     if (!period) return
-    const monthlyTarget = Number(window.prompt('Target iuran per anggota (Rp):', '50000'))
+    const monthlyTarget = Number(window.prompt('Target iuran baru per anggota (Rp). Nilai ini ditambahkan ke tunggakan sebelumnya:', '50000'))
     if (!monthlyTarget) return
     try {
       if (!isDemo) await request('closeBook', { period, monthlyTarget, date: new Date().toISOString().slice(0, 10) }, token)
