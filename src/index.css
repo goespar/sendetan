@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #243a31;
+  background: #f6f5ee;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+.font-display { font-family: 'Manrope', sans-serif; }
+::selection { background: #d9e7d9; color: #193f30; }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.animate-rise { animation: rise-in .45s ease-out both; }
+
+.tridatu-theme {
+  background: #fff;
+  color: #171717;
+}
+
+.tridatu-theme [class*="bg-[#f6f5ee]"],
+.tridatu-theme [class*="bg-[#fbfaf6]"],
+.tridatu-theme [class*="bg-[#fffefa]"],
+.tridatu-theme [class*="bg-[#fafaf6]"],
+.tridatu-theme [class*="bg-[#f9faf6]"],
+.tridatu-theme [class*="bg-[#fcfcf8]"] {
+  background-color: #fff !important;
+}
+
+.tridatu-theme [class*="bg-[#e9efe5]"],
+.tridatu-theme [class*="bg-[#e8eddf]"],
+.tridatu-theme [class*="bg-[#e9f0e5]"],
+.tridatu-theme [class*="bg-[#eef2e9]"],
+.tridatu-theme [class*="bg-[#edf1e9]"],
+.tridatu-theme [class*="bg-[#f0f1e9]"],
+.tridatu-theme [class*="bg-[#f0f2ea]"],
+.tridatu-theme [class*="bg-[#f0f2e9]"],
+.tridatu-theme [class*="bg-[#e9eee5]"],
+.tridatu-theme [class*="bg-[#f3f4ed]"],
+.tridatu-theme [class*="bg-[#f5f6f1]"],
+.tridatu-theme [class*="bg-[#f7f8f4]"],
+.tridatu-theme [class*="bg-[#f3f6ef]"],
+.tridatu-theme [class*="bg-[#f6f7f2]"],
+.tridatu-theme [class*="bg-[#f5e8cd]"],
+.tridatu-theme [class*="bg-[#f8efd9]"],
+.tridatu-theme [class*="bg-[#faeae1]"],
+.tridatu-theme [class*="bg-[#f6e6e3]"],
+.tridatu-theme [class*="bg-[#f8eee0]"],
+.tridatu-theme [class*="bg-[#f7eae6]"] {
+  background-color: #fff1f2 !important;
+}
+
+.tridatu-theme [class*="bg-[#355d3f]"],
+.tridatu-theme [class*="bg-[#294d33]"],
+.tridatu-theme [class*="bg-[#244332]"] {
+  background-color: #b5122a !important;
+}
+
+.tridatu-theme [class*="bg-[#193b2d]"],
+.tridatu-theme [class*="bg-[#16392c]"] {
+  background-color: rgb(20 20 20 / 45%) !important;
+}
+
+.tridatu-theme [class*="text-[#243a31]"],
+.tridatu-theme [class*="text-[#263e32]"],
+.tridatu-theme [class*="text-[#293f33]"],
+.tridatu-theme [class*="text-[#314b38]"],
+.tridatu-theme [class*="text-[#3c5043]"],
+.tridatu-theme [class*="text-[#344a3a]"] {
+  color: #171717 !important;
+}
+
+.tridatu-theme [class*="text-[#244332]"],
+.tridatu-theme [class*="text-[#315d3c]"],
+.tridatu-theme [class*="text-[#46694b]"],
+.tridatu-theme [class*="text-[#496b4d]"],
+.tridatu-theme [class*="text-[#48644d]"],
+.tridatu-theme [class*="text-[#527956]"],
+.tridatu-theme [class*="text-[#547b58]"],
+.tridatu-theme [class*="text-[#638367]"],
+.tridatu-theme [class*="text-[#638065]"],
+.tridatu-theme [class*="text-[#56785a]"],
+.tridatu-theme [class*="text-[#4c7653]"],
+.tridatu-theme [class*="text-[#4e7053]"],
+.tridatu-theme [class*="text-[#355d3f]"],
+.tridatu-theme [class*="text-[#55765a]"],
+.tridatu-theme [class*="text-[#56765a]"],
+.tridatu-theme [class*="text-[#426a49]"],
+.tridatu-theme [class*="text-[#9b712b]"],
+.tridatu-theme [class*="text-[#a98239]"],
+.tridatu-theme [class*="text-[#b56d49]"],
+.tridatu-theme [class*="text-[#aa6254]"],
+.tridatu-theme [class*="text-[#9b793b]"],
+.tridatu-theme [class*="text-[#a67842]"],
+.tridatu-theme [class*="text-[#a25143]"],
+.tridatu-theme [class*="text-[#a36e3f]"],
+.tridatu-theme [class*="text-[#c16e52]"] {
+  color: #b5122a !important;
+}
+
+.tridatu-theme [class*="focus:border-[#789578]"]:not(:focus) {
+  border-color: #e1e5dc !important;
+}
+
+.tridatu-theme [class*="focus:border-[#789578]"]:focus {
+  border-color: #b5122a !important;
+}
