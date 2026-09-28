@@ -650,7 +650,6 @@ function SukadukaModal({ members, editing, onClose, onSave }) {
       changePaid: incoming ? changePaid : 0,
       refundDebtAdded: incoming ? changeDue - changePaid : 0,
       refundDebt: incoming ? openingRefundDebt + changeDue - changePaid : 0,
-      arrears: incoming ? Number(member.Sisa_Hutang_Iuran || 0) : 0,
       notes: form.notes,
       proofFile,
     })
@@ -668,7 +667,6 @@ function SukadukaModal({ members, editing, onClose, onSave }) {
         <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian seharusnya</span><input readOnly value={changeDue} className={readonlyClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian diberikan</span><input type="number" min="0" max={openingRefundDebt + changeDue} step="1" value={form.changePaid} onChange={(event) => setValue('changePaid', event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Sisa hutang kembalian</span><input readOnly value={openingRefundDebt + changeDue - changePaid} className={readonlyClass} /></label>
-        <label><span className="mb-1.5 block text-[11px] font-semibold">Sisa hutang iuran (akhir)</span><input readOnly value={member?.Sisa_Hutang_Iuran || 0} className={readonlyClass} /></label>
       </> : <label><span className="mb-1.5 block text-[11px] font-semibold">Penerima dana</span><input required value={form.recipient} onChange={(event) => setValue('recipient', event.target.value)} className={inputClass} /></label>}
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan / peruntukan <span className="text-[#b5122a]">*</span></span><input required value={form.purpose} onChange={(event) => setValue('purpose', event.target.value)} className={inputClass} /></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Foto bukti serah terima</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setProofFile(event.target.files?.[0] || null)} className={inputClass} /><span className="mt-1 block text-[10px] text-[#888]">Foto tersimpan di folder Drive Foto Sukaduka (maks. 5 MB).{editing?.proofPhotoUrl && <a className="ml-1 font-semibold text-[#b5122a] underline" href={editing.proofPhotoUrl} target="_blank" rel="noreferrer">Lihat bukti saat ini</a>}</span></label>
