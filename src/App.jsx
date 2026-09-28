@@ -115,6 +115,7 @@ function App() {
   const [notice, setNotice] = useState('')
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState(false)
+  const [balanceModal, setBalanceModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -177,7 +178,7 @@ function App() {
   }, [active, token, role])
 
   useEffect(() => {
-    if (active !== 'iuran' || isDemo || !token) return
+    if ((active !== 'iuran' && !(active === 'anggota' && role === 'Admin')) || isDemo || !token) return
     request('masterAnggota', {}, token)
       .then((result) => setMasterMembers(result.members || []))
       .catch((error) => setNotice(error.message))
@@ -391,6 +392,22 @@ function App() {
     } catch (error) { setNotice(error.message) }
   }
 
+  async function saveMasterBalance(record) {
+    try {
+      let member
+      if (!isDemo) {
+        const result = await request('adjustMemberBalance', record, token)
+        member = result.member
+      } else {
+        const previous = masterMembers.find((item) => String(item.ID) === String(record.memberId))
+        member = { ...previous, Sisa_Hutang_Iuran: record.arrears, Sisa_Hutang_Kembalian: record.refundDebt }
+      }
+      setMasterMembers((previous) => previous.map((item) => String(item.ID) === String(member.ID) ? member : item))
+      setNotice('Saldo master diperbarui dan alasan koreksi dicatat di audit.')
+      setBalanceModal(false)
+    } catch (error) { setNotice(error.message) }
+  }
+
   async function deleteRecord(id) {
     if (!window.confirm('Hapus catatan ini? Tindakan ini tidak dapat dibatalkan.')) return
     try {
@@ -483,12 +500,13 @@ function App() {
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
-          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} onOpenGallery={() => setActive('kegiatan')} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} />}
+          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} onOpenGallery={() => setActive('kegiatan')} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
 
       {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onClose={() => { setModal(false); setEditing(null) }} onSave={saveRecord} onSaveIuran={saveIuran} onSaveSukaduka={saveSukaduka} onSaveRental={saveRental} onSaveActivity={saveActivity} />}
+      {balanceModal && <MasterBalanceModal members={masterMembers} onClose={() => setBalanceModal(false)} onSave={saveMasterBalance} />}
       {loginOpen && <LoginModal login={login} setLogin={setLogin} onClose={() => setLoginOpen(false)} onSubmit={signIn} demo={isDemo} />}
       {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}</div>}
     </div>
@@ -571,14 +589,14 @@ function GalleryPage({ items, writable, onAdd, onEdit, onDelete }) {
   </div>
 }
 
-function ModulePage({ active, page, rows, query, setQuery, loading, writable, periodFilter, setPeriodFilter, masterMembers, contacts, assets, rentalRows, onAdd, onEdit, onDelete, onCloseBook }) {
+function ModulePage({ active, page, rows, query, setQuery, loading, writable, canEditBalances, periodFilter, setPeriodFilter, masterMembers, contacts, assets, rentalRows, onAdd, onEdit, onDelete, onCloseBook, onEditBalance }) {
   const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
   const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (row.donationType === 'Uang Tunai' ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
   const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
   const selectedContacts = contacts || []
   return <div className="animate-rise">
     <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div>
-      <div className="flex gap-2">{active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><BookOpenCheck size={15} /> Tutup buku</button>}{writable && <button onClick={onAdd} className="flex items-center justify-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#294d33]"><Plus size={16} /> Tambah data</button>}</div>
+      <div className="flex gap-2">{active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><BookOpenCheck size={15} /> Tutup buku</button>}{active === 'anggota' && canEditBalances && <button onClick={onEditBalance} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Koreksi saldo</button>}{writable && <button onClick={onAdd} className="flex items-center justify-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#294d33]"><Plus size={16} /> Tambah data</button>}</div>
     </div>
     {hasCashSummary && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-md border border-[#e6e7dd] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">Dana masuk · hasil filter</p><p className="mt-1 text-sm font-bold text-[#b5122a]">{currency(cashIn)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">Dana keluar · hasil filter</p><p className="mt-1 text-sm font-bold text-[#242424]">{currency(cashOut)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">Selisih bersih · hasil filter</p><p className="mt-1 text-sm font-bold text-[#171717]">{currency(cashIn - cashOut)}</p></div></div>}
     <div className="overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]">
@@ -782,6 +800,44 @@ function NotulensiModal({ contacts, editing, onClose, onSave }) {
       <div className="mt-2 flex flex-wrap justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button type="button" onClick={share} disabled={shareMode === 'personal' && !contactId} className="flex items-center gap-2 rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50"><MessageCircle size={14} /> Buka WhatsApp</button><button className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white">Simpan catatan</button></div>
     </form>
   </div></div>
+}
+
+function MasterBalanceModal({ members, onClose, onSave }) {
+  const [form, setForm] = useState({ memberId: '', arrears: '', refundDebt: '', reason: '' })
+  const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
+
+  function chooseMember(memberId) {
+    const member = members.find((item) => String(item.ID) === String(memberId))
+    setForm((previous) => ({
+      ...previous,
+      memberId,
+      arrears: member ? String(Number(member.Sisa_Hutang_Iuran) || 0) : '',
+      refundDebt: member ? String(Number(member.Sisa_Hutang_Kembalian) || 0) : '',
+    }))
+  }
+
+  function submit(event) {
+    event.preventDefault()
+    onSave({
+      memberId: form.memberId,
+      arrears: Number(form.arrears),
+      refundDebt: Number(form.refundDebt),
+      reason: form.reason.trim(),
+    })
+  }
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="w-full max-w-[520px] rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">Koreksi saldo master anggota</h2><p className="mt-1 text-xs leading-5 text-[#8c978d]">Perubahan tidak membuat transaksi iuran. Nilai dan alasan koreksi dicatat di audit.</p></div><button type="button" onClick={onClose} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9]" aria-label="Tutup"><X size={18} /></button></div>
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Anggota</span><select required value={form.memberId} onChange={(event) => chooseMember(event.target.value)} className={inputClass}><option value="">{members.length ? 'Pilih anggota' : 'Master anggota belum tersedia'}</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama} · {member.ID}</option>)}</select></label>
+        <label><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang iuran</span><input required type="number" min="0" step="1" value={form.arrears} onChange={(event) => setForm((previous) => ({ ...previous, arrears: event.target.value }))} className={inputClass} /></label>
+        <label><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang kembalian</span><input required type="number" min="0" step="1" value={form.refundDebt} onChange={(event) => setForm((previous) => ({ ...previous, refundDebt: event.target.value }))} className={inputClass} /></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Alasan koreksi</span><textarea required rows="3" value={form.reason} onChange={(event) => setForm((previous) => ({ ...previous, reason: event.target.value }))} className={inputClass} /></label>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button disabled={!form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan koreksi</button></div>
+      </form>
+    </div>
+  </div>
 }
 
 function IuranModal({ members, editing, onClose, onSave }) {
