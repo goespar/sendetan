@@ -95,6 +95,8 @@ const demoModuleBalances = {
 }
 const moduleLabels = { iuran: 'Iuran', sukaduka: 'Sukaduka', sesari: 'Sesari', punia: 'Punia tunai', sewa: 'Sewa alat', piodalan: 'Piodalan' }
 const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777', punia: '#2563eb', sewa: '#15803d', piodalan: '#eab308' }
+const openingBalanceDefaults = { iuran: 1215000, sukaduka: 920000, sesari: 0 }
+const emptyOpeningBalances = Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, { amount: 0, date: '', notes: '', configured: false }]))
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
 function demoCache(key, fallback) {
@@ -123,6 +125,8 @@ function App() {
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState(false)
   const [balanceModal, setBalanceModal] = useState(false)
+  const [openingBalanceModal, setOpeningBalanceModal] = useState(false)
+  const [openingBalances, setOpeningBalances] = useState(() => isDemo ? demoCache('opening-balances', emptyOpeningBalances) : emptyOpeningBalances)
   const [sukadukaBalanceModal, setSukadukaBalanceModal] = useState(false)
   const [batchModal, setBatchModal] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -147,7 +151,8 @@ function App() {
     localStorage.setItem('takora-demo-contacts', JSON.stringify(contacts))
     localStorage.setItem('takora-demo-assets', JSON.stringify(rentalAssets))
     localStorage.setItem('takora-demo-rentals', JSON.stringify(rentalRows))
-  }, [rows, masterMembers, contacts, rentalAssets, rentalRows])
+    localStorage.setItem('takora-demo-opening-balances', JSON.stringify(openingBalances))
+  }, [rows, masterMembers, contacts, rentalAssets, rentalRows, openingBalances])
 
   useEffect(() => {
     if (!allowed.includes(active)) setActive('dashboard')
@@ -199,6 +204,13 @@ function App() {
     if ((active !== 'iuran' && active !== 'sukaduka' && active !== 'piodalan' && !(active === 'anggota' && role === 'Admin')) || isDemo || !token) return
     request('masterAnggota', {}, token)
       .then((result) => setMasterMembers(result.members || []))
+      .catch((error) => setNotice(error.message))
+  }, [active, token, role])
+
+  useEffect(() => {
+    if (!['iuran', 'sukaduka', 'sesari'].includes(active) || isDemo || !token) return
+    request('openingBalances', {}, token)
+      .then((result) => setOpeningBalances(result.balances || emptyOpeningBalances))
       .catch((error) => setNotice(error.message))
   }, [active, token, role])
 
@@ -458,6 +470,22 @@ function App() {
     } catch (error) { setNotice(error.message) }
   }
 
+  async function saveOpeningBalances(record) {
+    try {
+      let balances = Object.fromEntries(Object.entries(record.balances).map(([module, amount]) => [module, {
+        amount: Number(amount), date: record.date, notes: record.notes, configured: true,
+      }]))
+      if (!isDemo) {
+        const result = await request('setOpeningBalances', record, token)
+        balances = result.balances
+      }
+      setOpeningBalances(balances)
+      setOpeningBalanceModal(false)
+      setNotice('Saldo awal kas berhasil disimpan.')
+      if (!isDemo) request('summary', {}, token).then(setSummary).catch((error) => setNotice(error.message))
+    } catch (error) { setNotice(error.message) }
+  }
+
   async function deleteRecord(id) {
     if (!window.confirm('Hapus catatan ini? Tindakan ini tidak dapat dibatalkan.')) return
     try {
@@ -595,6 +623,7 @@ function App() {
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
+          {['iuran', 'sukaduka', 'sesari'].includes(active) && writable && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d9e1d5] bg-white px-4 py-3"><div><p className="text-[10px] font-semibold uppercase text-[#849084]">Saldo awal kas {moduleLabels[active]}</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{openingBalances[active]?.configured ? currency(openingBalances[active].amount) : 'Belum diatur'}</p>{openingBalances[active]?.date && <p className="mt-1 text-[10px] text-[#849084]">Per {readableDate(openingBalances[active].date)}</p>}</div><button onClick={() => setOpeningBalanceModal(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Atur saldo awal</button></div>}
           {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
@@ -650,6 +679,7 @@ function App() {
         } catch (error) { setNotice(error.message) }
       }} />}
       {balanceModal && <MasterBalanceModal members={masterMembers} onClose={() => setBalanceModal(false)} onSave={saveMasterBalance} />}
+      {openingBalanceModal && <OpeningBalanceModal balances={openingBalances} onClose={() => setOpeningBalanceModal(false)} onSave={saveOpeningBalances} />}
       {sukadukaBalanceModal && <SukadukaBalanceModal members={masterMembers} onClose={() => setSukadukaBalanceModal(false)} onSave={saveSukadukaBalance} />}
       {loginOpen && <LoginModal login={login} setLogin={setLogin} onClose={() => setLoginOpen(false)} onSubmit={signIn} demo={isDemo} />}
       {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}</div>}
@@ -1335,6 +1365,40 @@ function MasterBalanceModal({ members, onClose, onSave }) {
         <label><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang kembalian</span><input required type="number" min="0" step="1" value={form.refundDebt} onChange={(event) => setForm((previous) => ({ ...previous, refundDebt: event.target.value }))} className={inputClass} /></label>
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Alasan koreksi</span><textarea required rows="3" value={form.reason} onChange={(event) => setForm((previous) => ({ ...previous, reason: event.target.value }))} className={inputClass} /></label>
         <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button disabled={!form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan koreksi</button></div>
+      </form>
+    </div>
+  </div>
+}
+
+function OpeningBalanceModal({ balances, onClose, onSave }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const configured = Object.values(balances).some((balance) => balance.configured)
+  const [form, setForm] = useState(() => ({
+    date: Object.values(balances).find((balance) => balance.configured)?.date || today,
+    notes: Object.values(balances).find((balance) => balance.configured)?.notes || 'Saldo kas hasil pembayaran sebelum aplikasi digunakan.',
+    balances: Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, String(balances[module]?.configured ? balances[module].amount : openingBalanceDefaults[module])])),
+  }))
+  const total = Object.values(form.balances).reduce((sum, amount) => sum + (Number(amount) || 0), 0)
+  const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
+
+  function submit(event) {
+    event.preventDefault()
+    onSave({
+      date: form.date,
+      notes: form.notes.trim(),
+      balances: Object.fromEntries(Object.entries(form.balances).map(([module, amount]) => [module, Number(amount)])),
+    })
+  }
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="w-full max-w-[520px] rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{configured ? 'Ubah saldo awal kas' : 'Catat saldo awal kas'}</h2><p className="mt-1 text-xs leading-5 text-[#8c978d]">Masukkan kas dari pembayaran sebelum aplikasi digunakan. Tidak mengubah tunggakan anggota.</p><p className="mt-1 text-[10px] leading-4 text-[#9b712b]">Sesari Rp408.000 sudah tampak di transaksi sheet sebagai “rekap sesari”; nilai saldo awal Sesari diisi 0 agar tidak terhitung dua kali.</p></div><button type="button" onClick={onClose} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9]" aria-label="Tutup"><X size={18} /></button></div>
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Tanggal saldo awal</span><input required type="date" value={form.date} onChange={(event) => setForm((previous) => ({ ...previous, date: event.target.value }))} className={inputClass} /></label>
+        {Object.entries({ iuran: 'Kas Iuran', sukaduka: 'Kas Sukaduka', sesari: 'Kas Sesari' }).map(([module, label]) => <label key={module}><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">{label}</span><input required type="number" min="0" step="1" value={form.balances[module]} onChange={(event) => setForm((previous) => ({ ...previous, balances: { ...previous.balances, [module]: event.target.value } }))} className={inputClass} /></label>)}
+        <div className="rounded-md bg-[#f3f5ef] px-3 py-2.5 sm:col-span-2"><p className="text-[10px] text-[#849084]">Total saldo awal</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{currency(total)}</p></div>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Keterangan sumber saldo</span><textarea required rows="2" value={form.notes} onChange={(event) => setForm((previous) => ({ ...previous, notes: event.target.value }))} className={inputClass} /></label>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white">Simpan saldo awal</button></div>
       </form>
     </div>
   </div>

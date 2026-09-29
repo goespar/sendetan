@@ -3,6 +3,7 @@ const SHEETS = {
   Anggota: ['id', 'memberNo', 'memberName', 'phone', 'address', 'status', 'joinedAt', 'notes'],
   IuranPeriode: ['id', 'period', 'openedAt', 'closedAt', 'status', 'monthlyTarget', 'memberCount', 'totalBilled', 'carryArrears', 'carryRefundDebt', 'notes', 'createdBy'],
   MASTER_ANGGOTA: ['ID', 'Nama', 'Sisa_Hutang_Iuran', 'Sisa_Hutang_Kembalian', 'Sisa_Hutang_Sukaduka'],
+  SaldoAwal: ['id', 'module', 'amount', 'date', 'notes', 'updatedBy', 'updatedAt'],
   TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt'],
   PengeluaranIuran: ['id', 'date', 'category', 'description', 'amount', 'payee', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
@@ -35,6 +36,10 @@ function doGet(e) {
     if (action === 'masterAnggota') {
       assertRole_(user, 'list', 'MASTER_ANGGOTA');
       return json_({ ok: true, members: getMasterAnggota_() });
+    }
+    if (action === 'openingBalances') {
+      assertRole_(user, 'list', 'TRANSAKSI_IURAN');
+      return json_({ ok: true, balances: getOpeningBalances_() });
     }
     if (action === 'summary') {
       assertRole_(user, 'summary', '');
@@ -76,6 +81,10 @@ function doPost(e) {
       assertRole_(user, 'list', 'MASTER_ANGGOTA');
       return json_({ ok: true, members: getMasterAnggota_() });
     }
+    if (action === 'openingBalances') {
+      assertRole_(user, 'list', 'TRANSAKSI_IURAN');
+      return json_({ ok: true, balances: getOpeningBalances_() });
+    }
     if (action === 'uploadFile') {
       assertRole_(user, 'upload', body.folder || 'assets');
       return json_({ ok: true, ...uploadFile_(body) });
@@ -108,6 +117,9 @@ function doPost(e) {
         sukadukaArrears: body.sukadukaArrears,
         reason: body.reason,
       }, user);
+    } else if (action === 'setOpeningBalances') {
+      if (user.role !== 'Admin' && user.role !== 'Bendahara') throw new Error('Hanya Admin atau Bendahara yang dapat mengatur saldo awal kas.');
+      result = setOpeningBalances_(body, user);
     } else if (action === 'closeBook') {
       assertRole_(user, 'create', 'IuranPeriode');
       result = closeBook_(body, user);
@@ -1144,14 +1156,85 @@ function validateModule_(module) {
 }
 
 function summarySnapshot_() {
-  const names = ['Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA'];
+  const names = ['Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA', 'SaldoAwal'];
   const snapshot = {};
   names.forEach(function (name) { snapshot[name] = readRecords_(name); });
   return snapshot;
 }
 
+function getOpeningBalances_() {
+  const balances = {
+    iuran: { amount: 0, date: '', notes: '', configured: false },
+    sukaduka: { amount: 0, date: '', notes: '', configured: false },
+    sesari: { amount: 0, date: '', notes: '', configured: false },
+  };
+  readRecords_('SaldoAwal').forEach(function (record) {
+    if (!Object.prototype.hasOwnProperty.call(balances, record.module)) return;
+    balances[record.module] = {
+      amount: Number(record.amount) || 0,
+      date: record.date || '',
+      notes: record.notes || '',
+      configured: true,
+    };
+  });
+  return balances;
+}
+
+function setOpeningBalances_(input, user) {
+  const modules = ['iuran', 'sukaduka', 'sesari'];
+  const date = String(input.date || '').trim();
+  const notes = String(input.notes || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00').getTime())) {
+    throw new Error('Tanggal saldo awal tidak valid.');
+  }
+  if (!notes) throw new Error('Keterangan saldo awal wajib diisi.');
+  if (!input.balances || typeof input.balances !== 'object') throw new Error('Nominal saldo awal tidak ditemukan.');
+
+  const sheet = spreadsheet_().getSheetByName('SaldoAwal');
+  const headers = SHEETS.SaldoAwal;
+  const existing = readRecords_('SaldoAwal');
+  const records = modules.map(function (module) {
+    const amount = Number(input.balances[module]);
+    if (!Number.isFinite(amount) || amount < 0 || Math.floor(amount) !== amount) {
+      throw new Error('Saldo awal ' + module + ' harus berupa angka rupiah nol atau lebih.');
+    }
+    return {
+      id: 'SALDO-AWAL-' + module.toUpperCase(),
+      module: module,
+      amount: amount,
+      date: date,
+      notes: notes,
+      updatedBy: user.username,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+  records.forEach(function (record) {
+    let index = -1;
+    existing.forEach(function (row, rowIndex) {
+      if (row.module === record.module) index = rowIndex;
+    });
+    if (index < 0) {
+      sheet.appendRow(headers.map(function (key) { return normalizeCell_(record[key]); }));
+    } else {
+      sheet.getRange(index + 2, 1, 1, headers.length).setValues([headers.map(function (key) { return normalizeCell_(record[key]); })]);
+    }
+    audit_(user, 'setOpeningBalance', record.module, record.id, JSON.stringify({ amount: record.amount, date: date, notes: notes }));
+  });
+  return { balances: getOpeningBalances_() };
+}
+
 function summaryRows_(snapshot, module) {
   return snapshot ? snapshot[module] || [] : readRecords_(module);
+}
+
+function getOpeningBalancesFromSnapshot_(snapshot) {
+  const balances = { iuran: 0, sukaduka: 0, sesari: 0 };
+  summaryRows_(snapshot, 'SaldoAwal').forEach(function (record) {
+    if (Object.prototype.hasOwnProperty.call(balances, record.module)) {
+      balances[record.module] = Number(record.amount) || 0;
+    }
+  });
+  return balances;
 }
 
 function summary_() {
@@ -1271,6 +1354,7 @@ function moduleBalances_(snapshot, suppliedMembers) {
   const piodalan = summaryRows_(snapshot, 'Piodalan');
   const iuran = summaryRows_(snapshot, 'TRANSAKSI_IURAN');
   const iuranExpenses = summaryRows_(snapshot, 'PengeluaranIuran');
+  const openingBalances = getOpeningBalancesFromSnapshot_(snapshot);
   const rentals = summaryRows_(snapshot, 'SewaAset');
   const masterMembers = suppliedMembers || getMasterAnggota_(snapshot);
   const arrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
@@ -1294,9 +1378,9 @@ function moduleBalances_(snapshot, suppliedMembers) {
   const rentalIn = total(rentals, function (row) { return row.status !== 'Dibatalkan'; }, 'rentalIncome');
   const rentalOut = total(rentals, function (row) { return row.status !== 'Dibatalkan'; }, 'maintenanceCost');
   const modules = {
-    iuran: balance(iuranIn, iuranOut, arrears),
-    sukaduka: balance(socialIn, socialOut, sukadukaArrears),
-    sesari: balance(sesariIn, sesariOut, 0),
+    iuran: balance(iuranIn + openingBalances.iuran, iuranOut, arrears),
+    sukaduka: balance(socialIn + openingBalances.sukaduka, socialOut, sukadukaArrears),
+    sesari: balance(sesariIn + openingBalances.sesari, sesariOut, 0),
     punia: balance(puniaIn, 0, 0),
     sewa: balance(rentalIn, rentalOut, 0),
     piodalan: balance(eventIn, eventOut, 0),
@@ -1317,6 +1401,7 @@ function analytics_(snapshot) {
   const monthly = {};
   monthKeys.forEach(function (key) { monthly[key] = { month: monthLabels[key], masuk: 0, keluar: 0 }; });
   const sourceTotals = { Iuran: 0, Sesari: 0, Punia: 0 };
+  const openingRows = summaryRows_(snapshot, 'SaldoAwal');
   function add(dateValue, direction, amount, source) {
     if (direction !== 'Masuk' && direction !== 'Keluar') return;
     const date = dateValue instanceof Date ? dateValue : new Date(String(dateValue || '').slice(0, 10) + 'T00:00:00');
@@ -1353,6 +1438,10 @@ function analytics_(snapshot) {
     add(row.date, 'Masuk', row.rentalIncome, '');
     add(row.date, 'Keluar', row.maintenanceCost, '');
   });
+  openingRows.forEach(function (row) {
+    const source = row.module === 'iuran' ? 'Iuran' : row.module === 'sesari' ? 'Sesari' : '';
+    add(row.date, 'Masuk', row.amount, source);
+  });
   const sourceTotal = Object.keys(sourceTotals).reduce(function (sum, key) { return sum + sourceTotals[key]; }, 0);
   const colors = { Iuran: '#b5122a', Sesari: '#242424', Punia: '#777777' };
   const sources = Object.keys(sourceTotals).map(function (name) {
@@ -1369,7 +1458,8 @@ function summaryTotals_(snapshot) {
   const rentals = summaryRows_(snapshot, 'SewaAset');
   const iuran = summaryRows_(snapshot, 'TRANSAKSI_IURAN');
   const iuranExpenses = summaryRows_(snapshot, 'PengeluaranIuran');
-  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(isCashPunia_).reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + iuran.reduce(function (total, row) { return total + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.rentalIncome || 0); }, 0);
+  const openingBalances = getOpeningBalancesFromSnapshot_(snapshot);
+  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(isCashPunia_).reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + iuran.reduce(function (total, row) { return total + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.rentalIncome || 0); }, 0) + openingBalances.iuran + openingBalances.sukaduka + openingBalances.sesari;
   const expenses = sum_(sesari, 'Keluar') + sukadukaCashOut_(sukaduka) + sumCash_(piodalan, 'Keluar') + iuran.reduce(function (total, row) { return total + Number(row.changePaid || 0); }, 0) + iuranExpenses.reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.maintenanceCost || 0); }, 0);
   const refundPaid = 0;
   return { income: income, expenses: expenses + refundPaid };
