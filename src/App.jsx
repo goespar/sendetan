@@ -123,6 +123,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState(false)
   const [balanceModal, setBalanceModal] = useState(false)
+  const [sukadukaBalanceModal, setSukadukaBalanceModal] = useState(false)
   const [batchModal, setBatchModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -436,6 +437,27 @@ function App() {
     } catch (error) { setNotice(error.message) }
   }
 
+  async function saveSukadukaBalance(record) {
+    try {
+      const current = masterMembers.find((item) => String(item.ID) === String(record.memberId)) || { Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0, Sisa_Hutang_Sukaduka: 0 }
+      let member
+      if (!isDemo) {
+        const payload = {
+          memberId: record.memberId,
+          sukadukaArrears: Number(record.sukadukaArrears || 0),
+          reason: record.reason,
+        }
+        const result = await request('adjustSukadukaBalance', payload, token)
+        member = result.member
+      } else {
+        member = { ...current, Sisa_Hutang_Sukaduka: Number(record.sukadukaArrears || 0) }
+      }
+      setMasterMembers((previous) => previous.map((item) => String(item.ID) === String(member.ID) ? member : item))
+      setNotice('Saldo tunggakan Sukaduka berhasil diperbarui.')
+      setSukadukaBalanceModal(false)
+    } catch (error) { setNotice(error.message) }
+  }
+
   async function deleteRecord(id) {
     if (!window.confirm('Hapus catatan ini? Tindakan ini tidak dapat dibatalkan.')) return
     try {
@@ -628,6 +650,7 @@ function App() {
         } catch (error) { setNotice(error.message) }
       }} />}
       {balanceModal && <MasterBalanceModal members={masterMembers} onClose={() => setBalanceModal(false)} onSave={saveMasterBalance} />}
+      {sukadukaBalanceModal && <SukadukaBalanceModal members={masterMembers} onClose={() => setSukadukaBalanceModal(false)} onSave={saveSukadukaBalance} />}
       {loginOpen && <LoginModal login={login} setLogin={setLogin} onClose={() => setLoginOpen(false)} onSubmit={signIn} demo={isDemo} />}
       {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}</div>}
     </div>
@@ -742,6 +765,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
     <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
       {active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><BookOpenCheck size={15} /> Tutup buku</button>}
       {active === 'anggota' && canEditBalances && <button onClick={onEditBalance} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><CircleDollarSign size={15} /> Koreksi saldo</button>}
+      {active === 'sukaduka' && writable && <button onClick={() => setSukadukaBalanceModal(true)} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><CircleDollarSign size={15} /> Edit saldo tunggakan Sukaduka</button>}
       {['iuran', 'sukaduka', 'punia', 'piodalan'].includes(active) && writable && <button onClick={onBatch} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Input basket / Excel</button>}
       {writable && <button onClick={onAdd} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white"><Plus size={16} /> Tambah data</button>}
     </div></div>
@@ -1311,6 +1335,41 @@ function MasterBalanceModal({ members, onClose, onSave }) {
         <label><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang kembalian</span><input required type="number" min="0" step="1" value={form.refundDebt} onChange={(event) => setForm((previous) => ({ ...previous, refundDebt: event.target.value }))} className={inputClass} /></label>
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Alasan koreksi</span><textarea required rows="3" value={form.reason} onChange={(event) => setForm((previous) => ({ ...previous, reason: event.target.value }))} className={inputClass} /></label>
         <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button disabled={!form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan koreksi</button></div>
+      </form>
+    </div>
+  </div>
+}
+
+function SukadukaBalanceModal({ members, onClose, onSave }) {
+  const [form, setForm] = useState({ memberId: '', sukadukaArrears: '', reason: '' })
+  const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
+
+  function chooseMember(memberId) {
+    const member = members.find((item) => String(item.ID) === String(memberId))
+    setForm((previous) => ({
+      ...previous,
+      memberId,
+      sukadukaArrears: member ? String(Number(member.Sisa_Hutang_Sukaduka) || 0) : '',
+    }))
+  }
+
+  function submit(event) {
+    event.preventDefault()
+    onSave({
+      memberId: form.memberId,
+      sukadukaArrears: Number(form.sukadukaArrears),
+      reason: form.reason.trim(),
+    })
+  }
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="w-full max-w-[520px] rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">Edit saldo tunggakan Sukaduka</h2><p className="mt-1 text-xs leading-5 text-[#8c978d]">Koreksi langsung saldo tunggakan Sukaduka per anggota. Data dan alasan koreksi dicatat di audit.</p></div><button type="button" onClick={onClose} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9]" aria-label="Tutup"><X size={18} /></button></div>
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Anggota</span><select required value={form.memberId} onChange={(event) => chooseMember(event.target.value)} className={inputClass}><option value="">{members.length ? 'Pilih anggota' : 'Master anggota belum tersedia'}</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama} · {member.ID}</option>)}</select></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Saldo tunggakan Sukaduka</span><input required type="number" min="0" step="1" value={form.sukadukaArrears} onChange={(event) => setForm((previous) => ({ ...previous, sukadukaArrears: event.target.value }))} className={inputClass} /></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Alasan koreksi</span><textarea required rows="3" value={form.reason} onChange={(event) => setForm((previous) => ({ ...previous, reason: event.target.value }))} className={inputClass} /></label>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button disabled={!form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan saldo</button></div>
       </form>
     </div>
   </div>

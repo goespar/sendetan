@@ -2,7 +2,7 @@ const SHEETS = {
   Users: ['id', 'name', 'username', 'passwordHash', 'salt', 'role', 'status', 'createdAt', 'lastLoginAt'],
   Anggota: ['id', 'memberNo', 'memberName', 'phone', 'address', 'status', 'joinedAt', 'notes'],
   IuranPeriode: ['id', 'period', 'openedAt', 'closedAt', 'status', 'monthlyTarget', 'memberCount', 'totalBilled', 'carryArrears', 'carryRefundDebt', 'notes', 'createdBy'],
-  MASTER_ANGGOTA: ['ID', 'Nama', 'Sisa_Hutang_Iuran', 'Sisa_Hutang_Kembalian'],
+  MASTER_ANGGOTA: ['ID', 'Nama', 'Sisa_Hutang_Iuran', 'Sisa_Hutang_Kembalian', 'Sisa_Hutang_Sukaduka'],
   TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt'],
   PengeluaranIuran: ['id', 'date', 'category', 'description', 'amount', 'payee', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
@@ -101,6 +101,13 @@ function doPost(e) {
     } else if (action === 'adjustMemberBalance') {
       if (user.role !== 'Admin') throw new Error('Hanya Admin yang dapat mengoreksi saldo master anggota.');
       result = adjustMemberBalance_(body, user);
+    } else if (action === 'adjustSukadukaBalance') {
+      if (user.role !== 'Admin' && user.role !== 'Bendahara') throw new Error('Hanya Admin atau Bendahara yang dapat mengoreksi tunggakan Sukaduka.');
+      result = adjustMemberBalance_({
+        memberId: body.memberId,
+        sukadukaArrears: body.sukadukaArrears,
+        reason: body.reason,
+      }, user);
     } else if (action === 'closeBook') {
       assertRole_(user, 'create', 'IuranPeriode');
       result = closeBook_(body, user);
@@ -699,7 +706,7 @@ function getMasterAnggota_(snapshot) {
   master.forEach(function (member) { byId[String(member.ID)] = member; });
   currentMembers.forEach(function (member) {
     const id = String(member.id);
-    if (!byId[id]) byId[id] = { ID: member.id, Nama: member.memberName, Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0 };
+    if (!byId[id]) byId[id] = { ID: member.id, Nama: member.memberName, Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0, Sisa_Hutang_Sukaduka: 0 };
   });
   const latestBalances = {};
   (snapshot ? snapshot.TRANSAKSI_IURAN : readRecords_('TRANSAKSI_IURAN')).forEach(function (row) {
@@ -719,7 +726,8 @@ function getMasterAnggota_(snapshot) {
       ? Number(latest && latest.arrears) || 0 : Number(member.Sisa_Hutang_Iuran) || 0;
     member.Sisa_Hutang_Kembalian = member.Sisa_Hutang_Kembalian === '' || member.Sisa_Hutang_Kembalian === null || member.Sisa_Hutang_Kembalian === undefined
       ? Number(latest && latest.refundDebt) || 0 : Number(member.Sisa_Hutang_Kembalian) || 0;
-    member.Sisa_Hutang_Sukaduka = sukadukaArrears[id] || 0;
+    member.Sisa_Hutang_Sukaduka = member.Sisa_Hutang_Sukaduka === '' || member.Sisa_Hutang_Sukaduka === null || member.Sisa_Hutang_Sukaduka === undefined
+      ? sukadukaArrears[id] || 0 : Number(member.Sisa_Hutang_Sukaduka) || 0;
     return member;
   });
 }
@@ -762,6 +770,7 @@ function upsertMasterAnggota_(member) {
     Nama: member.memberName,
     Sisa_Hutang_Iuran: Number(latest && latest.arrears) || 0,
     Sisa_Hutang_Kembalian: Number(latest && latest.refundDebt) || 0,
+    Sisa_Hutang_Sukaduka: 0,
   });
 }
 
@@ -779,7 +788,8 @@ function findMasterAnggota_(memberId) {
         ? Number(latest && latest.arrears) || 0 : Number(member.Sisa_Hutang_Iuran) || 0;
       member.Sisa_Hutang_Kembalian = member.Sisa_Hutang_Kembalian === '' || member.Sisa_Hutang_Kembalian === null || member.Sisa_Hutang_Kembalian === undefined
         ? Number(latest && latest.refundDebt) || 0 : Number(member.Sisa_Hutang_Kembalian) || 0;
-      member.Sisa_Hutang_Sukaduka = sukadukaArrearsByMember_(readRecords_('Sukaduka'))[String(memberId)] || 0;
+      member.Sisa_Hutang_Sukaduka = member.Sisa_Hutang_Sukaduka === '' || member.Sisa_Hutang_Sukaduka === null || member.Sisa_Hutang_Sukaduka === undefined
+        ? sukadukaArrearsByMember_(readRecords_('Sukaduka'))[String(memberId)] || 0 : Number(member.Sisa_Hutang_Sukaduka) || 0;
       return { sheet: sheet, rowNumber: index + 1, member: member };
     }
   }
@@ -791,18 +801,20 @@ function findMasterAnggota_(memberId) {
   throw new Error('Anggota tidak ditemukan di MASTER_ANGGOTA.');
 }
 
-function updateMasterBalance_(memberId, arrears, refundDebt) {
+function updateMasterBalance_(memberId, arrears, refundDebt, sukadukaArrears) {
   const location = findMasterAnggota_(memberId);
   const arrearsColumn = SHEETS.MASTER_ANGGOTA.indexOf('Sisa_Hutang_Iuran') + 1;
   const refundColumn = SHEETS.MASTER_ANGGOTA.indexOf('Sisa_Hutang_Kembalian') + 1;
+  const sukadukaColumn = SHEETS.MASTER_ANGGOTA.indexOf('Sisa_Hutang_Sukaduka') + 1;
   location.sheet.getRange(location.rowNumber, arrearsColumn).setValue(arrears);
   location.sheet.getRange(location.rowNumber, refundColumn).setValue(refundDebt);
+  if (Number.isFinite(sukadukaArrears)) location.sheet.getRange(location.rowNumber, sukadukaColumn).setValue(sukadukaArrears);
   return {
     ID: location.member.ID,
     Nama: location.member.Nama,
     Sisa_Hutang_Iuran: arrears,
     Sisa_Hutang_Kembalian: refundDebt,
-    Sisa_Hutang_Sukaduka: Number(location.member.Sisa_Hutang_Sukaduka) || 0,
+    Sisa_Hutang_Sukaduka: Number.isFinite(sukadukaArrears) ? sukadukaArrears : Number(location.member.Sisa_Hutang_Sukaduka) || 0,
   };
 }
 
@@ -823,23 +835,29 @@ function adjustMemberBalance_(input, user) {
   const memberId = String(input.memberId || '').trim();
   const arrears = Number(input.arrears);
   const refundDebt = Number(input.refundDebt);
+  const sukadukaArrears = Number(input.sukadukaArrears);
   const reason = String(input.reason || '').trim();
   if (!memberId) throw new Error('Pilih anggota yang akan dikoreksi.');
-  if (![arrears, refundDebt].every(Number.isFinite) || arrears < 0 || refundDebt < 0) {
-    throw new Error('Saldo tunggakan dan kembalian harus berupa angka nol atau lebih.');
-  }
+  if (Number.isFinite(arrears) && arrears < 0) throw new Error('Saldo tunggakan iuran harus berupa angka nol atau lebih.');
+  if (Number.isFinite(refundDebt) && refundDebt < 0) throw new Error('Saldo kembalian harus berupa angka nol atau lebih.');
+  if (Number.isFinite(sukadukaArrears) && sukadukaArrears < 0) throw new Error('Saldo tunggakan Sukaduka harus berupa angka nol atau lebih.');
   if (!reason) throw new Error('Alasan koreksi wajib diisi.');
 
   const location = findMasterAnggota_(memberId);
   const before = {
     arrears: Number(location.member.Sisa_Hutang_Iuran) || 0,
     refundDebt: Number(location.member.Sisa_Hutang_Kembalian) || 0,
+    sukadukaArrears: Number(location.member.Sisa_Hutang_Sukaduka) || 0,
   };
-  const member = updateMasterBalance_(memberId, arrears, refundDebt);
+  const member = updateMasterBalance_(memberId,
+    Number.isFinite(arrears) ? arrears : Number(location.member.Sisa_Hutang_Iuran) || 0,
+    Number.isFinite(refundDebt) ? refundDebt : Number(location.member.Sisa_Hutang_Kembalian) || 0,
+    Number.isFinite(sukadukaArrears) ? sukadukaArrears : Number(location.member.Sisa_Hutang_Sukaduka) || 0
+  );
   audit_(user, 'adjustBalance', 'MASTER_ANGGOTA', memberId, JSON.stringify({
     reason: reason,
     before: before,
-    after: { arrears: arrears, refundDebt: refundDebt },
+    after: { arrears: member.Sisa_Hutang_Iuran, refundDebt: member.Sisa_Hutang_Kembalian, sukadukaArrears: member.Sisa_Hutang_Sukaduka },
   }));
   return { member: member };
 }
