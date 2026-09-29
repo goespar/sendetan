@@ -8,7 +8,7 @@ const SHEETS = {
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
   Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl', 'chargeAmount', 'openingArrears'],
   Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName'],
-  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor'],
+  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor', 'memberId'],
   Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice', 'rentalRateSemeton', 'rentalRateLuar'],
   KegiatanMedia: ['id', 'title', 'description', 'mediaType', 'photoUrl', 'youtubeUrl', 'eventDate', 'visibility', 'createdBy', 'createdAt'],
   InventarisLog: ['id', 'date', 'assetId', 'assetName', 'movement', 'quantity', 'condition', 'notes', 'createdBy', 'createdAt'],
@@ -444,13 +444,24 @@ function batchCreateRecords_(module, records, user) {
   if (module !== 'Punia' && module !== 'Piodalan') throw new Error('Input basket hanya tersedia untuk Dana Punia dan Piodalan.');
   if (!Array.isArray(records) || !records.length || records.length > 500) throw new Error('Pilih 1 sampai 500 baris untuk diproses.');
   const now = new Date().toISOString();
+  const membersById = {};
+  if (module === 'Piodalan') {
+    readRecords_('Anggota').filter(function (member) { return member.status === 'Aktif'; }).forEach(function (member) { membersById[String(member.id)] = member; });
+  }
   const cleanRows = records.map(function (record, index) {
     const clean = sanitizeRecord_(module, record || {});
     clean.id = Utilities.getUuid();
     clean.createdBy = user.username;
     clean.createdAt = now;
     if (module === 'Punia') validatePuniaRecord_(clean, index + 1);
-    else validatePiodalanRecord_(clean, index + 1);
+    else {
+      if (clean.category === 'Wijilan / Setoran wajib' && clean.memberId) {
+        const member = membersById[String(clean.memberId)];
+        if (!member) throw new Error('Anggota tidak aktif atau tidak ditemukan pada baris ' + (index + 1) + '.');
+        clean.donor = member.memberName;
+      }
+      validatePiodalanRecord_(clean, index + 1);
+    }
     return clean;
   });
   const headers = SHEETS[module];

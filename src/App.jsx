@@ -195,7 +195,7 @@ function App() {
   }, [active, token, role])
 
   useEffect(() => {
-    if ((active !== 'iuran' && active !== 'sukaduka' && !(active === 'anggota' && role === 'Admin')) || isDemo || !token) return
+    if ((active !== 'iuran' && active !== 'sukaduka' && active !== 'piodalan' && !(active === 'anggota' && role === 'Admin')) || isDemo || !token) return
     request('masterAnggota', {}, token)
       .then((result) => setMasterMembers(result.members || []))
       .catch((error) => setNotice(error.message))
@@ -597,7 +597,7 @@ function App() {
           setNotice(`${savedRecords.length} pembayaran berhasil disimpan.`)
         } catch (error) { setNotice(error.message) }
       }} />}
-      {batchModal && ['punia', 'piodalan'].includes(active) && <BatchLedgerModal module={active} onClose={() => setBatchModal(false)} onSave={async (records) => {
+      {batchModal && ['punia', 'piodalan'].includes(active) && <BatchLedgerModal module={active} members={masterMembers} onClose={() => setBatchModal(false)} onSave={async (records) => {
         try {
           let savedRecords = records
           if (!isDemo) {
@@ -873,18 +873,20 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   </div>
 }
 
-function BatchLedgerModal({ module, onClose, onSave }) {
+function BatchLedgerModal({ module, members, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10)
   const isPunia = module === 'punia'
   const [records, setRecords] = useState(() => Array.from({ length: 5 }, () => blankRecord()))
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [wijilanMode, setWijilanMode] = useState(false)
+  const [wijilanEvent, setWijilanEvent] = useState('')
   const inputClass = 'w-full min-w-[110px] rounded border border-[#e1e5dc] bg-white px-2 py-2 text-xs outline-none focus:border-[#b5122a]'
 
   function blankRecord() {
     return isPunia
       ? { date: today, donor: '', donationType: 'Uang Tunai', eventName: '', itemName: '', quantity: '', amount: '', notes: '' }
-      : { date: today, eventName: '', category: 'Punia uang', donor: '', itemName: '', quantity: '', direction: 'Masuk', amount: '', description: '' }
+      : { date: today, eventName: '', category: 'Punia uang', donor: '', memberId: '', itemName: '', quantity: '', direction: 'Masuk', amount: '', description: '' }
   }
 
   function updateRow(index, field, value) {
@@ -892,6 +894,7 @@ function BatchLedgerModal({ module, onClose, onSave }) {
   }
 
   function hasData(row) {
+    if (!isPunia && row.category === 'Wijilan / Setoran wajib' && row.memberId) return Number(row.amount) > 0
     const fields = isPunia ? ['donor', 'eventName', 'itemName', 'amount', 'notes'] : ['eventName', 'donor', 'itemName', 'amount', 'description']
     return fields.some((field) => String(row[field] || '').trim())
   }
@@ -899,7 +902,29 @@ function BatchLedgerModal({ module, onClose, onSave }) {
   const readyCount = records.filter(hasData).length
   const headers = isPunia
     ? ['date', 'donor', 'donationType', 'eventName', 'itemName', 'quantity', 'amount', 'notes']
-    : ['date', 'eventName', 'category', 'donor', 'itemName', 'quantity', 'direction', 'amount', 'description']
+    : ['date', 'eventName', 'category', 'donor', 'memberId', 'itemName', 'quantity', 'direction', 'amount', 'description']
+
+  function startWijilanForAll() {
+    if (!members.length) { setMessage('Daftar anggota belum dimuat. Buka kembali menu Piodalan lalu coba lagi.'); return }
+    setWijilanMode(true)
+    setRecords(members.map((member) => ({ ...blankRecord(), eventName: wijilanEvent, category: 'Wijilan / Setoran wajib', donor: member.Nama, memberId: member.ID, direction: 'Masuk' })))
+    setMessage(`Daftar ${members.length} anggota disiapkan. Isi nominal setiap anggota yang menyetor.`)
+  }
+
+  async function exportWijilanTemplate() {
+    if (!members.length) { setMessage('Daftar anggota belum dimuat. Buka kembali menu Piodalan lalu coba lagi.'); return }
+    try {
+      const XLSX = await import('xlsx')
+      const rows = members.map((member) => ({
+        date: today, eventName: wijilanEvent, category: 'Wijilan / Setoran wajib', donor: member.Nama,
+        memberId: member.ID, itemName: '', quantity: 0, direction: 'Masuk', amount: '', description: '',
+      }))
+      const sheet = XLSX.utils.json_to_sheet(rows, { header: headers })
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Wijilan per Anggota')
+      XLSX.writeFile(workbook, 'template-wijilan-semua-anggota.xlsx')
+    } catch (error) { setMessage(error.message || 'Template Wijilan tidak dapat dibuat.') }
+  }
 
   async function exportTemplate() {
     try {
@@ -928,16 +953,23 @@ function BatchLedgerModal({ module, onClose, onSave }) {
       const XLSX = await import('xlsx')
       const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true })
       const imported = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' })
-        .map((row) => ({ ...blankRecord(), ...row, date: excelDate(row.date, XLSX) || today }))
+        .map((row) => {
+          const member = !isPunia && row.memberId ? members.find((item) => String(item.ID) === String(row.memberId)) : null
+          return { ...blankRecord(), ...row, donor: member?.Nama || row.donor || '', date: excelDate(row.date, XLSX) || today }
+        })
         .filter(hasData)
       if (!imported.length) throw new Error('File belum berisi data donor atau transaksi.')
+      if (!isPunia && imported.some((row) => row.category === 'Wijilan / Setoran wajib' && row.memberId)) {
+        setWijilanMode(true)
+        setWijilanEvent(imported.find((row) => row.eventName)?.eventName || '')
+      }
       setRecords([...imported, ...Array.from({ length: 3 }, () => blankRecord())])
       setMessage(`${imported.length} baris terbaca dari Excel.`)
     } catch (error) { setMessage(error.message || 'File Excel tidak dapat dibaca.') }
   }
 
   function prepareRecords() {
-    const filled = records.filter(hasData)
+    const filled = records.filter((row) => wijilanMode ? Number(row.amount) > 0 : hasData(row))
     if (!filled.length) throw new Error('Isi minimal satu baris transaksi.')
     return filled.map((row, index) => {
       const amount = Number(row.amount) || 0
@@ -950,12 +982,14 @@ function BatchLedgerModal({ module, onClose, onSave }) {
         } else if (amount <= 0) throw new Error(`Nominal punia wajib lebih dari nol pada baris ${index + 1}.`)
         return { ...row, donor: String(row.donor).trim(), quantity, amount }
       }
-      if (!String(row.eventName || '').trim() || !row.category || !row.direction) throw new Error(`Nama piodalan, kategori, dan arus wajib pada baris ${index + 1}.`)
+      const eventName = String(row.eventName || (wijilanMode ? wijilanEvent : '')).trim()
+      if (!eventName || !row.category || !row.direction) throw new Error(`Nama piodalan, kategori, dan arus wajib pada baris ${index + 1}.`)
       if (['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(row.category) && !String(row.donor || '').trim()) throw new Error(`Nama penyumbang wajib pada baris ${index + 1}.`)
+      if (row.category === 'Wijilan / Setoran wajib' && row.memberId && !members.some((member) => String(member.ID) === String(row.memberId))) throw new Error(`Anggota tidak ditemukan pada baris ${index + 1}.`)
       if (row.category === 'Punia barang') {
         if (row.direction !== 'Masuk' || !String(row.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) throw new Error(`Punia barang perlu nama/jumlah barang dan arus Masuk pada baris ${index + 1}.`)
       } else if (amount <= 0) throw new Error(`Nominal transaksi harus lebih dari nol pada baris ${index + 1}.`)
-      return { ...row, donor: String(row.donor || '').trim(), quantity, amount }
+      return { ...row, eventName, donor: String(row.donor || '').trim(), quantity, amount }
     })
   }
 
@@ -977,7 +1011,8 @@ function BatchLedgerModal({ module, onClose, onSave }) {
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-7xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy} aria-label="Tutup" className="rounded p-1.5"><X size={18} /></button></header>
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label><button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>{!isPunia && <><button onClick={startWijilanForAll} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Wijilan semua anggota</button><button onClick={exportWijilanTemplate} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Template Wijilan anggota</button></>}<button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
+      {wijilanMode && <div className="border-b border-[#eceee6] px-4 py-3 sm:px-6"><label className="block max-w-xl text-[11px] font-semibold">Nama piodalan<input value={wijilanEvent} onChange={(event) => setWijilanEvent(event.target.value)} placeholder="Contoh: Piodalan Pura Desa" className={`${inputClass} mt-1`} /></label><p className="mt-1 text-[10px] text-[#849084]">Satu baris disediakan untuk setiap anggota aktif. Isi nominal yang disetor; baris kosong dilewati.</p></div>}
       <div className="min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[1160px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[9px] font-bold uppercase text-[#89958a]"><tr>{(isPunia ? ['Tanggal', 'Nama pemberi', 'Jenis', 'Nama piodalan', 'Barang', 'Jumlah', 'Nominal/nilai', 'Catatan'] : ['Tanggal', 'Nama piodalan', 'Kategori', 'Nama pemberi', 'Barang', 'Jumlah', 'Arus', 'Nominal', 'Keterangan']).map((label) => <th key={label} className="px-2 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#eff0ea]">{records.map((row, index) => <tr key={index}>
         <td className="px-2 py-2">{textCell(index, 'date', '', 'date')}</td>
         {isPunia ? <>
@@ -989,9 +1024,9 @@ function BatchLedgerModal({ module, onClose, onSave }) {
           <td className="px-2 py-2">{textCell(index, 'amount', '', 'number')}</td>
           <td className="px-2 py-2">{textCell(index, 'notes', 'Catatan')}</td>
         </> : <>
-          <td className="px-2 py-2">{textCell(index, 'eventName', 'Nama piodalan')}</td>
+          <td className="px-2 py-2">{wijilanMode ? <input readOnly value={wijilanEvent} placeholder="Nama piodalan di atas" className={`${inputClass} bg-[#f5f6f1]`} /> : textCell(index, 'eventName', 'Nama piodalan')}</td>
           <td className="px-2 py-2">{selectCell(index, 'category', ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib', 'Saldo awal', 'Sesari piodalan', 'Belanja'])}</td>
-          <td className="px-2 py-2">{textCell(index, 'donor', 'Nama pemberi')}</td>
+          <td className="px-2 py-2">{wijilanMode && row.memberId ? <div className="min-w-[150px] px-2 py-1"><b>{row.donor}</b><span className="ml-2 text-[10px] text-[#929c91]">{row.memberId}</span></div> : textCell(index, 'donor', 'Nama pemberi')}</td>
           <td className="px-2 py-2">{textCell(index, 'itemName', 'Nama barang')}</td>
           <td className="px-2 py-2">{textCell(index, 'quantity', '', 'number')}</td>
           <td className="px-2 py-2">{selectCell(index, 'direction', ['Masuk', 'Keluar'])}</td>

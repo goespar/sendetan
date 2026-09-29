@@ -34,7 +34,7 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `Sesari` | `id`, `date`, `direction`, `category`, `amount`, `description`, `createdBy`, `createdAt` |
 | `Sukaduka` | `id`, `date`, `direction`, `recipient`, `purpose`, `amount`, `notes`, `createdBy`, `createdAt`, `memberId`, `memberName`, `cashPhysical`, `changeDue`, `changePaid`, `refundDebtAdded`, `refundDebt`, `arrears`, `proofPhotoUrl`, `chargeAmount`, `openingArrears` |
 | `Punia` | `id`, `date`, `donor`, `donationType`, `itemName`, `quantity`, `amount`, `notes`, `createdBy`, `createdAt`, `eventName` |
-| `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt`, `donor` |
+| `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt`, `donor`, `memberId` |
 | `Aset` | `id`, `assetName`, `category`, `quantity`, `condition`, `rentalRate`, `photoUrl`, `notes`, `createdBy`, `createdAt`, `updatedAt`, `purchasePrice`, `rentalRateSemeton`, `rentalRateLuar` |
 | `KegiatanMedia` | `id`, `title`, `description`, `mediaType`, `photoUrl`, `youtubeUrl`, `eventDate`, `visibility`, `createdBy`, `createdAt` |
 | `InventarisLog` | `id`, `date`, `assetId`, `assetName`, `movement`, `quantity`, `condition`, `notes`, `createdBy`, `createdAt` |
@@ -49,13 +49,13 @@ Baris `MASTER_ANGGOTA` menjadi saldo berjalan, sedangkan setiap setoran disimpan
 
 ### Input basket dan format Excel
 
-Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Basket menampilkan seluruh anggota dan menyimpan semua pembayaran terpilih dalam satu permintaan. Tombol **Unduh format Excel** membuat `.xlsx` dengan `memberId` dan nama anggota sudah terisi; isi nominal pada baris yang dibayar, lalu unggah berkas tersebut. Menu **Dana Punia** dan **Piodalan** juga menyediakan basket dan template Excel untuk input banyak donor/transaksi sekaligus.
+Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Basket menampilkan seluruh anggota dan menyimpan semua pembayaran terpilih dalam satu permintaan. Tombol **Unduh format Excel** membuat `.xlsx` dengan `memberId` dan nama anggota sudah terisi; isi nominal pada baris yang dibayar, lalu unggah berkas tersebut. Menu **Dana Punia** dan **Piodalan** juga menyediakan basket dan template Excel. Pada Piodalan, pilih **Wijilan semua anggota** untuk membuat satu baris per anggota aktif, atau unduh **Template Wijilan anggota** yang sudah berisi ID/nama anggota; isi nama piodalan dan nominal masing-masing penyetor, lalu unggah file.
 
 - Iuran: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `periodId` (`YYYY-MM`), `allocatedContribution`, `cashPhysical`, `changePaid`, `notes`.
 - Sukaduka: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `chargeAmount`, `amount`, `cashPhysical`, `changePaid`, `purpose`, `notes`. `chargeAmount` menambah tagihan; `amount` adalah alokasi pembayaran yang boleh digunakan untuk tunggakan lama; `cashPhysical` adalah uang yang benar-benar diterima. Untuk mencatat tagihan tanpa pembayaran, isi tagihan dan set nominal serta uang fisik ke `0`.
 - Nominal berupa angka rupiah, bukan teks dengan awalan `Rp`. Baris dengan nominal kosong atau nol dilewati. ID anggota dari template adalah acuan pencocokan; nama dapat dipakai bila ID tidak ada.
 - Maksimal 500 pembayaran per pengiriman. Server memvalidasi saldo anggota dan menulis transaksi, saldo master, serta audit secara berkelompok.
-- Punia: `date`, `donor`, `donationType`, `eventName`, `itemName`, `quantity`, `amount`, `notes`. Piodalan: `date`, `eventName`, `category`, `donor`, `itemName`, `quantity`, `direction`, `amount`, `description`. Untuk `Punia barang`, isi nama barang dan jumlah; untuk punia uang, isi donor dan nominal.
+- Punia: `date`, `donor`, `donationType`, `eventName`, `itemName`, `quantity`, `amount`, `notes`. Piodalan: `date`, `eventName`, `category`, `donor`, `memberId`, `itemName`, `quantity`, `direction`, `amount`, `description`. Untuk `Punia barang`, isi nama barang dan jumlah; untuk Wijilan per anggota, gunakan ID dari template dan isi nominal. Baris tanpa nominal tidak dicatat sebagai setoran.
 - Daftar terbaru hingga 100 entri punia uang/barang beserta nama pemberi ditampilkan pada dashboard publik.
 
 ### Akses per peran
