@@ -4,10 +4,11 @@ const SHEETS = {
   IuranPeriode: ['id', 'period', 'openedAt', 'closedAt', 'status', 'monthlyTarget', 'memberCount', 'totalBilled', 'carryArrears', 'carryRefundDebt', 'notes', 'createdBy'],
   MASTER_ANGGOTA: ['ID', 'Nama', 'Sisa_Hutang_Iuran', 'Sisa_Hutang_Kembalian'],
   TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt'],
+  PengeluaranIuran: ['id', 'date', 'category', 'description', 'amount', 'payee', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
   Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl'],
   Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName'],
-  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt'],
+  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor'],
   Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice', 'rentalRateSemeton', 'rentalRateLuar'],
   KegiatanMedia: ['id', 'title', 'description', 'mediaType', 'photoUrl', 'youtubeUrl', 'eventDate', 'visibility', 'createdBy', 'createdAt'],
   InventarisLog: ['id', 'date', 'assetId', 'assetName', 'movement', 'quantity', 'condition', 'notes', 'createdBy', 'createdAt'],
@@ -17,7 +18,7 @@ const SHEETS = {
   AuditLog: ['id', 'timestamp', 'userId', 'username', 'action', 'module', 'recordId', 'details'],
 };
 
-const FINANCE_MODULES = ['IuranPeriode', 'TRANSAKSI_IURAN', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan'];
+const FINANCE_MODULES = ['IuranPeriode', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan'];
 const SECRETARY_MODULES = ['Anggota', 'Aset', 'InventarisLog', 'SewaAset', 'Notulensi', 'KegiatanMedia'];
 const PUBLIC_ROLES = ['Publik'];
 const SESSION_TTL_SECONDS = 21600;
@@ -85,6 +86,9 @@ function doPost(e) {
     if (action === 'batchPayments') {
       assertRole_(user, 'create', body.module);
       result = batchPayments_(body.module, body.records || [], user);
+    } else if (action === 'batchCreate') {
+      assertRole_(user, 'create', body.module);
+      result = batchCreateRecords_(body.module, body.records || [], user);
     } else if (action === 'create') {
       assertRole_(user, 'create', body.module);
       result = createRecord_(body.module, body.record || {}, user);
@@ -430,6 +434,73 @@ function batchPayments_(module, records, user) {
   };
 }
 
+function batchCreateRecords_(module, records, user) {
+  if (module !== 'Punia' && module !== 'Piodalan') throw new Error('Input basket hanya tersedia untuk Dana Punia dan Piodalan.');
+  if (!Array.isArray(records) || !records.length || records.length > 500) throw new Error('Pilih 1 sampai 500 baris untuk diproses.');
+  const now = new Date().toISOString();
+  const cleanRows = records.map(function (record, index) {
+    const clean = sanitizeRecord_(module, record || {});
+    clean.id = Utilities.getUuid();
+    clean.createdBy = user.username;
+    clean.createdAt = now;
+    if (module === 'Punia') validatePuniaRecord_(clean, index + 1);
+    else validatePiodalanRecord_(clean, index + 1);
+    return clean;
+  });
+  const headers = SHEETS[module];
+  const sheet = spreadsheet_().getSheetByName(module);
+  sheet.getRange(sheet.getLastRow() + 1, 1, cleanRows.length, headers.length)
+    .setValues(cleanRows.map(function (record) { return headers.map(function (key) { return normalizeCell_(record[key]); }); }));
+  const auditSheet = spreadsheet_().getSheetByName('AuditLog');
+  auditSheet.getRange(auditSheet.getLastRow() + 1, 1, cleanRows.length, SHEETS.AuditLog.length)
+    .setValues(cleanRows.map(function (record) {
+      return [Utilities.getUuid(), now, user.id, user.username, 'batchCreate', module, record.id, record.donor || record.eventName || ''];
+    }));
+  return { records: cleanRows };
+}
+
+function validatePuniaRecord_(record, rowNumber) {
+  if (!record.date || !String(record.donor || '').trim()) throw new Error('Tanggal dan nama pemberi wajib diisi pada baris ' + rowNumber + '.');
+  if (['Uang Tunai', 'Wijilan / Setoran wajib', 'Barang'].indexOf(record.donationType) === -1) throw new Error('Jenis punia tidak valid pada baris ' + rowNumber + '.');
+  const amount = Number(record.amount);
+  const quantity = Number(record.quantity) || 0;
+  if (!Number.isFinite(amount) || amount < 0) throw new Error('Nominal/nilai punia tidak valid pada baris ' + rowNumber + '.');
+  if (record.donationType === 'Barang') {
+    if (!String(record.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) throw new Error('Nama dan jumlah barang wajib diisi pada baris ' + rowNumber + '.');
+  } else if (amount <= 0) {
+    throw new Error('Nominal punia uang harus lebih dari nol pada baris ' + rowNumber + '.');
+  }
+  record.donor = String(record.donor).trim();
+  record.quantity = quantity;
+  record.amount = amount;
+}
+
+function validatePiodalanRecord_(record, rowNumber) {
+  if (!record.date || !String(record.eventName || '').trim() || !record.category || !record.direction) {
+    throw new Error('Tanggal, nama piodalan, kategori, dan arus wajib diisi pada baris ' + rowNumber + '.');
+  }
+  if (['Saldo awal', 'Punia uang', 'Punia barang', 'Wijilan / Setoran wajib', 'Belanja', 'Sesari piodalan'].indexOf(record.category) === -1) {
+    throw new Error('Kategori piodalan tidak valid pada baris ' + rowNumber + '.');
+  }
+  if (['Masuk', 'Keluar'].indexOf(record.direction) === -1) throw new Error('Arus kas tidak valid pada baris ' + rowNumber + '.');
+  const amount = Number(record.amount) || 0;
+  const quantity = Number(record.quantity) || 0;
+  if (!Number.isFinite(amount) || amount < 0) throw new Error('Nominal piodalan tidak valid pada baris ' + rowNumber + '.');
+  if (record.category === 'Punia barang') {
+    if (record.direction !== 'Masuk' || !String(record.donor || '').trim() || !String(record.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) {
+      throw new Error('Punia barang memerlukan nama pemberi, barang, dan jumlah pada baris ' + rowNumber + '.');
+    }
+  } else if (['Punia uang', 'Wijilan / Setoran wajib'].indexOf(record.category) !== -1) {
+    if (record.direction !== 'Masuk' || !String(record.donor || '').trim() || amount <= 0) throw new Error('Punia uang memerlukan nama pemberi dan nominal masuk pada baris ' + rowNumber + '.');
+  } else if (amount <= 0) {
+    throw new Error('Nominal transaksi harus lebih dari nol pada baris ' + rowNumber + '.');
+  }
+  record.eventName = String(record.eventName).trim();
+  record.donor = String(record.donor || '').trim();
+  record.quantity = quantity;
+  record.amount = amount;
+}
+
 function approveReport_(input, user) {
   const period = String(input.period || '').trim();
   if (!period) throw new Error('Periode laporan wajib diisi.');
@@ -516,6 +587,9 @@ function createRecord_(module, record, user) {
   clean.createdBy = clean.createdBy || user.username;
   clean.createdAt = clean.createdAt || new Date().toISOString();
   if (module === 'SewaAset') validateRentalAvailability_(clean);
+  if (module === 'PengeluaranIuran') validateIuranExpense_(clean);
+  if (module === 'Punia') validatePuniaRecord_(clean, 1);
+  if (module === 'Piodalan') validatePiodalanRecord_(clean, 1);
   if (module === 'KegiatanMedia') validateActivityMedia_(clean);
   appendRecord_(module, clean);
   if (module === 'Anggota') upsertMasterAnggota_(clean);
@@ -553,6 +627,9 @@ function updateRecord_(module, record, user, internal) {
     }
   }
   if (module === 'SewaAset') validateRentalAvailability_(clean, clean.id);
+  if (module === 'PengeluaranIuran') validateIuranExpense_(clean);
+  if (module === 'Punia') validatePuniaRecord_(clean, 1);
+  if (module === 'Piodalan') validatePiodalanRecord_(clean, 1);
   if (module === 'KegiatanMedia') validateActivityMedia_(clean);
   if (headers.indexOf('updatedAt') !== -1) clean.updatedAt = new Date().toISOString();
   sheet.getRange(rowNumber, 1, 1, headers.length).setValues([headers.map(function (key) { return normalizeCell_(clean[key]); })]);
@@ -582,7 +659,7 @@ function deleteRecord_(module, id, user) {
   throw new Error('Data tidak ditemukan.');
 }
 
-function getMasterAnggota_() {
+function getMasterAnggota_(snapshot) {
   const sheet = spreadsheet_().getSheetByName('MASTER_ANGGOTA');
   if (!sheet) throw new Error('Sheet MASTER_ANGGOTA tidak ditemukan. Jalankan setupSheets().');
   const expectedHeaders = SHEETS.MASTER_ANGGOTA;
@@ -590,10 +667,10 @@ function getMasterAnggota_() {
   if (expectedHeaders.some(function (header, index) { return actualHeaders[index] !== header; })) {
     throw new Error('Header MASTER_ANGGOTA harus: ' + expectedHeaders.join(', '));
   }
-  const currentMembers = readRecords_('Anggota');
+  const currentMembers = snapshot ? snapshot.Anggota : readRecords_('Anggota');
   const currentMemberIds = {};
   currentMembers.forEach(function (member) { currentMemberIds[String(member.id)] = true; });
-  const master = readRecords_('MASTER_ANGGOTA').filter(function (member) {
+  const master = (snapshot ? snapshot.MASTER_ANGGOTA : readRecords_('MASTER_ANGGOTA')).filter(function (member) {
     return member.ID !== '' && currentMemberIds[String(member.ID)];
   });
   const byId = {};
@@ -603,7 +680,7 @@ function getMasterAnggota_() {
     if (!byId[id]) byId[id] = { ID: member.id, Nama: member.memberName, Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0 };
   });
   const latestBalances = {};
-  readRecords_('TRANSAKSI_IURAN').forEach(function (row) {
+  (snapshot ? snapshot.TRANSAKSI_IURAN : readRecords_('TRANSAKSI_IURAN')).forEach(function (row) {
     const id = String(row.memberId);
     const current = latestBalances[id];
     const timestamp = String(row.updatedAt || row.createdAt || row.date || '');
@@ -928,6 +1005,17 @@ function validateRentalAvailability_(record, excludeId) {
   record.assetName = asset.assetName;
 }
 
+function validateIuranExpense_(record) {
+  if (!record.date || !record.category || !String(record.description || '').trim()) {
+    throw new Error('Tanggal, kategori, dan uraian pengeluaran iuran wajib diisi.');
+  }
+  const amount = Number(record.amount);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Nominal pengeluaran iuran harus lebih dari nol.');
+  record.amount = amount;
+  record.description = String(record.description).trim();
+  record.payee = String(record.payee || '').trim();
+}
+
 function calculateIuran_(record) {
   const target = Math.max(0, Number(record.target) || 0);
   const cash = Math.max(0, Number(record.cashPhysical) || 0);
@@ -991,63 +1079,107 @@ function validateModule_(module) {
   }
 }
 
+function summarySnapshot_() {
+  const names = ['Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA'];
+  const snapshot = {};
+  names.forEach(function (name) { snapshot[name] = readRecords_(name); });
+  return snapshot;
+}
+
+function summaryRows_(snapshot, module) {
+  return snapshot ? snapshot[module] || [] : readRecords_(module);
+}
+
 function summary_() {
-  const sesari = readRecords_('Sesari');
-  const sukaduka = readRecords_('Sukaduka');
-  const punia = readRecords_('Punia');
-  const piodalan = readRecords_('Piodalan');
-  const rentals = readRecords_('SewaAset');
-  const iuran = readRecords_('TRANSAKSI_IURAN');
-  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(isCashPunia_).reduce(function (sum, row) { return sum + Number(row.amount || 0); }, 0) + iuran.reduce(function (sum, row) { return sum + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (sum, row) { return sum + Number(row.rentalIncome || 0); }, 0);
-  const expenses = sum_(sesari, 'Keluar') + sukadukaCashOut_(sukaduka) + sumCash_(piodalan, 'Keluar') + iuran.reduce(function (sum, row) { return sum + Number(row.changePaid || 0); }, 0) + rentals.reduce(function (sum, row) { return sum + Number(row.maintenanceCost || 0); }, 0);
-  const refundPaid = 0;
-  const arrears = getMasterAnggota_().reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
-  const analytics = analytics_();
+  const snapshot = summarySnapshot_();
+  const totals = summaryTotals_(snapshot);
+  const masterMembers = getMasterAnggota_(snapshot);
+  const arrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
+  const analytics = analytics_(snapshot);
   const currentMonth = analytics.monthly[analytics.monthly.length - 1] || { masuk: 0, keluar: 0 };
   const cards = [
-    { label: 'Saldo kas gabungan', value: income - expenses, trend: 'Akumulasi tercatat' },
+    { label: 'Saldo kas gabungan', value: totals.income - totals.expenses, trend: 'Akumulasi tercatat' },
     { label: 'Penerimaan bulan ini', value: Math.round(currentMonth.masuk * 1000000), trend: 'Seluruh modul kas' },
     { label: 'Pengeluaran bulan ini', value: Math.round(currentMonth.keluar * 1000000), trend: 'Seluruh modul kas' },
     { label: 'Tunggakan iuran', value: arrears, trend: 'Saldo kewajiban anggota' },
   ];
-  const balances = moduleBalances_();
+  const balances = moduleBalances_(snapshot, masterMembers);
+  const publicData = {
+    balance: totals.income - totals.expenses,
+    income: totals.income,
+    expenses: totals.expenses,
+    activeMembers: summaryRows_(snapshot, 'Anggota').filter(function (member) { return member.status === 'Aktif'; }).length,
+    monthly: analytics.monthly,
+    sources: analytics.sources,
+    modules: balances.modules,
+    outstanding: balances.outstanding,
+    donations: publicDonations_(snapshot),
+    generatedAt: new Date().toISOString(),
+  };
   return {
     cards: cards,
-    totals: { income: income, expenses: expenses + refundPaid, arrears: arrears, refundDebt: balances.refundDebt },
+    totals: { income: totals.income, expenses: totals.expenses, arrears: arrears, refundDebt: balances.refundDebt },
     monthly: analytics.monthly,
     sources: analytics.sources,
     modules: balances.modules,
     outstanding: { arrears: arrears, refundDebt: balances.refundDebt },
-    public: publicSummary_(),
+    public: publicData,
   };
 }
 
 function publicSummary_() {
-  const summary = summaryTotals_();
-  const analytics = analytics_();
-  const members = readRecords_('Anggota').filter(function (row) { return row.status === 'Aktif'; }).length;
-  const balances = moduleBalances_();
+  const snapshot = summarySnapshot_();
+  const totals = summaryTotals_(snapshot);
+  const analytics = analytics_(snapshot);
+  const members = summaryRows_(snapshot, 'Anggota').filter(function (row) { return row.status === 'Aktif'; }).length;
+  const masterMembers = getMasterAnggota_(snapshot);
+  const balances = moduleBalances_(snapshot, masterMembers);
   return {
-    balance: summary.income - summary.expenses,
-    income: summary.income,
-    expenses: summary.expenses,
+    balance: totals.income - totals.expenses,
+    income: totals.income,
+    expenses: totals.expenses,
     activeMembers: members,
     monthly: analytics.monthly,
     sources: analytics.sources,
     modules: balances.modules,
     outstanding: balances.outstanding,
+    donations: publicDonations_(snapshot),
     generatedAt: new Date().toISOString(),
   };
 }
 
-function moduleBalances_() {
-  const sesari = readRecords_('Sesari');
-  const sukaduka = readRecords_('Sukaduka');
-  const punia = readRecords_('Punia');
-  const piodalan = readRecords_('Piodalan');
-  const iuran = readRecords_('TRANSAKSI_IURAN');
-  const rentals = readRecords_('SewaAset');
-  const masterMembers = getMasterAnggota_();
+function publicDonations_(snapshot) {
+  const punia = summaryRows_(snapshot, 'Punia').map(function (row) {
+    return {
+      id: row.id, date: row.date, donor: row.donor, donationType: row.donationType,
+      eventName: row.eventName || '', itemName: row.itemName || '', quantity: Number(row.quantity) || 0,
+      amount: Number(row.amount) || 0, module: 'Dana Punia',
+    };
+  });
+  const eventDonations = summaryRows_(snapshot, 'Piodalan').filter(function (row) {
+    return ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].indexOf(row.category) !== -1;
+  }).map(function (row) {
+    return {
+      id: row.id, date: row.date, donor: row.donor || row.description || '',
+      donationType: row.category === 'Punia barang' ? 'Barang' : 'Uang Tunai',
+      eventName: row.eventName || '', itemName: row.itemName || '', quantity: Number(row.quantity) || 0,
+      amount: Number(row.amount) || 0, module: 'Piodalan',
+    };
+  });
+  return punia.concat(eventDonations).filter(function (row) { return row.donor; })
+    .sort(function (left, right) { return String(right.date || '').localeCompare(String(left.date || '')); })
+    .slice(0, 100);
+}
+
+function moduleBalances_(snapshot, suppliedMembers) {
+  const sesari = summaryRows_(snapshot, 'Sesari');
+  const sukaduka = summaryRows_(snapshot, 'Sukaduka');
+  const punia = summaryRows_(snapshot, 'Punia');
+  const piodalan = summaryRows_(snapshot, 'Piodalan');
+  const iuran = summaryRows_(snapshot, 'TRANSAKSI_IURAN');
+  const iuranExpenses = summaryRows_(snapshot, 'PengeluaranIuran');
+  const rentals = summaryRows_(snapshot, 'SewaAset');
+  const masterMembers = suppliedMembers || getMasterAnggota_(snapshot);
   const arrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
   const refundDebt = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Kembalian || 0); }, 0);
   function total(rows, predicate, valueField) {
@@ -1057,7 +1189,7 @@ function moduleBalances_() {
     return { incoming: incoming, outgoing: outgoing, balance: incoming - outgoing, unpaid: unpaid || 0 };
   }
   const iuranIn = total(iuran, function () { return true; }, 'cashPhysical');
-  const iuranOut = total(iuran, function () { return true; }, 'changePaid');
+  const iuranOut = total(iuran, function () { return true; }, 'changePaid') + iuranExpenses.reduce(function (sum, row) { return sum + Number(row.amount || 0); }, 0);
   const socialIn = sukadukaCashIn_(sukaduka);
   const socialOut = sukadukaCashOut_(sukaduka);
   const sesariIn = total(sesari, function (row) { return row.direction === 'Masuk'; }, 'amount');
@@ -1078,7 +1210,7 @@ function moduleBalances_() {
   return { modules: modules, outstanding: { arrears: arrears, refundDebt: refundDebt }, refundDebt: refundDebt };
 }
 
-function analytics_() {
+function analytics_(snapshot) {
   const now = new Date();
   const monthKeys = [];
   const monthLabels = {};
@@ -1101,8 +1233,8 @@ function analytics_() {
     monthly[key][direction === 'Masuk' ? 'masuk' : 'keluar'] += value / 1000000;
     if (direction === 'Masuk' && source && Object.prototype.hasOwnProperty.call(sourceTotals, source)) sourceTotals[source] += value;
   }
-  readRecords_('Sesari').forEach(function (row) { add(row.date, row.direction, row.amount, 'Sesari'); });
-  readRecords_('Sukaduka').forEach(function (row) {
+  summaryRows_(snapshot, 'Sesari').forEach(function (row) { add(row.date, row.direction, row.amount, 'Sesari'); });
+  summaryRows_(snapshot, 'Sukaduka').forEach(function (row) {
     if (row.direction === 'Masuk') {
       add(row.date, 'Masuk', Number(row.cashPhysical || row.amount || 0), '');
       add(row.date, 'Keluar', row.changePaid, '');
@@ -1110,19 +1242,20 @@ function analytics_() {
       add(row.date, row.direction, row.amount, '');
     }
   });
-  readRecords_('Piodalan').forEach(function (row) {
+  summaryRows_(snapshot, 'Piodalan').forEach(function (row) {
     if (row.category === 'Punia barang') return;
     const source = row.category === 'Punia uang' ? 'Punia' : row.category === 'Sesari piodalan' ? 'Sesari' : '';
     add(row.date, row.direction, row.amount, source);
   });
-  readRecords_('Punia').forEach(function (row) {
+  summaryRows_(snapshot, 'Punia').forEach(function (row) {
     if (isCashPunia_(row)) add(row.date, 'Masuk', row.amount, 'Punia');
   });
-  readRecords_('TRANSAKSI_IURAN').forEach(function (row) {
+  summaryRows_(snapshot, 'TRANSAKSI_IURAN').forEach(function (row) {
     add(row.date, 'Masuk', row.cashPhysical, 'Iuran');
     add(row.date, 'Keluar', row.changePaid, '');
   });
-  readRecords_('SewaAset').forEach(function (row) {
+  summaryRows_(snapshot, 'PengeluaranIuran').forEach(function (row) { add(row.date, 'Keluar', row.amount, ''); });
+  summaryRows_(snapshot, 'SewaAset').forEach(function (row) {
     add(row.date, 'Masuk', row.rentalIncome, '');
     add(row.date, 'Keluar', row.maintenanceCost, '');
   });
@@ -1134,15 +1267,16 @@ function analytics_() {
   return { monthly: monthKeys.map(function (key) { return { ...monthly[key], masuk: Number(monthly[key].masuk.toFixed(2)), keluar: Number(monthly[key].keluar.toFixed(2)) }; }), sources: sources };
 }
 
-function summaryTotals_() {
-  const sesari = readRecords_('Sesari');
-  const sukaduka = readRecords_('Sukaduka');
-  const punia = readRecords_('Punia');
-  const piodalan = readRecords_('Piodalan');
-  const rentals = readRecords_('SewaAset');
-  const iuran = readRecords_('TRANSAKSI_IURAN');
+function summaryTotals_(snapshot) {
+  const sesari = summaryRows_(snapshot, 'Sesari');
+  const sukaduka = summaryRows_(snapshot, 'Sukaduka');
+  const punia = summaryRows_(snapshot, 'Punia');
+  const piodalan = summaryRows_(snapshot, 'Piodalan');
+  const rentals = summaryRows_(snapshot, 'SewaAset');
+  const iuran = summaryRows_(snapshot, 'TRANSAKSI_IURAN');
+  const iuranExpenses = summaryRows_(snapshot, 'PengeluaranIuran');
   const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(isCashPunia_).reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + iuran.reduce(function (total, row) { return total + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.rentalIncome || 0); }, 0);
-  const expenses = sum_(sesari, 'Keluar') + sukadukaCashOut_(sukaduka) + sumCash_(piodalan, 'Keluar') + iuran.reduce(function (total, row) { return total + Number(row.changePaid || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.maintenanceCost || 0); }, 0);
+  const expenses = sum_(sesari, 'Keluar') + sukadukaCashOut_(sukaduka) + sumCash_(piodalan, 'Keluar') + iuran.reduce(function (total, row) { return total + Number(row.changePaid || 0); }, 0) + iuranExpenses.reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.maintenanceCost || 0); }, 0);
   const refundPaid = 0;
   return { income: income, expenses: expenses + refundPaid };
 }

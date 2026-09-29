@@ -30,10 +30,11 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `IuranPeriode` | `id`, `period`, `openedAt`, `closedAt`, `status`, `monthlyTarget`, `memberCount`, `totalBilled`, `carryArrears`, `carryRefundDebt`, `notes`, `createdBy` |
 | `MASTER_ANGGOTA` | `ID`, `Nama`, `Sisa_Hutang_Iuran`, `Sisa_Hutang_Kembalian` |
 | `TRANSAKSI_IURAN` | `id`, `date`, `periodId`, `memberId`, `memberName`, `target`, `allocatedContribution`, `cashPhysical`, `changeDue`, `changePaid`, `openingArrears`, `arrears`, `openingRefundDebt`, `refundDebtAdded`, `refundDebt`, `notes`, `createdBy`, `createdAt`, `updatedAt` |
+| `PengeluaranIuran` | `id`, `date`, `category`, `description`, `amount`, `payee`, `createdBy`, `createdAt`, `updatedAt` |
 | `Sesari` | `id`, `date`, `direction`, `category`, `amount`, `description`, `createdBy`, `createdAt` |
 | `Sukaduka` | `id`, `date`, `direction`, `recipient`, `purpose`, `amount`, `notes`, `createdBy`, `createdAt`, `memberId`, `memberName`, `cashPhysical`, `changeDue`, `changePaid`, `refundDebtAdded`, `refundDebt`, `arrears`, `proofPhotoUrl` |
 | `Punia` | `id`, `date`, `donor`, `donationType`, `itemName`, `quantity`, `amount`, `notes`, `createdBy`, `createdAt`, `eventName` |
-| `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt` |
+| `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt`, `donor` |
 | `Aset` | `id`, `assetName`, `category`, `quantity`, `condition`, `rentalRate`, `photoUrl`, `notes`, `createdBy`, `createdAt`, `updatedAt`, `purchasePrice`, `rentalRateSemeton`, `rentalRateLuar` |
 | `KegiatanMedia` | `id`, `title`, `description`, `mediaType`, `photoUrl`, `youtubeUrl`, `eventDate`, `visibility`, `createdBy`, `createdAt` |
 | `InventarisLog` | `id`, `date`, `assetId`, `assetName`, `movement`, `quantity`, `condition`, `notes`, `createdBy`, `createdAt` |
@@ -44,16 +45,18 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 
 Nominal disimpan sebagai angka rupiah tanpa simbol pemisah. `direction` memakai `Masuk` atau `Keluar`. `Punia.donationType` memakai `Uang Tunai`, `Wijilan / Setoran wajib`, atau `Barang`; Wijilan/setoran wajib dicatat sebagai uang masuk dan dapat diberi nama piodalan pada `eventName`. Nilai barang dicatat di `amount` dan detail unit di `quantity`, tetapi tidak menambah kas. Buku piodalan juga menyimpan `itemName` dan `quantity` untuk punia barang. Pengeluaran perawatan aset dicatat di `SewaAset.maintenanceCost`.
 
-Baris `MASTER_ANGGOTA` menjadi saldo berjalan, sedangkan setiap setoran disimpan sebagai baris baru di `TRANSAKSI_IURAN`; anggota dapat membayar beberapa kali pada periode yang sama. Setelah tutup buku membuka periode berikutnya, tagihan baru ditambahkan ke sisa hutang sehingga anggota yang sudah lunas tetap dapat membayar periode baru. Menu `Anggota` menyinkronkan profil ke master. Jalankan ulang `setupSheets()` setelah pembaruan untuk menambahkan kolom baru di akhir sheet lama dan memigrasikan ledger `IuranTransaksi` sekali saja. Penerimaan `Sukaduka` mengaitkan `memberId` dan hanya memperbarui saldo kembalian, bukan hutang iuran. Booking `SewaAset` memeriksa ketersediaan dengan rentang tanggal inklusif; tarif per item per hari dipilih dari `Aset.rentalRateSemeton` atau `Aset.rentalRateLuar` menurut jenis penyewa. Kolom `rentalRate` lama menjadi fallback untuk aset yang belum memiliki tarif baru.
+Baris `MASTER_ANGGOTA` menjadi saldo berjalan, sedangkan setiap setoran disimpan sebagai baris baru di `TRANSAKSI_IURAN`; anggota dapat membayar beberapa kali pada periode yang sama. Pengeluaran dari kas iuran dicatat terpisah pada `PengeluaranIuran` dan ikut mengurangi saldo iuran serta saldo kas gabungan. Setelah tutup buku membuka periode berikutnya, tagihan baru ditambahkan ke sisa hutang sehingga anggota yang sudah lunas tetap dapat membayar periode baru. Menu `Anggota` menyinkronkan profil ke master. Jalankan ulang `setupSheets()` setelah pembaruan untuk menambahkan kolom baru di akhir sheet lama dan memigrasikan ledger `IuranTransaksi` sekali saja. Penerimaan `Sukaduka` mengaitkan `memberId` dan hanya memperbarui saldo kembalian, bukan hutang iuran. Booking `SewaAset` memeriksa ketersediaan dengan rentang tanggal inklusif; tarif per item per hari dipilih dari `Aset.rentalRateSemeton` atau `Aset.rentalRateLuar` menurut jenis penyewa. Kolom `rentalRate` lama menjadi fallback untuk aset yang belum memiliki tarif baru.
 
 ### Input basket dan format Excel
 
-Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Basket menampilkan seluruh anggota dan menyimpan semua pembayaran terpilih dalam satu permintaan. Tombol **Unduh format Excel** membuat `.xlsx` dengan `memberId` dan nama anggota sudah terisi; isi nominal pada baris yang dibayar, lalu unggah berkas tersebut.
+Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Basket menampilkan seluruh anggota dan menyimpan semua pembayaran terpilih dalam satu permintaan. Tombol **Unduh format Excel** membuat `.xlsx` dengan `memberId` dan nama anggota sudah terisi; isi nominal pada baris yang dibayar, lalu unggah berkas tersebut. Menu **Dana Punia** dan **Piodalan** juga menyediakan basket dan template Excel untuk input banyak donor/transaksi sekaligus.
 
 - Iuran: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `periodId` (`YYYY-MM`), `allocatedContribution`, `cashPhysical`, `changePaid`, `notes`.
 - Sukaduka: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `amount`, `cashPhysical`, `changePaid`, `purpose`, `notes`.
 - Nominal berupa angka rupiah, bukan teks dengan awalan `Rp`. Baris dengan nominal kosong atau nol dilewati. ID anggota dari template adalah acuan pencocokan; nama dapat dipakai bila ID tidak ada.
 - Maksimal 500 pembayaran per pengiriman. Server memvalidasi saldo anggota dan menulis transaksi, saldo master, serta audit secara berkelompok.
+- Punia: `date`, `donor`, `donationType`, `eventName`, `itemName`, `quantity`, `amount`, `notes`. Piodalan: `date`, `eventName`, `category`, `donor`, `itemName`, `quantity`, `direction`, `amount`, `description`. Untuk `Punia barang`, isi nama barang dan jumlah; untuk punia uang, isi donor dan nominal.
+- Daftar terbaru hingga 100 entri punia uang/barang beserta nama pemberi ditampilkan pada dashboard publik.
 
 ### Akses per peran
 
@@ -137,7 +140,7 @@ Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbi
 - Jika login gagal, pastikan akun admin dibuat sekali oleh `createInitialAdmin()` dan statusnya aktif di tab `Users`.
 - Jika data anggota tidak muncul di modul saldo, jalankan `setupSheets()` lagi untuk sinkronisasi ke `MASTER_ANGGOTA`.
 
-Endpoint yang disediakan: `GET ?action=health`, `GET ?action=publicSummary`, `GET ?action=publicGallery`, `GET ?action=list&module=...&token=...`, serta POST JSON untuk `login`, `logout`, `summary`, `list`, `create`, `update`, `delete`, `batchPayments`, `closeBook`, `approveReport`, `publicGallery`, dan `uploadFile`.
+Endpoint yang disediakan: `GET ?action=health`, `GET ?action=publicSummary`, `GET ?action=publicGallery`, `GET ?action=list&module=...&token=...`, serta POST JSON untuk `login`, `logout`, `summary`, `list`, `create`, `update`, `delete`, `batchPayments`, `batchCreate`, `closeBook`, `approveReport`, `publicGallery`, dan `uploadFile`.
 
 Foto kegiatan/aset dapat dilihat oleh siapa pun yang memiliki tautan. Foto bukti Sukaduka tidak diberi izin `ANYONE_WITH_LINK`; akses mengikuti ACL Google Drive organisasi. Upload dibuat otomatis ke folder `Foto Aset`, `Foto Kegiatan`, dan `Foto Sukaduka` di bawah `DRIVE_FOLDER_ID` (atau Drive root skrip jika folder induk tidak diatur); ID subfolder tersimpan di `ASSET_PHOTO_FOLDER_ID`, `ACTIVITY_PHOTO_FOLDER_ID`, dan `SUKADUKA_PHOTO_FOLDER_ID`. Galeri publik hanya mengembalikan baris `KegiatanMedia` dengan `visibility=Publik`. Video YouTube disematkan dari ID video tanpa diunggah ulang.
 
