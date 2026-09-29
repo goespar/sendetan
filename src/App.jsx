@@ -41,8 +41,8 @@ const modules = {
   pengeluaranIuran: { title: 'Pengeluaran iuran', desc: 'Catat belanja dan pembayaran yang diambil dari kas iuran.', api: 'PengeluaranIuran', fields: [['date', 'Tanggal pengeluaran', 'date'], ['category', 'Kategori', 'select:Operasional|Kegiatan|Konsumsi|Perlengkapan|Lainnya'], ['description', 'Uraian pengeluaran', 'text'], ['payee', 'Penerima pembayaran', 'text'], ['amount', 'Nominal', 'number']], columns: [['date', 'Tanggal'], ['category', 'Kategori'], ['description', 'Uraian'], ['payee', 'Penerima'], ['amount', 'Nominal']] },
   sesari: { title: 'Sesari', desc: 'Arus dana sesari persembahyangan.', api: 'Sesari', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Sumber / kategori', 'text'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   sukaduka: { title: 'Sukaduka', desc: 'Tagihan dan pembayaran per anggota dengan saldo tunggakan otomatis.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['chargeAmount', 'Tagihan baru'], ['amount', 'Dialokasikan'], ['arrears', 'Sisa tunggakan'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
-  punia: { title: 'Dana punia', desc: 'Donasi uang, Wijilan atau setoran wajib piodalan, dan barang.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Wijilan / Setoran wajib|Barang'], ['eventName', 'Nama piodalan (opsional)', 'text'], ['itemName', 'Nama barang (jika barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['eventName', 'Piodalan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
-  piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal kas / nilai barang', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
+  punia: { title: 'Dana punia', desc: 'Donasi uang, Wijilan atau setoran wajib piodalan, dan barang.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Wijilan / Setoran wajib|Barang'], ['eventName', 'Nama piodalan (opsional)', 'text'], ['itemName', 'Nama barang (jika barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['eventName', 'Piodalan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
+  piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal kas / nilai barang', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
   sewa: { title: 'Transaksi sewa aset', desc: 'Pilih alat berdasarkan stok tersedia, jenis penyewa, dan rentang tanggal sewa.', api: 'SewaAset', fields: [], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['renter', 'Penyewa'], ['customerType', 'Jenis penyewa'], ['startDate', 'Mulai'], ['endDate', 'Selesai'], ['quantity', 'Jumlah'], ['rentalIncome', 'Pemasukan'], ['maintenanceCost', 'Perawatan'], ['status', 'Status']] },
   inventaris: { title: 'Log inventaris', desc: 'Riwayat barang masuk dan keluar dari inventaris.', api: 'InventarisLog', fields: [['date', 'Tanggal transaksi', 'date'], ['assetId', 'ID aset', 'text'], ['assetName', 'Nama barang', 'text'], ['movement', 'Pergerakan', 'select:Masuk|Keluar'], ['quantity', 'Jumlah', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['movement', 'Pergerakan'], ['quantity', 'Jumlah'], ['condition', 'Kondisi'], ['notes', 'Catatan']] },
@@ -157,7 +157,7 @@ function App() {
       const loadSummary = token ? request('summary', {}, token) : request('publicSummary')
       loadSummary.then((result) => {
         if (result.cards) setSummary(result)
-        else if (result.summary) setSummary({ monthly: result.summary.monthly, sources: result.summary.sources, modules: result.summary.modules, outstanding: result.summary.outstanding, donations: result.summary.donations || [], cards: [
+        else if (result.summary) setSummary({ monthly: result.summary.monthly, sources: result.summary.sources, modules: result.summary.modules, outstanding: result.summary.outstanding, donations: result.summary.donations || [], piodalanReport: result.summary.piodalanReport || [], cards: [
           { label: 'Saldo kas transparansi', value: result.summary.balance, trend: 'Saldo gabungan' },
           { label: 'Penerimaan tercatat', value: result.summary.income, trend: 'Semua modul kas' },
           { label: 'Pengeluaran tercatat', value: result.summary.expenses, trend: `${result.summary.activeMembers} anggota aktif` },
@@ -500,6 +500,20 @@ function App() {
     ? [...(rows.punia || []).map((row) => ({ ...row, module: 'Dana Punia' })), ...(rows.piodalan || []).filter((row) => ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(row.category)).map((row) => ({ ...row, donor: row.donor || row.description, donationType: row.category === 'Punia barang' ? 'Barang' : 'Uang Tunai', module: 'Piodalan' }))]
       .filter((row) => row.donor).sort((left, right) => String(right.date || '').localeCompare(String(left.date || ''))).slice(0, 100)
     : summary?.donations || summary?.public?.donations || []
+  const dashboardPiodalanReport = isDemo
+    ? Object.values((rows.piodalan || []).reduce((events, row) => {
+      const eventName = String(row.eventName || '').trim()
+      if (!eventName) return events
+      const event = events[eventName] || { eventName, income: 0, expenses: 0, goodsValue: 0 }
+      const amount = Number(row.amount || 0)
+      if (row.category === 'Punia barang' && row.direction === 'Masuk') event.goodsValue += amount
+      else if (row.direction === 'Masuk') event.income += amount
+      else if (row.direction === 'Keluar') event.expenses += amount
+      event.balance = event.income - event.expenses
+      events[eventName] = event
+      return events
+    }, {})).sort((left, right) => left.eventName.localeCompare(right.eventName, 'id'))
+    : summary?.piodalanReport || summary?.public?.piodalanReport || []
   const summaryCards = summary?.cards || [
     { label: 'Saldo kas gabungan', value: isDemo ? 24750000 : 0, icon: Landmark, trend: isDemo ? '+8,2%' : 'Menunggu data' },
     { label: 'Penerimaan bulan ini', value: isDemo ? 4680000 : 0, icon: ArrowDownLeft, trend: isDemo ? '32 transaksi' : 'Menunggu data' },
@@ -559,7 +573,7 @@ function App() {
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
-          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
+          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
@@ -620,7 +634,7 @@ function App() {
   )
 }
 
-function Dashboard({ role, cards, analytics, galleryItems, donations, onOpenGallery, demo }) {
+function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanReport, onOpenGallery, demo }) {
   const publicMode = role === 'Publik'
   const visibleCards = publicMode ? cards.filter((card) => !/tunggakan/i.test(card.label)) : cards
   const chartData = analytics?.monthly || (demo ? cashBars : [])
@@ -630,6 +644,12 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, onOpenGall
   const moduleEntries = Object.entries(moduleBalances).map(([key, value]) => ({ key, name: moduleLabels[key] || key, color: moduleColors[key] || '#777777', ...value }))
   const donutBalances = moduleEntries.filter((item) => Number(item.balance) > 0).map((item) => ({ name: item.name, value: Number(item.balance), color: item.color }))
   const donutTotal = donutBalances.reduce((sum, item) => sum + item.value, 0)
+  const piodalanTotals = piodalanReport.reduce((totals, item) => ({
+    income: totals.income + Number(item.income || 0),
+    expenses: totals.expenses + Number(item.expenses || 0),
+    balance: totals.balance + Number(item.balance || 0),
+    goodsValue: totals.goodsValue + Number(item.goodsValue || 0),
+  }), { income: 0, expenses: 0, balance: 0, goodsValue: 0 })
   return <div className="animate-rise" data-demo={demo}>
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[#79877b]">Om Swastyastu, <span className="font-semibold text-[#48644d]">{publicMode ? 'Semeton Sendetan' : roleNames[role]}</span></p><p className="mt-1 text-xs text-[#9aa399]">{publicMode ? 'Ringkasan transparansi dana organisasi.' : 'Berikut ringkasan posisi kas dan aktivitas organisasi.'}</p></div><div className="flex items-center gap-2 self-start rounded-md border border-[#e2e5dc] bg-white px-3 py-2 text-xs font-semibold text-[#6e7f71] sm:self-auto"><CalendarDays size={14} /> Tahun berjalan <ChevronDown size={13} /></div></div>
     <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${visibleCards.length === 3 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
@@ -638,9 +658,15 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, onOpenGall
         <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#638367]"><TrendingUp size={12} />{card.trend}<span className="font-normal text-[#9aa399]"> periode ini</span></div>
       </div> })}
     </div>
+    <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Laporan keuangan Piodalan</h2><p className="mt-1 text-[11px] text-[#929c91]">Ringkasan per acara · punia barang dicatat sebagai nilai nonkas</p></div><span className="text-[10px] text-[#849084]">{piodalanReport.length} acara</span></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama piodalan</th><th className="px-4 py-3 text-right">Pemasukan kas</th><th className="px-4 py-3 text-right">Pengeluaran</th><th className="px-4 py-3 text-right">Saldo kas</th><th className="px-4 py-3 text-right">Punia barang (nonkas)</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">
+        {piodalanReport.length ? piodalanReport.map((event) => <tr key={event.eventName}><td className="px-4 py-3 font-semibold text-[#3c5043]">{event.eventName}</td><td className="px-4 py-3 text-right">{currency(event.income)}</td><td className="px-4 py-3 text-right">{currency(event.expenses)}</td><td className="px-4 py-3 text-right font-semibold">{currency(event.balance)}</td><td className="px-4 py-3 text-right">{currency(event.goodsValue)}</td></tr>) : <tr><td colSpan="5" className="px-4 py-8 text-center text-[#849084]">Belum ada transaksi Piodalan yang tercatat.</td></tr>}
+      </tbody>{piodalanReport.length > 0 && <tfoot className="border-t border-[#e6e7dd] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3">Total</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.income)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.expenses)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.balance)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.goodsValue)}</td></tr></tfoot>}</table></div>
+    </section>
     {donations.length > 0 && <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="flex items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Punia uang dan barang</h2><p className="mt-1 text-[11px] text-[#929c91]">Nama pemberi dan sumbangan yang tercatat · terbaru 20 entri</p></div><span className="text-[10px] text-[#849084]">Publik</span></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Nama pemberi</th><th className="px-4 py-3">Bentuk</th><th className="px-4 py-3">Detail</th><th className="px-4 py-3">Piodalan</th><th className="px-4 py-3 text-right">Nilai</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{donations.slice(0, 20).map((item) => <tr key={`${item.module}-${item.id}`}><td className="whitespace-nowrap px-4 py-3 text-[#788579]">{readableDate(item.date)}</td><td className="px-4 py-3 font-semibold text-[#3c5043]">{item.donor}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? 'Barang' : item.donationType}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? `${item.itemName || '-'}${Number(item.quantity) ? ` · ${item.quantity} unit` : ''}` : item.module === 'Piodalan' ? item.category || 'Punia uang' : 'Punia uang'}</td><td className="px-4 py-3">{item.eventName || '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{item.donationType === 'Barang' && !Number(item.amount) ? '-' : currency(item.amount)}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Nama pemberi</th><th className="px-4 py-3">Bentuk</th><th className="px-4 py-3">Detail</th><th className="px-4 py-3">Piodalan</th><th className="px-4 py-3 text-right">Nilai</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{donations.slice(0, 20).map((item) => <tr key={`${item.module}-${item.id}`}><td className="whitespace-nowrap px-4 py-3 text-[#788579]">{readableDate(item.date)}</td><td className="px-4 py-3 font-semibold text-[#3c5043]">{item.donor}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? 'Barang' : item.donationType}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? `${item.itemName || '-'}${Number(item.quantity) ? ` · ${item.quantity} ${item.unit || 'unit'}` : ''}` : item.module === 'Piodalan' ? item.category || 'Punia uang' : 'Punia uang'}</td><td className="px-4 py-3">{item.eventName || '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{item.donationType === 'Barang' && !Number(item.amount) ? '-' : currency(item.amount)}</td></tr>)}</tbody></table></div>
     </section>}
     <Suspense fallback={<div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]"><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /></div>}>
       <DashboardCharts chartData={chartData} sourceData={sourceData} moduleEntries={moduleEntries} outstanding={outstanding} donutBalances={donutBalances} donutTotal={donutTotal} currency={currency} />
@@ -885,8 +911,8 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
 
   function blankRecord() {
     return isPunia
-      ? { date: today, donor: '', donationType: 'Uang Tunai', eventName: '', itemName: '', quantity: '', amount: '', notes: '' }
-      : { date: today, eventName: '', category: 'Punia uang', donor: '', memberId: '', itemName: '', quantity: '', direction: 'Masuk', amount: '', description: '' }
+      ? { date: today, donor: '', donationType: 'Uang Tunai', eventName: '', itemName: '', quantity: '', unit: '', amount: '', notes: '' }
+      : { date: today, eventName: '', category: 'Punia uang', donor: '', memberId: '', itemName: '', quantity: '', unit: '', direction: 'Masuk', amount: '', description: '' }
   }
 
   function updateRow(index, field, value) {
@@ -901,8 +927,8 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
 
   const readyCount = records.filter(hasData).length
   const headers = isPunia
-    ? ['date', 'donor', 'donationType', 'eventName', 'itemName', 'quantity', 'amount', 'notes']
-    : ['date', 'eventName', 'category', 'donor', 'memberId', 'itemName', 'quantity', 'direction', 'amount', 'description']
+    ? ['date', 'donor', 'donationType', 'eventName', 'itemName', 'quantity', 'unit', 'amount', 'notes']
+    : ['date', 'eventName', 'category', 'donor', 'memberId', 'itemName', 'quantity', 'unit', 'direction', 'amount', 'description']
 
   function startWijilanForAll() {
     if (!members.length) { setMessage('Daftar anggota belum dimuat. Buka kembali menu Piodalan lalu coba lagi.'); return }
@@ -917,7 +943,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
       const XLSX = await import('xlsx')
       const rows = members.map((member) => ({
         date: today, eventName: wijilanEvent, category: 'Wijilan / Setoran wajib', donor: member.Nama,
-        memberId: member.ID, itemName: '', quantity: 0, direction: 'Masuk', amount: '', description: '',
+        memberId: member.ID, itemName: '', quantity: 0, unit: '', direction: 'Masuk', amount: '', description: '',
       }))
       const sheet = XLSX.utils.json_to_sheet(rows, { header: headers })
       const workbook = XLSX.utils.book_new()
@@ -979,8 +1005,9 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
         if (!String(row.donor || '').trim()) throw new Error(`Nama pemberi wajib diisi pada baris ${index + 1}.`)
         if (row.donationType === 'Barang') {
           if (!String(row.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) throw new Error(`Nama dan jumlah barang wajib pada baris ${index + 1}.`)
+          return { ...row, donor: String(row.donor).trim(), quantity, unit: String(row.unit || 'unit').trim() || 'unit', amount }
         } else if (amount <= 0) throw new Error(`Nominal punia wajib lebih dari nol pada baris ${index + 1}.`)
-        return { ...row, donor: String(row.donor).trim(), quantity, amount }
+        return { ...row, donor: String(row.donor).trim(), quantity, unit: '', amount }
       }
       const eventName = String(row.eventName || (wijilanMode ? wijilanEvent : '')).trim()
       if (!eventName || !row.category || !row.direction) throw new Error(`Nama piodalan, kategori, dan arus wajib pada baris ${index + 1}.`)
@@ -988,8 +1015,9 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
       if (row.category === 'Wijilan / Setoran wajib' && row.memberId && !members.some((member) => String(member.ID) === String(row.memberId))) throw new Error(`Anggota tidak ditemukan pada baris ${index + 1}.`)
       if (row.category === 'Punia barang') {
         if (row.direction !== 'Masuk' || !String(row.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) throw new Error(`Punia barang perlu nama/jumlah barang dan arus Masuk pada baris ${index + 1}.`)
+        return { ...row, eventName, donor: String(row.donor || '').trim(), quantity, unit: String(row.unit || 'unit').trim() || 'unit', amount }
       } else if (amount <= 0) throw new Error(`Nominal transaksi harus lebih dari nol pada baris ${index + 1}.`)
-      return { ...row, eventName, donor: String(row.donor || '').trim(), quantity, amount }
+      return { ...row, eventName, donor: String(row.donor || '').trim(), quantity, unit: '', amount }
     })
   }
 
@@ -1013,7 +1041,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy} aria-label="Tutup" className="rounded p-1.5"><X size={18} /></button></header>
       <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>{!isPunia && <><button onClick={startWijilanForAll} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Wijilan semua anggota</button><button onClick={exportWijilanTemplate} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Template Wijilan anggota</button></>}<button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
       {wijilanMode && <div className="border-b border-[#eceee6] px-4 py-3 sm:px-6"><label className="block max-w-xl text-[11px] font-semibold">Nama piodalan<input value={wijilanEvent} onChange={(event) => setWijilanEvent(event.target.value)} placeholder="Contoh: Piodalan Pura Desa" className={`${inputClass} mt-1`} /></label><p className="mt-1 text-[10px] text-[#849084]">Satu baris disediakan untuk setiap anggota aktif. Isi nominal yang disetor; baris kosong dilewati.</p></div>}
-      <div className="min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[1160px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[9px] font-bold uppercase text-[#89958a]"><tr>{(isPunia ? ['Tanggal', 'Nama pemberi', 'Jenis', 'Nama piodalan', 'Barang', 'Jumlah', 'Nominal/nilai', 'Catatan'] : ['Tanggal', 'Nama piodalan', 'Kategori', 'Nama pemberi', 'Barang', 'Jumlah', 'Arus', 'Nominal', 'Keterangan']).map((label) => <th key={label} className="px-2 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#eff0ea]">{records.map((row, index) => <tr key={index}>
+      <div className="min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[1160px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[9px] font-bold uppercase text-[#89958a]"><tr>{(isPunia ? ['Tanggal', 'Nama pemberi', 'Jenis', 'Nama piodalan', 'Barang', 'Jumlah', 'Satuan', 'Nominal/nilai', 'Catatan'] : ['Tanggal', 'Nama piodalan', 'Kategori', 'Nama pemberi', 'Barang', 'Jumlah', 'Satuan', 'Arus', 'Nominal', 'Keterangan']).map((label) => <th key={label} className="px-2 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#eff0ea]">{records.map((row, index) => <tr key={index}>
         <td className="px-2 py-2">{textCell(index, 'date', '', 'date')}</td>
         {isPunia ? <>
           <td className="px-2 py-2">{textCell(index, 'donor', 'Nama pemberi')}</td>
@@ -1021,6 +1049,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
           <td className="px-2 py-2">{textCell(index, 'eventName', 'Opsional')}</td>
           <td className="px-2 py-2">{textCell(index, 'itemName', 'Nama barang')}</td>
           <td className="px-2 py-2">{textCell(index, 'quantity', '', 'number')}</td>
+          <td className="px-2 py-2">{textCell(index, 'unit', 'kg / bungkus / unit')}</td>
           <td className="px-2 py-2">{textCell(index, 'amount', '', 'number')}</td>
           <td className="px-2 py-2">{textCell(index, 'notes', 'Catatan')}</td>
         </> : <>
@@ -1029,6 +1058,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
           <td className="px-2 py-2">{wijilanMode && row.memberId ? <div className="min-w-[150px] px-2 py-1"><b>{row.donor}</b><span className="ml-2 text-[10px] text-[#929c91]">{row.memberId}</span></div> : textCell(index, 'donor', 'Nama pemberi')}</td>
           <td className="px-2 py-2">{textCell(index, 'itemName', 'Nama barang')}</td>
           <td className="px-2 py-2">{textCell(index, 'quantity', '', 'number')}</td>
+          <td className="px-2 py-2">{textCell(index, 'unit', 'kg / bungkus / unit')}</td>
           <td className="px-2 py-2">{selectCell(index, 'direction', ['Masuk', 'Keluar'])}</td>
           <td className="px-2 py-2">{textCell(index, 'amount', '', 'number')}</td>
           <td className="px-2 py-2">{textCell(index, 'description', 'Keterangan')}</td>

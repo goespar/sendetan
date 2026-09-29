@@ -7,8 +7,8 @@ const SHEETS = {
   PengeluaranIuran: ['id', 'date', 'category', 'description', 'amount', 'payee', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
   Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl', 'chargeAmount', 'openingArrears'],
-  Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName'],
-  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor', 'memberId'],
+  Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName', 'unit'],
+  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor', 'memberId', 'unit'],
   Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice', 'rentalRateSemeton', 'rentalRateLuar'],
   KegiatanMedia: ['id', 'title', 'description', 'mediaType', 'photoUrl', 'youtubeUrl', 'eventDate', 'visibility', 'createdBy', 'createdAt'],
   InventarisLog: ['id', 'date', 'assetId', 'assetName', 'movement', 'quantity', 'condition', 'notes', 'createdBy', 'createdAt'],
@@ -484,8 +484,11 @@ function validatePuniaRecord_(record, rowNumber) {
   if (!Number.isFinite(amount) || amount < 0) throw new Error('Nominal/nilai punia tidak valid pada baris ' + rowNumber + '.');
   if (record.donationType === 'Barang') {
     if (!String(record.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) throw new Error('Nama dan jumlah barang wajib diisi pada baris ' + rowNumber + '.');
+    record.unit = String(record.unit || 'unit').trim() || 'unit';
   } else if (amount <= 0) {
     throw new Error('Nominal punia uang harus lebih dari nol pada baris ' + rowNumber + '.');
+  } else {
+    record.unit = '';
   }
   record.donor = String(record.donor).trim();
   record.quantity = quantity;
@@ -507,8 +510,10 @@ function validatePiodalanRecord_(record, rowNumber) {
     if (record.direction !== 'Masuk' || !String(record.donor || '').trim() || !String(record.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) {
       throw new Error('Punia barang memerlukan nama pemberi, barang, dan jumlah pada baris ' + rowNumber + '.');
     }
+    record.unit = String(record.unit || 'unit').trim() || 'unit';
   } else if (['Punia uang', 'Wijilan / Setoran wajib'].indexOf(record.category) !== -1) {
     if (record.direction !== 'Masuk' || !String(record.donor || '').trim() || amount <= 0) throw new Error('Punia uang memerlukan nama pemberi dan nominal masuk pada baris ' + rowNumber + '.');
+    record.unit = '';
   } else if (amount <= 0) {
     throw new Error('Nominal transaksi harus lebih dari nol pada baris ' + rowNumber + '.');
   }
@@ -1146,6 +1151,7 @@ function summary_() {
     { label: 'Tunggakan iuran', value: arrears, trend: 'Saldo kewajiban anggota' },
   ];
   const balances = moduleBalances_(snapshot, masterMembers);
+  const piodalanReport = piodalanReport_(snapshot);
   const publicData = {
     balance: totals.income - totals.expenses,
     income: totals.income,
@@ -1156,6 +1162,7 @@ function summary_() {
     modules: balances.modules,
     outstanding: balances.outstanding,
     donations: publicDonations_(snapshot),
+    piodalanReport: piodalanReport,
     generatedAt: new Date().toISOString(),
   };
   return {
@@ -1165,6 +1172,7 @@ function summary_() {
     sources: analytics.sources,
     modules: balances.modules,
     outstanding: { arrears: arrears, sukadukaArrears: sukadukaArrears, refundDebt: balances.refundDebt },
+    piodalanReport: piodalanReport,
     public: publicData,
   };
 }
@@ -1176,6 +1184,7 @@ function publicSummary_() {
   const members = summaryRows_(snapshot, 'Anggota').filter(function (row) { return row.status === 'Aktif'; }).length;
   const masterMembers = getMasterAnggota_(snapshot);
   const balances = moduleBalances_(snapshot, masterMembers);
+  const piodalanReport = piodalanReport_(snapshot);
   return {
     balance: totals.income - totals.expenses,
     income: totals.income,
@@ -1186,8 +1195,32 @@ function publicSummary_() {
     modules: balances.modules,
     outstanding: balances.outstanding,
     donations: publicDonations_(snapshot),
+    piodalanReport: piodalanReport,
     generatedAt: new Date().toISOString(),
   };
+}
+
+function piodalanReport_(snapshot) {
+  const events = {};
+  summaryRows_(snapshot, 'Piodalan').forEach(function (row) {
+    const eventName = String(row.eventName || '').trim();
+    if (!eventName) return;
+    if (!events[eventName]) events[eventName] = { eventName: eventName, income: 0, expenses: 0, goodsValue: 0 };
+    const event = events[eventName];
+    const amount = Number(row.amount) || 0;
+    if (row.category === 'Punia barang') {
+      if (row.direction === 'Masuk') event.goodsValue += amount;
+    } else if (row.direction === 'Masuk') {
+      event.income += amount;
+    } else if (row.direction === 'Keluar') {
+      event.expenses += amount;
+    }
+  });
+  return Object.keys(events).map(function (eventName) {
+    const event = events[eventName];
+    event.balance = event.income - event.expenses;
+    return event;
+  }).sort(function (left, right) { return left.eventName.localeCompare(right.eventName, 'id'); });
 }
 
 function publicDonations_(snapshot) {
@@ -1195,7 +1228,7 @@ function publicDonations_(snapshot) {
     return {
       id: row.id, date: row.date, donor: row.donor, donationType: row.donationType,
       eventName: row.eventName || '', itemName: row.itemName || '', quantity: Number(row.quantity) || 0,
-      amount: Number(row.amount) || 0, module: 'Dana Punia',
+      amount: Number(row.amount) || 0, unit: row.unit || 'unit', module: 'Dana Punia',
     };
   });
   const eventDonations = summaryRows_(snapshot, 'Piodalan').filter(function (row) {
@@ -1204,7 +1237,7 @@ function publicDonations_(snapshot) {
     return {
       id: row.id, date: row.date, donor: row.donor || row.description || '',
       donationType: row.category === 'Punia barang' ? 'Barang' : 'Uang Tunai',
-      eventName: row.eventName || '', itemName: row.itemName || '', quantity: Number(row.quantity) || 0,
+      eventName: row.eventName || '', itemName: row.itemName || '', quantity: Number(row.quantity) || 0, unit: row.unit || 'unit',
       amount: Number(row.amount) || 0, module: 'Piodalan',
     };
   });
