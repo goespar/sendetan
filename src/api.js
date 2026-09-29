@@ -1,6 +1,6 @@
 const endpoint = import.meta.env.VITE_APPS_SCRIPT_URL
 
-export const isDemo = !endpoint
+export const isDemo = !endpoint?.trim()
 
 export async function request(action, payload = {}, token = '') {
   if (isDemo) return { demo: true }

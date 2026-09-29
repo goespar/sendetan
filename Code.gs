@@ -6,12 +6,12 @@ const SHEETS = {
   TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
   Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl'],
-  Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt'],
+  Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName'],
   Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt'],
-  Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice'],
+  Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice', 'rentalRateSemeton', 'rentalRateLuar'],
   KegiatanMedia: ['id', 'title', 'description', 'mediaType', 'photoUrl', 'youtubeUrl', 'eventDate', 'visibility', 'createdBy', 'createdAt'],
   InventarisLog: ['id', 'date', 'assetId', 'assetName', 'movement', 'quantity', 'condition', 'notes', 'createdBy', 'createdAt'],
-  SewaAset: ['id', 'date', 'assetId', 'assetName', 'renter', 'startDate', 'endDate', 'quantity', 'rentalIncome', 'maintenanceCost', 'status', 'notes', 'createdBy', 'createdAt'],
+  SewaAset: ['id', 'date', 'assetId', 'assetName', 'renter', 'startDate', 'endDate', 'quantity', 'rentalIncome', 'maintenanceCost', 'status', 'notes', 'createdBy', 'createdAt', 'customerType'],
   Notulensi: ['id', 'date', 'title', 'attendees', 'minutes', 'followUp', 'createdBy', 'createdAt'],
   LaporanPersetujuan: ['id', 'period', 'status', 'approvedBy', 'approvedAt', 'notes'],
   AuditLog: ['id', 'timestamp', 'userId', 'username', 'action', 'module', 'recordId', 'details'],
@@ -82,7 +82,10 @@ function doPost(e) {
 
     lock.waitLock(20000);
     let result;
-    if (action === 'create') {
+    if (action === 'batchPayments') {
+      assertRole_(user, 'create', body.module);
+      result = batchPayments_(body.module, body.records || [], user);
+    } else if (action === 'create') {
       assertRole_(user, 'create', body.module);
       result = createRecord_(body.module, body.record || {}, user);
     } else if (action === 'update') {
@@ -91,6 +94,9 @@ function doPost(e) {
     } else if (action === 'delete') {
       assertRole_(user, 'delete', body.module);
       result = deleteRecord_(body.module, body.id, user);
+    } else if (action === 'adjustMemberBalance') {
+      if (user.role !== 'Admin') throw new Error('Hanya Admin yang dapat mengoreksi saldo master anggota.');
+      result = adjustMemberBalance_(body, user);
     } else if (action === 'closeBook') {
       assertRole_(user, 'create', 'IuranPeriode');
       result = closeBook_(body, user);
@@ -282,7 +288,9 @@ function closeBook_(input, user) {
   if (!Number.isFinite(monthlyTarget) || monthlyTarget < 0) throw new Error('Target iuran tidak valid.');
   if (readRecords_('IuranPeriode').some(function (row) { return row.period === period; })) throw new Error('Periode tersebut sudah pernah dibuka.');
 
-  const members = getMasterAnggota_();
+  const activeIds = {};
+  readRecords_('Anggota').filter(function (member) { return member.status === 'Aktif'; }).forEach(function (member) { activeIds[String(member.id)] = true; });
+  const members = getMasterAnggota_().filter(function (member) { return activeIds[String(member.ID)]; });
   if (!members.length) throw new Error('Belum ada anggota aktif untuk dibebankan iuran.');
   let carryArrears = 0;
   let carryRefundDebt = 0;
@@ -301,10 +309,22 @@ function closeBook_(input, user) {
       notes: 'Tagihan dibuat saat tutup buku ' + period,
       createdBy: user.username, createdAt: now, updatedAt: now,
     };
-    updateMasterBalance_(member.ID, openingArrears + monthlyTarget, openingRefundDebt);
-    appendRecord_('TRANSAKSI_IURAN', entry);
     return entry;
   });
+  if (generated.length) {
+    const transactionSheet = spreadsheet_().getSheetByName('TRANSAKSI_IURAN');
+    transactionSheet.getRange(transactionSheet.getLastRow() + 1, 1, generated.length, SHEETS.TRANSAKSI_IURAN.length)
+      .setValues(generated.map(function (entry) { return SHEETS.TRANSAKSI_IURAN.map(function (key) { return normalizeCell_(entry[key]); }); }));
+    const masterSheet = spreadsheet_().getSheetByName('MASTER_ANGGOTA');
+    const masterValues = masterSheet.getRange(2, 1, masterSheet.getLastRow() - 1, SHEETS.MASTER_ANGGOTA.length).getValues();
+    const billedById = {};
+    generated.forEach(function (entry) { billedById[String(entry.memberId)] = entry; });
+    masterValues.forEach(function (row) {
+      const entry = billedById[String(row[0])];
+      if (entry) { row[2] = entry.arrears; row[3] = entry.refundDebt; }
+    });
+    masterSheet.getRange(2, 1, masterValues.length, SHEETS.MASTER_ANGGOTA.length).setValues(masterValues);
+  }
   const periodRecord = {
     id: Utilities.getUuid(), period: period, openedAt: now, closedAt: '', status: 'Terbuka',
     monthlyTarget: monthlyTarget, memberCount: members.length, totalBilled: monthlyTarget * members.length,
@@ -317,6 +337,97 @@ function closeBook_(input, user) {
   appendRecord_('IuranPeriode', periodRecord);
   audit_(user, 'closeBook', 'IuranPeriode', periodRecord.id, period);
   return { period: periodRecord, generated: generated.length, carriedArrears: carryArrears, carriedRefundDebt: carryRefundDebt };
+}
+
+function batchPayments_(module, records, user) {
+  if (module !== 'TRANSAKSI_IURAN' && module !== 'Sukaduka') throw new Error('Input massal hanya tersedia untuk iuran dan sukaduka.');
+  if (!Array.isArray(records) || !records.length || records.length > 500) throw new Error('Pilih 1 sampai 500 pembayaran untuk diproses.');
+  const members = getMasterAnggota_();
+  const memberById = {};
+  members.forEach(function (member) { memberById[String(member.ID)] = member; });
+  const seen = {};
+  const updates = {};
+  const now = new Date().toISOString();
+  const cleanRows = records.map(function (record) {
+    const memberId = String(record.memberId || '').trim();
+    const member = memberById[memberId];
+    if (!member) throw new Error('Anggota tidak ditemukan pada baris input massal: ' + (record.memberName || memberId || '(tanpa nama)'));
+    if (seen[memberId]) throw new Error('Anggota ' + member.Nama + ' tercantum lebih dari sekali. Gabungkan pembayarannya dalam satu baris.');
+    seen[memberId] = true;
+    if (!record.date) throw new Error('Tanggal wajib diisi untuk ' + member.Nama + '.');
+    const balance = updates[memberId] || {
+      arrears: Number(member.Sisa_Hutang_Iuran) || 0,
+      refundDebt: Number(member.Sisa_Hutang_Kembalian) || 0,
+    };
+    let entry;
+    if (module === 'TRANSAKSI_IURAN') {
+      const periodId = String(record.periodId || '').trim();
+      const allocated = Number(record.allocatedContribution);
+      const cash = Number(record.cashPhysical);
+      const changePaid = Number(record.changePaid) || 0;
+      if (!/^\d{4}-\d{2}$/.test(periodId)) throw new Error('Periode tidak valid untuk ' + member.Nama + '.');
+      if (![allocated, cash, changePaid].every(Number.isFinite) || allocated <= 0 || cash < allocated || changePaid < 0) throw new Error('Nominal iuran tidak valid untuk ' + member.Nama + '.');
+      if (allocated > balance.arrears) throw new Error('Pembayaran ' + member.Nama + ' melebihi hutang iuran ' + balance.arrears + '.');
+      const changeDue = cash - allocated;
+      if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
+      const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
+      entry = {
+        id: Utilities.getUuid(), date: record.date, periodId: periodId, memberId: member.ID, memberName: member.Nama,
+        target: balance.arrears, allocatedContribution: allocated, cashPhysical: cash, changeDue: changeDue,
+        changePaid: changePaid, openingArrears: balance.arrears, arrears: balance.arrears - allocated,
+        openingRefundDebt: balance.refundDebt, refundDebtAdded: refundDebt - balance.refundDebt,
+        refundDebt: refundDebt, notes: String(record.notes || ''), createdBy: user.username,
+        createdAt: now, updatedAt: now,
+      };
+      balance.arrears = entry.arrears;
+      balance.refundDebt = refundDebt;
+    } else {
+      const amount = Number(record.amount);
+      const cash = Number(record.cashPhysical);
+      const changePaid = Number(record.changePaid) || 0;
+      const purpose = String(record.purpose || '').trim();
+      if (!purpose || ![amount, cash, changePaid].every(Number.isFinite) || amount <= 0 || cash < amount || changePaid < 0) throw new Error('Data pembayaran sukaduka tidak valid untuk ' + member.Nama + '.');
+      const changeDue = cash - amount;
+      if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
+      const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
+      entry = {
+        id: Utilities.getUuid(), date: record.date, direction: 'Masuk', recipient: member.Nama, purpose: purpose,
+        amount: amount, notes: String(record.notes || ''), createdBy: user.username, createdAt: now,
+        memberId: member.ID, memberName: member.Nama, cashPhysical: cash, changeDue: changeDue,
+        changePaid: changePaid, refundDebtAdded: refundDebt - balance.refundDebt,
+        refundDebt: refundDebt, arrears: '', proofPhotoUrl: '',
+      };
+      balance.refundDebt = refundDebt;
+    }
+    updates[memberId] = balance;
+    return entry;
+  });
+
+  const sheet = spreadsheet_().getSheetByName(module);
+  const headers = SHEETS[module];
+  sheet.getRange(sheet.getLastRow() + 1, 1, cleanRows.length, headers.length)
+    .setValues(cleanRows.map(function (entry) { return headers.map(function (key) { return normalizeCell_(entry[key]); }); }));
+  const masterSheet = spreadsheet_().getSheetByName('MASTER_ANGGOTA');
+  const masterValues = masterSheet.getRange(2, 1, masterSheet.getLastRow() - 1, SHEETS.MASTER_ANGGOTA.length).getValues();
+  masterValues.forEach(function (row) {
+    const update = updates[String(row[0])];
+    if (!update) return;
+    row[2] = update.arrears;
+    row[3] = update.refundDebt;
+  });
+  masterSheet.getRange(2, 1, masterValues.length, SHEETS.MASTER_ANGGOTA.length).setValues(masterValues);
+  const auditSheet = spreadsheet_().getSheetByName('AuditLog');
+  const auditRows = cleanRows.map(function (entry) {
+    return [Utilities.getUuid(), now, user.id, user.username, 'batchCreate', module, entry.id, entry.memberName];
+  });
+  auditSheet.getRange(auditSheet.getLastRow() + 1, 1, auditRows.length, SHEETS.AuditLog.length).setValues(auditRows);
+  return {
+    records: cleanRows,
+    members: Object.keys(updates).map(function (id) {
+      const source = memberById[id];
+      return { ID: source.ID, Nama: source.Nama, Sisa_Hutang_Iuran: updates[id].arrears, Sisa_Hutang_Kembalian: updates[id].refundDebt };
+    }),
+  };
 }
 
 function approveReport_(input, user) {
@@ -479,16 +590,30 @@ function getMasterAnggota_() {
   if (expectedHeaders.some(function (header, index) { return actualHeaders[index] !== header; })) {
     throw new Error('Header MASTER_ANGGOTA harus: ' + expectedHeaders.join(', '));
   }
-  const master = readRecords_('MASTER_ANGGOTA').filter(function (member) { return member.ID !== ''; });
+  const currentMembers = readRecords_('Anggota');
+  const currentMemberIds = {};
+  currentMembers.forEach(function (member) { currentMemberIds[String(member.id)] = true; });
+  const master = readRecords_('MASTER_ANGGOTA').filter(function (member) {
+    return member.ID !== '' && currentMemberIds[String(member.ID)];
+  });
   const byId = {};
   master.forEach(function (member) { byId[String(member.ID)] = member; });
-  readRecords_('Anggota').forEach(function (member) {
+  currentMembers.forEach(function (member) {
     const id = String(member.id);
     if (!byId[id]) byId[id] = { ID: member.id, Nama: member.memberName, Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0 };
   });
+  const latestBalances = {};
+  readRecords_('TRANSAKSI_IURAN').forEach(function (row) {
+    const id = String(row.memberId);
+    const current = latestBalances[id];
+    const timestamp = String(row.updatedAt || row.createdAt || row.date || '');
+    if (!current || String(row.periodId) > String(current.periodId) || String(row.periodId) === String(current.periodId) && timestamp >= current.timestamp) {
+      latestBalances[id] = { periodId: row.periodId, timestamp: timestamp, arrears: row.arrears, refundDebt: row.refundDebt };
+    }
+  });
   return Object.keys(byId).map(function (id) {
     const member = byId[id];
-    const latest = latestIuranBalance_(id);
+    const latest = latestBalances[id];
     member.Nama = member.Nama || '';
     member.Sisa_Hutang_Iuran = member.Sisa_Hutang_Iuran === '' || member.Sisa_Hutang_Iuran === null || member.Sisa_Hutang_Iuran === undefined
       ? Number(latest && latest.arrears) || 0 : Number(member.Sisa_Hutang_Iuran) || 0;
@@ -565,6 +690,43 @@ function updateMasterBalance_(memberId, arrears, refundDebt) {
     Sisa_Hutang_Iuran: arrears,
     Sisa_Hutang_Kembalian: refundDebt,
   };
+}
+
+function updateMasterRefundDebt_(memberId, refundDebt) {
+  const location = findMasterAnggota_(memberId);
+  const refundColumn = SHEETS.MASTER_ANGGOTA.indexOf('Sisa_Hutang_Kembalian') + 1;
+  location.sheet.getRange(location.rowNumber, refundColumn).setValue(refundDebt);
+  return {
+    ID: location.member.ID,
+    Nama: location.member.Nama,
+    Sisa_Hutang_Iuran: Number(location.member.Sisa_Hutang_Iuran) || 0,
+    Sisa_Hutang_Kembalian: refundDebt,
+  };
+}
+
+function adjustMemberBalance_(input, user) {
+  const memberId = String(input.memberId || '').trim();
+  const arrears = Number(input.arrears);
+  const refundDebt = Number(input.refundDebt);
+  const reason = String(input.reason || '').trim();
+  if (!memberId) throw new Error('Pilih anggota yang akan dikoreksi.');
+  if (![arrears, refundDebt].every(Number.isFinite) || arrears < 0 || refundDebt < 0) {
+    throw new Error('Saldo tunggakan dan kembalian harus berupa angka nol atau lebih.');
+  }
+  if (!reason) throw new Error('Alasan koreksi wajib diisi.');
+
+  const location = findMasterAnggota_(memberId);
+  const before = {
+    arrears: Number(location.member.Sisa_Hutang_Iuran) || 0,
+    refundDebt: Number(location.member.Sisa_Hutang_Kembalian) || 0,
+  };
+  const member = updateMasterBalance_(memberId, arrears, refundDebt);
+  audit_(user, 'adjustBalance', 'MASTER_ANGGOTA', memberId, JSON.stringify({
+    reason: reason,
+    before: before,
+    after: { arrears: arrears, refundDebt: refundDebt },
+  }));
+  return { member: member };
 }
 
 function saveIuranTransaction_(mode, input, user) {
@@ -689,7 +851,7 @@ function saveSukadukaIncoming_(mode, input, user) {
     memberName: location.member.Nama, cashPhysical: cashPhysical, changeDue: changeDue,
     changePaid: changePaid, refundDebtAdded: refundDebtAdded,
     refundDebt: refundDebt,
-    arrears: Number(location.member.Sisa_Hutang_Iuran) || 0,
+    arrears: existing ? Number(existing.arrears) || 0 : '',
     notes: String(record.notes || ''), proofPhotoUrl: String(record.proofPhotoUrl || existing && existing.proofPhotoUrl || ''),
     createdBy: existing ? existing.createdBy : user.username,
     createdAt: existing ? existing.createdAt : new Date().toISOString(),
@@ -698,7 +860,7 @@ function saveSukadukaIncoming_(mode, input, user) {
   const headers = SHEETS.Sukaduka;
   const oldRefundDebt = Number(location.member.Sisa_Hutang_Kembalian) || 0;
   try {
-    const member = updateMasterBalance_(clean.memberId, clean.arrears, clean.refundDebt);
+    const member = updateMasterRefundDebt_(clean.memberId, clean.refundDebt);
     if (existing) {
       const values = sheet.getDataRange().getValues();
       const idColumn = headers.indexOf('id');
@@ -709,16 +871,15 @@ function saveSukadukaIncoming_(mode, input, user) {
       appendRecord_('Sukaduka', clean);
     }
   } catch (error) {
-    updateMasterBalance_(clean.memberId, clean.arrears, oldRefundDebt);
+    updateMasterRefundDebt_(clean.memberId, oldRefundDebt);
     throw error;
   }
   audit_(user, mode, 'Sukaduka', clean.id, clean.memberName);
-  return { record: clean, member: { ID: clean.memberId, Nama: clean.memberName, Sisa_Hutang_Iuran: clean.arrears, Sisa_Hutang_Kembalian: clean.refundDebt } };
+  return { record: clean, member: member };
 }
 
 function deleteSukadukaIncoming_(record, user) {
   const location = findMasterAnggota_(record.memberId);
-  const oldArrears = Number(location.member.Sisa_Hutang_Iuran) || 0;
   const oldRefundDebt = Number(location.member.Sisa_Hutang_Kembalian) || 0;
   const sheet = spreadsheet_().getSheetByName('Sukaduka');
   const rows = sheet.getDataRange().getValues();
@@ -726,11 +887,11 @@ function deleteSukadukaIncoming_(record, user) {
   const rowIndex = rows.findIndex(function (row, index) { return index > 0 && String(row[idColumn]) === String(record.id); });
   if (rowIndex < 1) throw new Error('Transaksi penerimaan sukaduka tidak ditemukan.');
   const updatedRefundDebt = Math.max(0, oldRefundDebt - (Number(record.refundDebtAdded) || 0));
-  const member = updateMasterBalance_(record.memberId, oldArrears, updatedRefundDebt);
+  const member = updateMasterRefundDebt_(record.memberId, updatedRefundDebt);
   try {
     sheet.deleteRow(rowIndex + 1);
   } catch (error) {
-    updateMasterBalance_(record.memberId, oldArrears, oldRefundDebt);
+    updateMasterRefundDebt_(record.memberId, oldRefundDebt);
     throw error;
   }
   audit_(user, 'delete', 'Sukaduka', record.id, record.memberName);
@@ -745,6 +906,7 @@ function validateRentalAvailability_(record, excludeId) {
     record.assetName = asset.assetName;
     return;
   }
+  record.customerType = record.customerType === 'Luar' ? 'Luar' : 'Semeton';
   if (!record.startDate || !record.endDate || String(record.endDate) < String(record.startDate)) throw new Error('Rentang tanggal sewa tidak valid.');
   const quantity = Number(record.quantity);
   if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Jumlah sewa minimal 1 item.');
@@ -759,7 +921,10 @@ function validateRentalAvailability_(record, excludeId) {
   if (quantity > available) throw new Error('Stok tidak cukup pada tanggal tersebut. Tersedia ' + available + ' item.');
 
   const days = Math.max(1, Math.floor((Date.parse(record.endDate + 'T00:00:00') - Date.parse(record.startDate + 'T00:00:00')) / 86400000) + 1);
-  record.rentalIncome = (Number(asset.rentalRate) || 0) * quantity * days;
+  const rate = record.customerType === 'Luar'
+    ? Number(asset.rentalRateLuar || asset.rentalRate) || 0
+    : Number(asset.rentalRateSemeton || asset.rentalRate) || 0;
+  record.rentalIncome = rate * quantity * days;
   record.assetName = asset.assetName;
 }
 
@@ -833,16 +998,10 @@ function summary_() {
   const piodalan = readRecords_('Piodalan');
   const rentals = readRecords_('SewaAset');
   const iuran = readRecords_('TRANSAKSI_IURAN');
-  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(function (row) { return row.donationType === 'Uang Tunai'; }).reduce(function (sum, row) { return sum + Number(row.amount || 0); }, 0) + iuran.reduce(function (sum, row) { return sum + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (sum, row) { return sum + Number(row.rentalIncome || 0); }, 0);
+  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(isCashPunia_).reduce(function (sum, row) { return sum + Number(row.amount || 0); }, 0) + iuran.reduce(function (sum, row) { return sum + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (sum, row) { return sum + Number(row.rentalIncome || 0); }, 0);
   const expenses = sum_(sesari, 'Keluar') + sukadukaCashOut_(sukaduka) + sumCash_(piodalan, 'Keluar') + iuran.reduce(function (sum, row) { return sum + Number(row.changePaid || 0); }, 0) + rentals.reduce(function (sum, row) { return sum + Number(row.maintenanceCost || 0); }, 0);
   const refundPaid = 0;
-  const latestIuran = {};
-  iuran.forEach(function (row) {
-    const key = row.memberId || row.memberName;
-    if (!latestIuran[key] || String(row.periodId) > String(latestIuran[key].periodId)) latestIuran[key] = row;
-    else if (String(row.periodId) === String(latestIuran[key].periodId) && String(row.updatedAt || row.createdAt || row.date) >= String(latestIuran[key].updatedAt || latestIuran[key].createdAt || latestIuran[key].date)) latestIuran[key] = row;
-  });
-  const arrears = Object.keys(latestIuran).reduce(function (sum, key) { return sum + Number(latestIuran[key].arrears || 0); }, 0);
+  const arrears = getMasterAnggota_().reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
   const analytics = analytics_();
   const currentMonth = analytics.monthly[analytics.monthly.length - 1] || { masuk: 0, keluar: 0 };
   const cards = [
@@ -888,13 +1047,9 @@ function moduleBalances_() {
   const piodalan = readRecords_('Piodalan');
   const iuran = readRecords_('TRANSAKSI_IURAN');
   const rentals = readRecords_('SewaAset');
-  const latestByMember = {};
-  iuran.forEach(function (row) {
-    const key = String(row.memberId || row.memberName);
-    if (!latestByMember[key] || String(row.periodId) > String(latestByMember[key].periodId) || String(row.periodId) === String(latestByMember[key].periodId) && String(row.updatedAt || row.createdAt || row.date) >= String(latestByMember[key].updatedAt || latestByMember[key].createdAt || latestByMember[key].date)) latestByMember[key] = row;
-  });
-  const arrears = Object.keys(latestByMember).reduce(function (sum, key) { return sum + Number(latestByMember[key].arrears || 0); }, 0);
-  const refundDebt = getMasterAnggota_().reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Kembalian || 0); }, 0);
+  const masterMembers = getMasterAnggota_();
+  const arrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
+  const refundDebt = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Kembalian || 0); }, 0);
   function total(rows, predicate, valueField) {
     return rows.filter(predicate).reduce(function (sum, row) { return sum + Number(row[valueField] || 0); }, 0);
   }
@@ -907,7 +1062,7 @@ function moduleBalances_() {
   const socialOut = sukadukaCashOut_(sukaduka);
   const sesariIn = total(sesari, function (row) { return row.direction === 'Masuk'; }, 'amount');
   const sesariOut = total(sesari, function (row) { return row.direction === 'Keluar'; }, 'amount');
-  const puniaIn = total(punia, function (row) { return row.donationType === 'Uang Tunai'; }, 'amount');
+  const puniaIn = total(punia, isCashPunia_, 'amount');
   const eventIn = total(piodalan, function (row) { return row.direction === 'Masuk' && row.category !== 'Punia barang'; }, 'amount');
   const eventOut = total(piodalan, function (row) { return row.direction === 'Keluar' && row.category !== 'Punia barang'; }, 'amount');
   const rentalIn = total(rentals, function (row) { return row.status !== 'Dibatalkan'; }, 'rentalIncome');
@@ -961,7 +1116,7 @@ function analytics_() {
     add(row.date, row.direction, row.amount, source);
   });
   readRecords_('Punia').forEach(function (row) {
-    if (row.donationType === 'Uang Tunai') add(row.date, 'Masuk', row.amount, 'Punia');
+    if (isCashPunia_(row)) add(row.date, 'Masuk', row.amount, 'Punia');
   });
   readRecords_('TRANSAKSI_IURAN').forEach(function (row) {
     add(row.date, 'Masuk', row.cashPhysical, 'Iuran');
@@ -986,7 +1141,7 @@ function summaryTotals_() {
   const piodalan = readRecords_('Piodalan');
   const rentals = readRecords_('SewaAset');
   const iuran = readRecords_('TRANSAKSI_IURAN');
-  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(function (row) { return row.donationType === 'Uang Tunai'; }).reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + iuran.reduce(function (total, row) { return total + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.rentalIncome || 0); }, 0);
+  const income = sum_(sesari, 'Masuk') + sukadukaCashIn_(sukaduka) + sumCash_(piodalan, 'Masuk') + punia.filter(isCashPunia_).reduce(function (total, row) { return total + Number(row.amount || 0); }, 0) + iuran.reduce(function (total, row) { return total + Number(row.cashPhysical || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.rentalIncome || 0); }, 0);
   const expenses = sum_(sesari, 'Keluar') + sukadukaCashOut_(sukaduka) + sumCash_(piodalan, 'Keluar') + iuran.reduce(function (total, row) { return total + Number(row.changePaid || 0); }, 0) + rentals.reduce(function (total, row) { return total + Number(row.maintenanceCost || 0); }, 0);
   const refundPaid = 0;
   return { income: income, expenses: expenses + refundPaid };
@@ -999,6 +1154,10 @@ function sum_(rows, direction) {
 function sumCash_(rows, direction) {
   return rows.filter(function (row) { return row.direction === direction && row.category !== 'Punia barang'; })
     .reduce(function (total, row) { return total + Number(row.amount || 0); }, 0);
+}
+
+function isCashPunia_(row) {
+  return row.donationType === 'Uang Tunai' || row.donationType === 'Wijilan / Setoran wajib';
 }
 
 function sukadukaCashIn_(rows) {

@@ -41,10 +41,10 @@ const modules = {
   iuran: { title: 'Iuran anggota', desc: 'Rekap pembayaran berulang, tunggakan per periode, dan kewajiban kembalian.', api: 'TRANSAKSI_IURAN', fields: [], columns: [['date', 'Tanggal'], ['memberName', 'Anggota'], ['periodId', 'Periode'], ['target', 'Target'], ['allocatedContribution', 'Uang untuk iuran'], ['cashPhysical', 'Uang diterima'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['arrears', 'Sisa iuran saat itu'], ['refundDebt', 'Sisa kembalian'], ['currentArrears', 'Hutang iuran kini'], ['currentRefundDebt', 'Hutang kembalian kini']] },
   sesari: { title: 'Sesari', desc: 'Arus dana sesari persembahyangan.', api: 'Sesari', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Sumber / kategori', 'text'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   sukaduka: { title: 'Sukaduka', desc: 'Penerimaan per anggota dengan pencatatan kembalian atau pengeluaran sosial.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['amount', 'Uang untuk sukaduka'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
-  punia: { title: 'Dana punia', desc: 'Donasi uang tunai dan barang inventaris.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Barang'], ['itemName', 'Nama barang (jika barang)', 'text'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['itemName', 'Barang'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
+  punia: { title: 'Dana punia', desc: 'Donasi uang, Wijilan atau setoran wajib piodalan, dan barang.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Wijilan / Setoran wajib|Barang'], ['eventName', 'Nama piodalan (opsional)', 'text'], ['itemName', 'Nama barang (jika barang)', 'text'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['eventName', 'Piodalan'], ['itemName', 'Barang'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
   piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Belanja|Sesari piodalan'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal kas / nilai barang', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
-  aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, harga beli, tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRate', 'Harga sewa / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['purchasePrice', 'Harga beli'], ['rentalRate', 'Sewa / hari'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
-  sewa: { title: 'Transaksi sewa aset', desc: 'Pilih alat berdasarkan stok tersedia dan rentang tanggal sewa.', api: 'SewaAset', fields: [], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['renter', 'Penyewa'], ['startDate', 'Mulai'], ['endDate', 'Selesai'], ['quantity', 'Jumlah'], ['rentalIncome', 'Pemasukan'], ['maintenanceCost', 'Perawatan'], ['status', 'Status']] },
+  aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
+  sewa: { title: 'Transaksi sewa aset', desc: 'Pilih alat berdasarkan stok tersedia, jenis penyewa, dan rentang tanggal sewa.', api: 'SewaAset', fields: [], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['renter', 'Penyewa'], ['customerType', 'Jenis penyewa'], ['startDate', 'Mulai'], ['endDate', 'Selesai'], ['quantity', 'Jumlah'], ['rentalIncome', 'Pemasukan'], ['maintenanceCost', 'Perawatan'], ['status', 'Status']] },
   inventaris: { title: 'Log inventaris', desc: 'Riwayat barang masuk dan keluar dari inventaris.', api: 'InventarisLog', fields: [['date', 'Tanggal transaksi', 'date'], ['assetId', 'ID aset', 'text'], ['assetName', 'Nama barang', 'text'], ['movement', 'Pergerakan', 'select:Masuk|Keluar'], ['quantity', 'Jumlah', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['movement', 'Pergerakan'], ['quantity', 'Jumlah'], ['condition', 'Kondisi'], ['notes', 'Catatan']] },
   anggota: { title: 'Manajemen anggota', desc: 'Data keanggotaan organisasi.', api: 'Anggota', fields: [['memberName', 'Nama lengkap', 'text'], ['memberNo', 'Nomor anggota', 'text'], ['phone', 'Nomor telepon', 'text'], ['address', 'Alamat', 'text'], ['status', 'Status', 'select:Aktif|Nonaktif']], columns: [['memberNo', 'Nomor'], ['memberName', 'Nama anggota'], ['phone', 'Telepon'], ['address', 'Alamat'], ['status', 'Status']] },
   notulensi: { title: 'Notulensi', desc: 'Arsip keputusan rapat dengan pesan yang dapat dibagikan ke WhatsApp.', api: 'Notulensi', fields: [['date', 'Tanggal rapat', 'date'], ['title', 'Agenda / judul', 'text'], ['attendees', 'Peserta', 'text'], ['minutes', 'Catatan dan keputusan', 'textarea'], ['followUp', 'Tindak lanjut', 'textarea']], columns: [['date', 'Tanggal'], ['title', 'Agenda'], ['attendees', 'Peserta'], ['minutes', 'Catatan'], ['followUp', 'Tindak lanjut']] },
@@ -96,6 +96,12 @@ const moduleLabels = { iuran: 'Iuran', sukaduka: 'Sukaduka', sesari: 'Sesari', p
 const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777', punia: '#2563eb', sewa: '#15803d', piodalan: '#eab308' }
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+function demoCache(key, fallback) {
+  try {
+    const cached = localStorage.getItem(`takora-demo-${key}`)
+    return cached ? { ...fallback, ...JSON.parse(cached) } : fallback
+  } catch { return fallback }
+}
 
 function App() {
   const savedSession = isDemo ? localStorage.getItem('takora-role') : localStorage.getItem('takora-token')
@@ -104,11 +110,11 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('takora-token') || '')
   const [userName, setUserName] = useState(savedSession ? (localStorage.getItem('takora-name') || 'I Made Sudarma') : 'Anggota')
   const [active, setActive] = useState('dashboard')
-  const [rows, setRows] = useState(isDemo ? initialRows : Object.fromEntries(Object.keys(initialRows).map((key) => [key, []])))
-  const [masterMembers, setMasterMembers] = useState(isDemo ? initialMasterMembers : [])
-  const [contacts, setContacts] = useState(isDemo ? initialRows.anggota : [])
-  const [rentalAssets, setRentalAssets] = useState(isDemo ? initialRows.aset : [])
-  const [rentalRows, setRentalRows] = useState(isDemo ? initialRows.sewa : [])
+  const [rows, setRows] = useState(() => isDemo ? demoCache('rows', initialRows) : Object.fromEntries(Object.keys(initialRows).map((key) => [key, []])))
+  const [masterMembers, setMasterMembers] = useState(() => isDemo ? demoCache('members', initialMasterMembers) : [])
+  const [contacts, setContacts] = useState(() => isDemo ? demoCache('contacts', initialRows.anggota) : [])
+  const [rentalAssets, setRentalAssets] = useState(() => isDemo ? demoCache('assets', initialRows.aset) : [])
+  const [rentalRows, setRentalRows] = useState(() => isDemo ? demoCache('rentals', initialRows.sewa) : [])
   const [publicActivities, setPublicActivities] = useState(isDemo ? initialRows.kegiatan : [])
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -116,6 +122,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [modal, setModal] = useState(false)
   const [balanceModal, setBalanceModal] = useState(false)
+  const [batchModal, setBatchModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -130,6 +137,15 @@ function App() {
   const writable = role === 'Admin' || (role === 'Bendahara' && ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan'].includes(active)) || (role === 'Sekretaris' && ['aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan'].includes(active))
   const page = modules[active]
   const currentRows = rows[active] || []
+
+  useEffect(() => {
+    if (!isDemo) return
+    localStorage.setItem('takora-demo-rows', JSON.stringify(rows))
+    localStorage.setItem('takora-demo-members', JSON.stringify(masterMembers))
+    localStorage.setItem('takora-demo-contacts', JSON.stringify(contacts))
+    localStorage.setItem('takora-demo-assets', JSON.stringify(rentalAssets))
+    localStorage.setItem('takora-demo-rentals', JSON.stringify(rentalRows))
+  }, [rows, masterMembers, contacts, rentalAssets, rentalRows])
 
   useEffect(() => {
     if (!allowed.includes(active)) setActive('dashboard')
@@ -281,8 +297,8 @@ function App() {
       } catch (error) { setNotice(error.message); return }
     }
     delete values.photoFile
-    if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].some((field) => field in values)) {
-      for (const key of Object.keys(values)) if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) values[key] = Number(values[key]) || 0
+    if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].some((field) => field in values)) {
+      for (const key of Object.keys(values)) if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) values[key] = Number(values[key]) || 0
     }
     const updated = editing ? { ...editing, ...values } : { id: `${active.slice(0, 2).toUpperCase()}-${Date.now()}`, ...values }
     try {
@@ -433,19 +449,41 @@ function App() {
   async function closeBook() {
     const period = window.prompt('Periode baru (contoh: 2026-10). Tunggakan yang belum dibayar otomatis dibawa ke periode ini:')
     if (!period) return
-    const monthlyTarget = Number(window.prompt('Target iuran baru per anggota (Rp). Nilai ini ditambahkan ke tunggakan sebelumnya:', '50000'))
-    if (!monthlyTarget) return
+    const targetInput = window.prompt('Target iuran baru per anggota (Rp). Nilai ini ditambahkan ke tunggakan sebelumnya:', '50000')
+    if (targetInput === null || !targetInput.trim()) return
+    const monthlyTarget = Number(targetInput)
+    if (!Number.isFinite(monthlyTarget) || monthlyTarget < 0) return
     try {
-      if (!isDemo) await request('closeBook', { period, monthlyTarget, date: new Date().toISOString().slice(0, 10) }, token)
+      if (!isDemo) {
+        await request('closeBook', { period, monthlyTarget, date: new Date().toISOString().slice(0, 10) }, token)
+        const [transactions, members, refreshedSummary] = await Promise.all([
+          request('list', { module: 'TRANSAKSI_IURAN' }, token),
+          request('masterAnggota', {}, token),
+          request('summary', {}, token),
+        ])
+        setRows((previous) => ({ ...previous, iuran: transactions.data || [] }))
+        setMasterMembers(members.members || [])
+        setSummary(refreshedSummary)
+      } else {
+        const date = new Date().toISOString().slice(0, 10)
+        setMasterMembers((previous) => previous.map((member) => ({ ...member, Sisa_Hutang_Iuran: Number(member.Sisa_Hutang_Iuran || 0) + monthlyTarget })))
+        setRows((previous) => ({ ...previous, iuran: [...(previous.iuran || []), ...masterMembers.map((member) => ({
+          id: `IU-${Date.now()}-${member.ID}`, date, periodId: period, memberId: member.ID, memberName: member.Nama,
+          target: Number(member.Sisa_Hutang_Iuran || 0) + monthlyTarget, allocatedContribution: 0, cashPhysical: 0,
+          changeDue: 0, changePaid: 0, openingArrears: Number(member.Sisa_Hutang_Iuran || 0),
+          arrears: Number(member.Sisa_Hutang_Iuran || 0) + monthlyTarget, openingRefundDebt: Number(member.Sisa_Hutang_Kembalian || 0),
+          refundDebtAdded: 0, refundDebt: Number(member.Sisa_Hutang_Kembalian || 0), notes: `Tagihan dibuat saat tutup buku ${period}`,
+        }))] }))
+      }
       setNotice(`Tutup buku periode ${period} berhasil dibuat.`)
     } catch (error) { setNotice(error.message) }
   }
 
   const summaryCards = summary?.cards || [
-    { label: 'Saldo kas gabungan', value: 24750000, icon: Landmark, trend: '+8,2%', tone: 'green' },
-    { label: 'Penerimaan bulan ini', value: 4680000, icon: ArrowDownLeft, trend: '32 transaksi', tone: 'yellow' },
-    { label: 'Pengeluaran bulan ini', value: 1920000, icon: ArrowUpRight, trend: '18 transaksi', tone: 'peach' },
-    { label: 'Tunggakan iuran', value: 850000, icon: Activity, trend: '4 anggota', tone: 'rose' },
+    { label: 'Saldo kas gabungan', value: isDemo ? 24750000 : 0, icon: Landmark, trend: isDemo ? '+8,2%' : 'Menunggu data' },
+    { label: 'Penerimaan bulan ini', value: isDemo ? 4680000 : 0, icon: ArrowDownLeft, trend: isDemo ? '32 transaksi' : 'Menunggu data' },
+    { label: 'Pengeluaran bulan ini', value: isDemo ? 1920000 : 0, icon: ArrowUpRight, trend: isDemo ? '18 transaksi' : 'Menunggu data' },
+    { label: 'Tunggakan iuran', value: isDemo ? 850000 : 0, icon: Activity, trend: isDemo ? '4 anggota' : 'Menunggu data' },
   ]
 
   return (
@@ -500,12 +538,42 @@ function App() {
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
-          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} onOpenGallery={() => setActive('kegiatan')} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
+          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
 
       {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onClose={() => { setModal(false); setEditing(null) }} onSave={saveRecord} onSaveIuran={saveIuran} onSaveSukaduka={saveSukaduka} onSaveRental={saveRental} onSaveActivity={saveActivity} />}
+      {batchModal && <BatchPaymentModal module={active === 'iuran' ? 'TRANSAKSI_IURAN' : 'Sukaduka'} members={masterMembers} onClose={() => setBatchModal(false)} onSave={async (records) => {
+        try {
+          let savedRecords = records
+          let updatedMembers = []
+          if (!isDemo) {
+            const result = await request('batchPayments', { module: active === 'iuran' ? 'TRANSAKSI_IURAN' : 'Sukaduka', records }, token)
+            savedRecords = result.records || []
+            updatedMembers = result.members || []
+          } else {
+            const balances = new Map(masterMembers.map((member) => [String(member.ID), { ...member }]))
+            savedRecords = records.map((record) => {
+              const member = balances.get(String(record.memberId))
+              const openingArrears = Number(member?.Sisa_Hutang_Iuran || 0)
+              const openingRefundDebt = Number(member?.Sisa_Hutang_Kembalian || 0)
+              const cash = Number(record.cashPhysical)
+              const amount = Number(active === 'iuran' ? record.allocatedContribution : record.amount)
+              const changeDue = Math.max(0, cash - amount)
+              const refundDebt = Math.max(0, openingRefundDebt + changeDue - Number(record.changePaid || 0))
+              if (active === 'iuran') member.Sisa_Hutang_Iuran = Math.max(0, openingArrears - amount)
+              member.Sisa_Hutang_Kembalian = refundDebt
+              return active === 'iuran' ? { ...record, id: `IU-${Date.now()}-${record.memberId}`, memberName: member.Nama, target: openingArrears, changeDue, openingArrears, arrears: openingArrears - amount, openingRefundDebt, refundDebtAdded: refundDebt - openingRefundDebt, refundDebt } : { ...record, id: `SK-${Date.now()}-${record.memberId}`, direction: 'Masuk', recipient: member.Nama, memberName: member.Nama, changeDue, refundDebtAdded: refundDebt - openingRefundDebt, refundDebt }
+            })
+            updatedMembers = [...balances.values()]
+          }
+          setRows((previous) => ({ ...previous, [active]: [...savedRecords, ...(previous[active] || [])] }))
+          if (updatedMembers.length) setMasterMembers((previous) => previous.map((member) => updatedMembers.find((updated) => String(updated.ID) === String(member.ID)) || member))
+          setBatchModal(false)
+          setNotice(`${savedRecords.length} pembayaran berhasil disimpan.`)
+        } catch (error) { setNotice(error.message) }
+      }} />}
       {balanceModal && <MasterBalanceModal members={masterMembers} onClose={() => setBalanceModal(false)} onSave={saveMasterBalance} />}
       {loginOpen && <LoginModal login={login} setLogin={setLogin} onClose={() => setLoginOpen(false)} onSubmit={signIn} demo={isDemo} />}
       {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}</div>}
@@ -513,18 +581,18 @@ function App() {
   )
 }
 
-function Dashboard({ role, cards, analytics, galleryItems, onOpenGallery }) {
+function Dashboard({ role, cards, analytics, galleryItems, onOpenGallery, demo }) {
   const publicMode = role === 'Publik'
   const visibleCards = publicMode ? cards.filter((card) => !/tunggakan/i.test(card.label)) : cards
-  const chartData = analytics?.monthly || cashBars
-  const sourceData = analytics?.sources?.length ? analytics.sources : fundSlices
+  const chartData = analytics?.monthly || (demo ? cashBars : [])
+  const sourceData = analytics?.sources?.length ? analytics.sources : demo ? fundSlices : []
   const sourceTotal = sourceData.reduce((sum, item) => sum + Number(item.value || 0), 0)
-  const moduleBalances = analytics?.modules || demoModuleBalances
-  const outstanding = analytics?.outstanding || { arrears: demoModuleBalances.iuran.unpaid, refundDebt: 20000 }
+  const moduleBalances = analytics?.modules || (demo ? demoModuleBalances : {})
+  const outstanding = analytics?.outstanding || (demo ? { arrears: demoModuleBalances.iuran.unpaid, refundDebt: 20000 } : { arrears: 0, refundDebt: 0 })
   const moduleEntries = Object.entries(moduleBalances).map(([key, value]) => ({ key, name: moduleLabels[key] || key, color: moduleColors[key] || '#777777', ...value }))
   const donutBalances = moduleEntries.filter((item) => Number(item.balance) > 0).map((item) => ({ name: item.name, value: Number(item.balance), color: item.color }))
   const donutTotal = donutBalances.reduce((sum, item) => sum + item.value, 0)
-  return <div className="animate-rise">
+  return <div className="animate-rise" data-demo={demo}>
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[#79877b]">Om Swastyastu, <span className="font-semibold text-[#48644d]">{publicMode ? 'Semeton Sendetan' : roleNames[role]}</span></p><p className="mt-1 text-xs text-[#9aa399]">{publicMode ? 'Ringkasan transparansi dana organisasi.' : 'Berikut ringkasan posisi kas dan aktivitas organisasi.'}</p></div><div className="flex items-center gap-2 self-start rounded-md border border-[#e2e5dc] bg-white px-3 py-2 text-xs font-semibold text-[#6e7f71] sm:self-auto"><CalendarDays size={14} /> Tahun berjalan <ChevronDown size={13} /></div></div>
     <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${visibleCards.length === 3 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
       {visibleCards.map((card, index) => { const Icon = card.icon || [Landmark, ArrowDownLeft, ArrowUpRight, Activity][index]; return <div key={card.label} className="animate-rise rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4" style={{ animationDelay: `${index * 55}ms` }}>
@@ -550,7 +618,7 @@ function Dashboard({ role, cards, analytics, galleryItems, onOpenGallery }) {
         <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="border-b border-[#eceee6] text-[9px] font-bold uppercase tracking-wide text-[#99a197]"><th className="py-2.5">Modul</th><th className="px-3 py-2.5 text-right">Masuk</th><th className="px-3 py-2.5 text-right">Keluar</th><th className="px-3 py-2.5 text-right">Saldo</th><th className="px-3 py-2.5 text-right">Belum dibayar</th></tr></thead><tbody className="divide-y divide-[#f0f1eb]">{moduleEntries.map((item) => <tr key={item.key}><td className="py-3 font-semibold text-[#3c5043]"><span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: item.color }} />{item.name}</td><td className="px-3 py-3 text-right text-[#555]">{currency(item.incoming)}</td><td className="px-3 py-3 text-right text-[#555]">{currency(item.outgoing)}</td><td className="px-3 py-3 text-right font-bold">{currency(item.balance)}</td><td className="px-3 py-3 text-right font-semibold text-[#b5122a]">{item.key === 'iuran' ? currency(item.unpaid) : '-'}</td></tr>)}</tbody></table></div>
       </div>
     </section>
-    <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]"><div className="flex items-center justify-between border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Aktivitas terakhir</h2><p className="mt-1 text-[11px] text-[#929c91]">Transaksi tercatat di seluruh modul</p></div><span className="rounded bg-[#eef2e9] px-2 py-1 text-[10px] font-semibold text-[#638065]">{isDemo ? 'Data simulasi' : 'Terkini'}</span></div>
+    <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]"><div className="flex items-center justify-between border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Aktivitas terakhir</h2><p className="mt-1 text-[11px] text-[#929c91]">Transaksi tercatat di seluruh modul</p></div><span className="rounded bg-[#eef2e9] px-2 py-1 text-[10px] font-semibold text-[#638065]">{demo ? 'Data simulasi' : 'Terkini'}</span></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="text-[10px] font-semibold uppercase tracking-wide text-[#97a096]"><th className="px-5 py-3">Tanggal</th><th className="px-4 py-3">Aktivitas</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-[#f0f1eb]">{[{ date: '2026-09-28', activity: 'Penerimaan sesari purnama', category: 'Sesari', amount: 350000, incoming: true }, { date: '2026-09-27', activity: 'Iuran Ni Luh Sari', category: 'Iuran', amount: 100000, incoming: true }, { date: '2026-09-25', activity: 'Kebutuhan persembahyangan', category: 'Sesari', amount: 125000, incoming: false }, { date: '2026-09-21', activity: 'Dana belasungkawa', category: 'Sukaduka', amount: 500000, incoming: false }].map((item) => <tr key={item.activity}><td className="whitespace-nowrap px-5 py-3.5 text-[#7e8a7f]">{readableDate(item.date)}</td><td className="whitespace-nowrap px-4 py-3.5 font-semibold text-[#3c5043]">{item.activity}</td><td className="px-4 py-3.5 text-[#788579]">{item.category}</td><td className="px-4 py-3.5"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${item.incoming ? 'bg-[#e9f0e5] text-[#56785a]' : 'bg-[#f8eee0] text-[#9b793b]'}`}>{item.incoming ? 'Penerimaan' : 'Pengeluaran'}</span></td><td className={`whitespace-nowrap px-5 py-3.5 text-right font-bold ${item.incoming ? 'text-[#4c7653]' : 'text-[#a67842]'}`}>{item.incoming ? '+' : '−'} {currency(item.amount)}</td></tr>)}</tbody></table></div>
     </section>
     <GalleryPreview items={galleryItems} onOpen={onOpenGallery} />
@@ -589,14 +657,17 @@ function GalleryPage({ items, writable, onAdd, onEdit, onDelete }) {
   </div>
 }
 
+/*
 function ModulePage({ active, page, rows, query, setQuery, loading, writable, canEditBalances, periodFilter, setPeriodFilter, masterMembers, contacts, assets, rentalRows, onAdd, onEdit, onDelete, onCloseBook, onEditBalance }) {
+  function ModulePage({ active, page, rows, query, setQuery, loading, writable, canEditBalances, periodFilter, setPeriodFilter, masterMembers, contacts, assets, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
   const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
-  const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (row.donationType === 'Uang Tunai' ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
+  const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
   const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
   const selectedContacts = contacts || []
   return <div className="animate-rise">
     <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div>
-      <div className="flex gap-2">{active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><BookOpenCheck size={15} /> Tutup buku</button>}{active === 'anggota' && canEditBalances && <button onClick={onEditBalance} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Koreksi saldo</button>}{writable && <button onClick={onAdd} className="flex items-center justify-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#294d33]"><Plus size={16} /> Tambah data</button>}</div>
+      <div className="flex flex-wrap gap-2">{active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><BookOpenCheck size={15} /> Tutup buku</button>}{active === 'anggota' && canEditBalances && <button onClick={onEditBalance} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Koreksi saldo</button>}{['iuran', 'sukaduka'].includes(active) && writable && <button onClick={onBatch} className="flex items-center justify-center gap-2 rounded-md border border-[#d9e1d5] bg-white px-3 py-2.5 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><FileText size={15} /> Input basket / Excel</button>}{writable && <button onClick={onAdd} className="flex items-center justify-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#294d33]"><Plus size={16} /> Tambah data</button>}</div>
+      {loading ? <tr><td colSpan={page.columns.length + 1} className="px-5 py-12 text-center text-[#89958a]">Memuat data...</td></tr> : rows.length === 0 ? <tr><td colSpan={page.columns.length + 1} className="px-5 py-14 text-center"><div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#f0f2ea] text-[#829183]"><Package size={18} /></div><p className="text-xs font-semibold text-[#647568]">Belum ada catatan</p><p className="mt-1 text-[11px] text-[#9aa399]">Data yang dicatat akan tampil di sini.</p></td></tr> : rows.map((row) => <tr key={row.id} className="hover:bg-[#fcfcf8]">{page.columns.map(([key]) => <td key={key} className="max-w-[240px] truncate whitespace-nowrap px-4 py-3.5 text-[#68776b] first:pl-5">{key === 'date' || key === 'startDate' || key === 'endDate' ? readableDate(row[key]) : key === 'available' ? Math.max(0, Number(row.quantity || 0) - (rentalRows || []).filter((rental) => String(rental.assetId) === String(row.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)) : ['photoUrl', 'proofPhotoUrl'].includes(key) && row[key] ? <a href={row[key]} target="_blank" rel="noreferrer" className="font-semibold text-[#b5122a] underline">Lihat foto</a> : key === 'currentArrears' || key === 'currentRefundDebt' ? currency(masterMembers.find((member) => String(member.ID) === String(row.memberId))?.[key === 'currentArrears' ? 'Sisa_Hutang_Iuran' : 'Sisa_Hutang_Kembalian']) : ['amount', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'rentalRate', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key) ? currency(row[key]) : row[key] || '-'}</td>)}{writable && <td className="whitespace-nowrap px-4 py-3 text-right"><button onClick={() => onEdit(row)} className="rounded p-1.5 text-[#819082] hover:bg-[#edf1e
     </div>
     {hasCashSummary && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-md border border-[#e6e7dd] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">Dana masuk · hasil filter</p><p className="mt-1 text-sm font-bold text-[#b5122a]">{currency(cashIn)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">Dana keluar · hasil filter</p><p className="mt-1 text-sm font-bold text-[#242424]">{currency(cashOut)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">Selisih bersih · hasil filter</p><p className="mt-1 text-sm font-bold text-[#171717]">{currency(cashIn - cashOut)}</p></div></div>}
     <div className="overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]">
@@ -607,6 +678,162 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
     </div>
     {active === 'aset' && <div className="mt-4 flex gap-2 rounded-md border border-[#e8e8df] bg-[#f0f2e9] p-3.5 text-[11px] leading-5 text-[#68796b]"><Camera size={15} className="mt-0.5 shrink-0 text-[#56765a]" /><p>Foto barang dikirim ke Google Drive sebagai file, lalu URL tersimpan pada inventaris. Untuk pencatatan sewa dan biaya perawatan rinci, gunakan sheet <b>SewaAset</b> dan <b>InventarisLog</b>.</p></div>}
     </div>
+}
+
+*/
+function ModulePage({ active, page, rows, query, setQuery, loading, writable, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
+  const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
+  const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
+  const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
+  return <div className="animate-rise">
+    <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
+      {active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><BookOpenCheck size={15} /> Tutup buku</button>}
+      {active === 'anggota' && canEditBalances && <button onClick={onEditBalance} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><CircleDollarSign size={15} /> Koreksi saldo</button>}
+      {['iuran', 'sukaduka'].includes(active) && writable && <button onClick={onBatch} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Input basket / Excel</button>}
+      {writable && <button onClick={onAdd} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white"><Plus size={16} /> Tambah data</button>}
+    </div></div>
+    {hasCashSummary && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana masuk · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana keluar · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashOut)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Selisih bersih · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn - cashOut)}</p></div></div>}
+    <section className="overflow-hidden rounded-md border bg-white"><div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><b className="text-xs">Daftar {page.title.toLowerCase()}</b><div className="flex gap-2"><input aria-label="Cari catatan" placeholder="Cari catatan..." value={query} onChange={(event) => setQuery(event.target.value)} className="rounded-md border px-3 py-2 text-xs" />{hasCashSummary && <input aria-label="Filter periode" type="month" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} className="rounded-md border px-2 py-2 text-xs" />}</div></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[690px] text-left text-xs"><thead><tr>{page.columns.map(([key, label]) => <th key={key} className="px-4 py-3">{label}</th>)}{writable && <th className="px-4 py-3 text-right">Aksi</th>}</tr></thead><tbody>
+        {loading ? <tr><td colSpan={page.columns.length + Number(writable)} className="p-8 text-center">Memuat data...</td></tr> : rows.length === 0 ? <tr><td colSpan={page.columns.length + Number(writable)} className="p-8 text-center">Belum ada catatan</td></tr> : rows.map((row) => <tr key={row.id} className="border-t">{page.columns.map(([key]) => {
+          let value = row[key]
+          if (['date', 'startDate', 'endDate'].includes(key)) value = readableDate(value)
+          else if (key === 'available') value = Math.max(0, Number(row.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(row.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0))
+          else if (key === 'currentArrears' || key === 'currentRefundDebt') value = currency(masterMembers.find((member) => String(member.ID) === String(row.memberId))?.[key === 'currentArrears' ? 'Sisa_Hutang_Iuran' : 'Sisa_Hutang_Kembalian'])
+          else if (['amount', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) value = currency(value)
+          else if (['photoUrl', 'proofPhotoUrl'].includes(key) && value) value = <a href={value} target="_blank" rel="noreferrer" className="text-[#b5122a] underline">Lihat foto</a>
+          return <td key={key} className="max-w-[240px] truncate whitespace-nowrap px-4 py-3">{value || '-'}</td>
+        })}{writable && <td className="whitespace-nowrap px-4 py-3 text-right"><button onClick={() => onEdit(row)} aria-label="Ubah" className="p-1.5"><Pencil size={14} /></button><button onClick={() => onDelete(row.id)} aria-label="Hapus" className="p-1.5 text-[#b5122a]"><Trash2 size={14} /></button></td>}</tr>)}</tbody></table></div>
+      <div className="flex justify-between border-t px-5 py-3 text-[10px] text-[#98a096]"><span>Menampilkan {rows.length} catatan</span><span>TAKORA · Data tersimpan sesuai periode</span></div>
+    </section>
+    {active === 'aset' && <div className="mt-4 flex gap-2 rounded-md border bg-[#f0f2e9] p-3.5 text-[11px]"><Camera size={15} /><p>Isi tarif Semeton dan orang luar agar hitungan sewa sesuai jenis penyewa.</p></div>}
+  </div>
+}
+
+function BatchPaymentModal({ module, members, onClose, onSave }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const periodNow = today.slice(0, 7)
+  const isIuran = module === 'TRANSAKSI_IURAN'
+  const [date, setDate] = useState(today)
+  const [periodId, setPeriodId] = useState(periodNow)
+  const [search, setSearch] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [values, setValues] = useState(() => Object.fromEntries(members.map((member) => [String(member.ID), {
+    amount: '', cashPhysical: '', changePaid: '', purpose: '', notes: '',
+  }])))
+  const inputClass = 'w-full min-w-[96px] rounded border border-[#e1e5dc] bg-white px-2 py-2 text-xs outline-none focus:border-[#b5122a]'
+  const visibleMembers = members.filter((member) => `${member.Nama} ${member.ID}`.toLowerCase().includes(search.toLowerCase()))
+  const readyCount = members.filter((member) => Number(values[String(member.ID)]?.amount) > 0).length
+
+  function setField(memberId, field, value) {
+    setValues((previous) => ({ ...previous, [memberId]: { ...previous[memberId], [field]: value } }))
+  }
+
+  async function exportTemplate() {
+    const XLSX = await import('xlsx')
+    const headers = isIuran
+      ? ['memberId', 'memberName', 'date', 'periodId', 'allocatedContribution', 'cashPhysical', 'changePaid', 'notes']
+      : ['memberId', 'memberName', 'date', 'amount', 'cashPhysical', 'changePaid', 'purpose', 'notes']
+    const rows = members.map((member) => isIuran
+      ? { memberId: member.ID, memberName: member.Nama, date, periodId, allocatedContribution: '', cashPhysical: '', changePaid: 0, notes: '' }
+      : { memberId: member.ID, memberName: member.Nama, date, amount: '', cashPhysical: '', changePaid: 0, purpose: '', notes: '' })
+    const sheet = XLSX.utils.json_to_sheet(rows, { header: headers })
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Pembayaran')
+    XLSX.writeFile(workbook, isIuran ? 'template-pembayaran-iuran.xlsx' : 'template-pembayaran-sukaduka.xlsx')
+  }
+
+  function excelDate(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+    if (typeof value === 'number') {
+      const dateValue = XLSX.SSF.parse_date_code(value)
+      if (dateValue) return `${dateValue.y}-${String(dateValue.m).padStart(2, '0')}-${String(dateValue.d).padStart(2, '0')}`
+    }
+    const text = String(value || '').trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text
+    return text
+  }
+
+  async function importWorkbook(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const XLSX = await import('xlsx')
+      const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+      if (!rows.length) throw new Error('File Excel tidak memiliki baris pembayaran.')
+      const memberById = new Map(members.map((member) => [String(member.ID).trim(), member]))
+      const memberByName = new Map(members.map((member) => [String(member.Nama).trim().toLowerCase(), member]))
+      const imported = {}
+      rows.forEach((row, index) => {
+        const member = memberById.get(String(row.memberId || '').trim()) || memberByName.get(String(row.memberName || '').trim().toLowerCase())
+        const amount = Number(isIuran ? row.allocatedContribution : row.amount) || 0
+        if (!member || amount <= 0) return
+        const memberId = String(member.ID)
+        if (imported[memberId]) throw new Error(`Anggota ${member.Nama} muncul lebih dari sekali (baris ${index + 2}).`)
+        imported[memberId] = {
+          amount,
+          cashPhysical: Number(row.cashPhysical) || 0,
+          changePaid: Number(row.changePaid) || 0,
+          purpose: String(row.purpose || ''),
+          notes: String(row.notes || ''),
+          date: excelDate(row.date) || date,
+          periodId: String(row.periodId || periodId),
+        }
+      })
+      if (!Object.keys(imported).length) throw new Error('Tidak ada pembayaran bernominal di file. Gunakan template dan isi memberId serta nominal.')
+      setValues((previous) => ({ ...previous, ...imported }))
+      setMessage(`${Object.keys(imported).length} baris pembayaran terbaca.`)
+    } catch (error) {
+      setMessage(error.message || 'File Excel tidak dapat dibaca.')
+    }
+  }
+
+  async function submit() {
+    const selected = members.filter((member) => Number(values[String(member.ID)]?.amount) > 0)
+    if (!selected.length) { setMessage('Masukkan nominal untuk minimal satu anggota.'); return }
+    const records = selected.map((member) => {
+      const value = values[String(member.ID)]
+      const amount = Number(value.amount)
+      const cashPhysical = Number(value.cashPhysical) || 0
+      const paymentDate = value.date || date
+      if (!paymentDate || amount <= 0 || cashPhysical < amount) throw new Error(`Periksa nominal dan uang fisik untuk ${member.Nama}.`)
+      if (isIuran && amount > Number(member.Sisa_Hutang_Iuran || 0)) throw new Error(`Nominal iuran ${member.Nama} melebihi hutang saat ini.`)
+      if (!isIuran && !String(value.purpose || '').trim()) throw new Error(`Peruntukan sukaduka wajib diisi untuk ${member.Nama}.`)
+      return isIuran
+        ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
+        : { memberId: member.ID, memberName: member.Nama, date: paymentDate, amount, cashPhysical, changePaid: Number(value.changePaid) || 0, purpose: value.purpose, notes: value.notes || '' }
+    })
+    setBusy(true)
+    try { await onSave(records) } catch (error) { setMessage(error.message || 'Pembayaran gagal disimpan.') } finally { setBusy(false) }
+  }
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+    <section className="flex max-h-[94vh] w-full max-w-6xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">Isi banyak anggota sekaligus, atau unggah template Excel untuk diproses dalam satu kali simpan.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e]" aria-label="Tutup"><X size={18} /></button></header>
+      <div className="flex flex-wrap items-end gap-3 border-b border-[#eceee6] p-4 sm:px-6">
+        <label className="text-[11px] font-semibold">Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>
+        {isIuran && <label className="text-[11px] font-semibold">Periode<input type="month" value={periodId} onChange={(event) => setPeriodId(event.target.value)} className={`${inputClass} mt-1`} /></label>}
+        <label className="min-w-[180px] flex-1 text-[11px] font-semibold">Cari anggota<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nama atau ID" className={`${inputClass} mt-1`} /></label>
+        <button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]"><FileText size={15} /> Unduh format Excel</button>
+        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>
+        {isIuran && <button onClick={() => setValues((previous) => Object.fromEntries(members.map((member) => [String(member.ID), { ...previous[String(member.ID)], amount: Number(member.Sisa_Hutang_Iuran) || '', cashPhysical: Number(member.Sisa_Hutang_Iuran) || '' }]))) } className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]">Isi sesuai tunggakan</button>}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[900px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[10px] uppercase text-[#89958a]"><tr><th className="px-4 py-3">Anggota</th><th className="px-3 py-3">Hutang {isIuran ? 'iuran' : 'kembalian'}</th><th className="px-3 py-3">{isIuran ? 'Dialokasikan ke iuran' : 'Nominal sukaduka'}</th><th className="px-3 py-3">Uang fisik</th><th className="px-3 py-3">Kembalian diberikan</th>{!isIuran && <th className="px-3 py-3">Peruntukan</th>}<th className="px-3 py-3">Catatan</th></tr></thead>
+          <tbody className="divide-y divide-[#eff0ea]">{visibleMembers.map((member) => {
+            const key = String(member.ID)
+            const value = values[key] || {}
+            return <tr key={key}><td className="px-4 py-2.5"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td><td className="px-3 py-2.5">{currency(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Kembalian)}</td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.amount || ''} onChange={(event) => setField(key, 'amount', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.cashPhysical || ''} onChange={(event) => setField(key, 'cashPhysical', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.changePaid || ''} onChange={(event) => setField(key, 'changePaid', event.target.value)} className={inputClass} /></td>{!isIuran && <td className="px-3 py-2.5"><input value={value.purpose || ''} onChange={(event) => setField(key, 'purpose', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input value={value.notes || ''} onChange={(event) => setField(key, 'notes', event.target.value)} className={inputClass} /></td></tr>
+          })}</tbody>
+        </table>
+      </div>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{readyCount} anggota akan dicatat{message && <p role="status" className="mt-1 font-semibold text-[#b5122a]">{message}</p>}</div><div className="flex gap-2"><button onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : `Simpan ${readyCount} pembayaran`}</button></div></footer>
+    </section>
+  </div>
 }
 
 function RecordModal({ page, editing, members, contacts, assets, rentalRows, onClose, onSave, onSaveIuran, onSaveSukaduka, onSaveRental, onSaveActivity }) {
@@ -700,6 +927,7 @@ function RentalModal({ assets, rentalRows, editing, onClose, onSave }) {
   const [form, setForm] = useState({
     date: editing?.date || today, assetId: editing?.assetId || '', renter: editing?.renter || '',
     startDate: editing?.startDate || today, endDate: editing?.endDate || today,
+    customerType: editing?.customerType || 'Semeton',
     quantity: Number(editing?.quantity || 1), maintenanceCost: Number(editing?.maintenanceCost || 0),
     status: editing?.status || 'Berjalan', notes: editing?.notes || '',
   })
@@ -711,26 +939,29 @@ function RentalModal({ assets, rentalRows, editing, onClose, onSave }) {
   }
   const available = availableFor(asset)
   const days = form.startDate && form.endDate ? Math.max(1, Math.floor((new Date(`${form.endDate}T00:00:00`) - new Date(`${form.startDate}T00:00:00`)) / 86400000) + 1) : 0
-  const rentalIncome = Number(asset?.rentalRate || 0) * Number(form.quantity || 0) * days
+  const rentalRate = Number(form.customerType === 'Luar' ? asset?.rentalRateLuar || asset?.rentalRate : asset?.rentalRateSemeton || asset?.rentalRate) || 0
+  const rentalIncome = rentalRate * Number(form.quantity || 0) * days
   const valid = Boolean(asset && form.renter && form.startDate && form.endDate && form.endDate >= form.startDate) && Number(form.quantity) > 0 && (form.status === 'Dibatalkan' || Number(form.quantity) <= available)
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   function setValue(key, value) { setForm((previous) => ({ ...previous, [key]: value })) }
   function submit(event) {
     event.preventDefault()
     if (!valid) return
-    onSave({ id: editing?.id, date: form.date, assetId: asset.id, assetName: asset.assetName, renter: form.renter, startDate: form.startDate, endDate: form.endDate, quantity: Number(form.quantity), rentalIncome, maintenanceCost: Number(form.maintenanceCost) || 0, status: form.status, notes: form.notes })
+    onSave({ id: editing?.id, date: form.date, assetId: asset.id, assetName: asset.assetName, renter: form.renter, customerType: form.customerType, startDate: form.startDate, endDate: form.endDate, quantity: Number(form.quantity), rentalIncome, maintenanceCost: Number(form.maintenanceCost) || 0, status: form.status, notes: form.notes })
   }
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
     <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sewa' : 'Tambah transaksi sewa'}</h2><p className="mt-1 text-xs text-[#8c978d]">Stok dihitung untuk rentang tanggal yang dipilih.</p></div><button type="button" onClick={onClose} className="rounded p-1.5" aria-label="Tutup"><X size={18} /></button></div>
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal transaksi</span><input type="date" value={form.date} onChange={(event) => setValue('date', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Status</span><select value={form.status} onChange={(event) => setValue('status', event.target.value)} className={inputClass}><option>Berjalan</option><option>Selesai</option><option>Dibatalkan</option></select></label>
-      <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Pilih alat</span><select required value={form.assetId} onChange={(event) => setValue('assetId', event.target.value)} className={inputClass}><option value="">Pilih inventaris</option>{assets.map((item) => <option key={item.id} value={item.id}>{item.assetName} · {currency(item.rentalRate)}/hari · stok {availableFor(item)}</option>)}</select></label>
-      {asset && <div className="flex items-center gap-3 rounded-md border border-[#e6e7dd] bg-white p-3 sm:col-span-2">{asset.photoUrl && <img src={asset.photoUrl} alt={asset.assetName} className="h-12 w-14 rounded object-cover" />}<div className="text-[11px] text-[#68776b]"><b>{asset.assetName}</b><div>Dimiliki {asset.quantity} · tersedia {available} · {asset.condition}</div><div>Harga beli {currency(asset.purchasePrice)} · sewa {currency(asset.rentalRate)}/item/hari</div></div></div>}
+      <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Pilih alat</span><select required value={form.assetId} onChange={(event) => setValue('assetId', event.target.value)} className={inputClass}><option value="">Pilih inventaris</option>{assets.map((item) => <option key={item.id} value={item.id}>{item.assetName} · Semeton {currency(item.rentalRateSemeton || item.rentalRate)} / luar {currency(item.rentalRateLuar || item.rentalRate)} · stok {availableFor(item)}</option>)}</select></label>
+      {asset && <div className="flex items-center gap-3 rounded-md border border-[#e6e7dd] bg-white p-3 sm:col-span-2">{asset.photoUrl && <img src={asset.photoUrl} alt={asset.assetName} className="h-12 w-14 rounded object-cover" />}<div className="text-[11px] text-[#68776b]"><b>{asset.assetName}</b><div>Dimiliki {asset.quantity} · tersedia {available} · {asset.condition}</div><div>Semeton {currency(asset.rentalRateSemeton || asset.rentalRate)} · luar {currency(asset.rentalRateLuar || asset.rentalRate)} / item / hari</div></div></div>}
+      <label><span className="mb-1.5 block text-[11px] font-semibold">Jenis penyewa</span><select value={form.customerType} onChange={(event) => setValue('customerType', event.target.value)} className={inputClass}><option value="Semeton">Semeton</option><option value="Luar">Orang luar</option></select></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal mulai</span><input type="date" value={form.startDate} onChange={(event) => setValue('startDate', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal selesai</span><input type="date" min={form.startDate} value={form.endDate} onChange={(event) => setValue('endDate', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Nama penyewa</span><input required value={form.renter} onChange={(event) => setValue('renter', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Jumlah disewa</span><input type="number" min="1" max={available} value={form.quantity} onChange={(event) => setValue('quantity', event.target.value)} className={inputClass} /></label>
+      <label><span className="mb-1.5 block text-[11px] font-semibold">Tarif {form.customerType === 'Semeton' ? 'Semeton' : 'orang luar'} / hari</span><input readOnly value={rentalRate} className={`${inputClass} bg-[#f5f6f1]`} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Total pemasukan sewa</span><input readOnly value={rentalIncome} className={`${inputClass} bg-[#f5f6f1]`} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Biaya perawatan</span><input type="number" min="0" value={form.maintenanceCost} onChange={(event) => setValue('maintenanceCost', event.target.value)} className={inputClass} /></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan</span><textarea rows="3" value={form.notes} onChange={(event) => setValue('notes', event.target.value)} className={inputClass} /></label>
