@@ -3,7 +3,7 @@ import {
   Tooltip, XAxis, YAxis,
 } from 'recharts'
 
-export default function DashboardCharts({ chartData, sourceData, moduleEntries, outstanding, donutBalances, donutTotal, currency }) {
+export default function DashboardCharts({ chartData, sourceData, moduleEntries, outstanding, donutBalances, donutTotal, currency, chartPeriodLabel }) {
   const sourceTotal = sourceData.reduce((sum, item) => sum + Number(item.value || 0), 0)
 
   return <>
@@ -11,7 +11,7 @@ export default function DashboardCharts({ chartData, sourceData, moduleEntries, 
       <section className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4 sm:p-5">
         <div className="mb-4 flex items-start justify-between">
           <div><h2 className="font-display text-sm font-extrabold">Arus kas bulanan</h2><p className="mt-1 text-[11px] text-[#929c91]">Penerimaan dan pengeluaran · dalam juta rupiah</p></div>
-          <span className="rounded border border-[#e6e7dd] px-2 py-1 text-[10px] text-[#748174]">Sesuai filter</span>
+          <span className="rounded border border-[#e6e7dd] px-2 py-1 text-[10px] text-[#748174]">{chartPeriodLabel}</span>
         </div>
         <div className="h-[250px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 8, right: 3, left: -18, bottom: 0 }} barGap={5}>
           <CartesianGrid vertical={false} stroke="#eceee6" strokeDasharray="3 4" />

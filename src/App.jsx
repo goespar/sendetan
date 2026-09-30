@@ -141,7 +141,7 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
   const [periodFilter, setPeriodFilter] = useState('')
-  const [dashboardFilter, setDashboardFilter] = useState({ year: String(new Date().getFullYear()), month: '', day: '' })
+  const [dashboardFilter, setDashboardFilter] = useState({ year: '', month: '', day: '' })
   const [busyAction, setBusyAction] = useState('')
   const operationRef = useRef(false)
   const [dashboardHidden, setDashboardHidden] = useState(localStorage.getItem('takora-dashboard-hidden') === 'true')
@@ -177,9 +177,9 @@ function App() {
         if (cancelled) return
         if (result.cards) setSummary(result)
         else if (result.summary) setSummary({ monthly: result.summary.monthly, sources: result.summary.sources, modules: result.summary.modules, outstanding: result.summary.outstanding, donations: result.summary.donations || [], activities: result.summary.activities || [], piodalanReport: result.summary.piodalanReport || [], assets: result.summary.assets || [], cards: [
-          { label: 'Selisih arus kas sesuai filter', value: result.summary.balance, trend: 'Periode terpilih' },
-          { label: 'Penerimaan sesuai filter', value: result.summary.income, trend: 'Seluruh modul kas' },
-          { label: 'Pengeluaran sesuai filter', value: result.summary.expenses, trend: `${result.summary.activeMembers} anggota aktif` },
+          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Selisih arus kas sesuai filter' : 'Saldo kas gabungan · seumur hidup', value: result.summary.balance, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Seluruh riwayat' },
+          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Penerimaan sesuai filter' : 'Penerimaan · seumur hidup', value: result.summary.income, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Seluruh riwayat' },
+          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Pengeluaran sesuai filter' : 'Pengeluaran · seumur hidup', value: result.summary.expenses, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Seluruh riwayat' },
         ] })
       }).catch((error) => { if (!cancelled) setNotice(error.message) })
       return () => { cancelled = true }
@@ -616,6 +616,11 @@ function App() {
     ;(rows.piodalan || []).forEach((row) => {
       if (row.category !== 'Punia barang') add(row, 'Piodalan', row.eventName || row.description || 'Transaksi Piodalan', row.direction, row.amount, row.category === 'Punia uang' ? 'Punia' : row.category === 'Sesari piodalan' ? 'Sesari' : '')
     })
+    Object.entries(openingBalances).forEach(([module, balance]) => {
+      if (!balance.configured) return
+      const category = module === 'iuran' ? 'Iuran' : module === 'sukaduka' ? 'Sukaduka' : 'Sesari'
+      add({ date: balance.date }, category, `Saldo awal ${category}`, 'Masuk', balance.amount, category)
+    })
     ;(rows.sewa || []).forEach((row) => {
       if (row.status !== 'Dibatalkan') {
         add(row, 'Sewa alat', `Sewa ${row.assetName || 'aset'}`, 'Masuk', row.rentalIncome)
@@ -647,16 +652,21 @@ function App() {
     const colors = { Iuran: '#b5122a', Sesari: '#242424', Punia: '#777777' }
     const sources = Object.entries(sourceTotals).map(([name, amount]) => ({ name, value: sourceTotal ? Math.round(amount / sourceTotal * 100) : 0, color: colors[name] }))
     const selectedYear = dashboardFilter.year || String(new Date().getFullYear())
-    const selectedMonths = dashboardFilter.month ? [Number(dashboardFilter.month)] : Array.from({ length: 12 }, (_, index) => index + 1)
-    const monthly = selectedMonths.map((monthNumber) => {
-      const key = `${selectedYear}-${String(monthNumber).padStart(2, '0')}`
-      return monthlyTotals.get(key) || { month: new Date(Number(selectedYear), monthNumber - 1, 1).toLocaleDateString('id-ID', { month: 'short' }), masuk: 0, keluar: 0, income: 0, expenses: 0 }
-    })
+    const monthKeys = dashboardFilter.year || dashboardFilter.month
+      ? (dashboardFilter.month ? [Number(dashboardFilter.month)] : Array.from({ length: 12 }, (_, index) => index + 1)).map((monthNumber) => `${selectedYear}-${String(monthNumber).padStart(2, '0')}`)
+      : Array.from({ length: 6 }, (_, index) => {
+        const date = new Date()
+        date.setDate(1)
+        date.setMonth(date.getMonth() - 5 + index)
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      })
+    const monthly = monthKeys.map((key) => monthlyTotals.get(key) || { month: new Date(`${key}-01T00:00:00`).toLocaleDateString('id-ID', { month: 'short' }), masuk: 0, keluar: 0, income: 0, expenses: 0 })
+    const hasDashboardFilter = Boolean(dashboardFilter.year || dashboardFilter.month || dashboardFilter.day)
     return {
       cards: [
-        { label: 'Selisih arus kas sesuai filter', value: entries.reduce((sum, entry) => sum + (entry.incoming ? entry.amount : -entry.amount), 0), icon: Landmark, trend: 'Periode terpilih' },
-        { label: 'Penerimaan sesuai filter', value: entries.filter((entry) => entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowDownLeft, trend: 'Data simulasi' },
-        { label: 'Pengeluaran sesuai filter', value: entries.filter((entry) => !entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowUpRight, trend: 'Data simulasi' },
+        { label: hasDashboardFilter ? 'Selisih arus kas sesuai filter' : 'Saldo kas gabungan · seumur hidup', value: entries.reduce((sum, entry) => sum + (entry.incoming ? entry.amount : -entry.amount), 0), icon: Landmark, trend: hasDashboardFilter ? 'Periode terpilih' : 'Seluruh riwayat' },
+        { label: hasDashboardFilter ? 'Penerimaan sesuai filter' : 'Penerimaan · seumur hidup', value: entries.filter((entry) => entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowDownLeft, trend: hasDashboardFilter ? 'Periode terpilih' : 'Seluruh riwayat' },
+        { label: hasDashboardFilter ? 'Pengeluaran sesuai filter' : 'Pengeluaran · seumur hidup', value: entries.filter((entry) => !entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowUpRight, trend: hasDashboardFilter ? 'Periode terpilih' : 'Seluruh riwayat' },
         { label: 'Tunggakan iuran', value: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Iuran || 0), 0), icon: Activity, trend: 'Saldo kewajiban anggota' },
       ],
       monthly,
@@ -665,7 +675,7 @@ function App() {
       outstanding: { arrears: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Iuran || 0), 0), refundDebt: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Kembalian || 0), 0) },
       activities: entries.sort((left, right) => right.date.localeCompare(left.date)).slice(0, 12),
     }
-  }, [rows, dashboardFilter, masterMembers])
+  }, [rows, dashboardFilter, masterMembers, openingBalances])
   useEffect(() => {
     if (isDemo) setSummary(demoDashboard)
   }, [demoDashboard])
@@ -800,6 +810,7 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
   const moduleBalances = analytics?.modules || (demo ? demoModuleBalances : {})
   const outstanding = analytics?.outstanding || (demo ? { arrears: demoModuleBalances.iuran.unpaid, refundDebt: 20000 } : { arrears: 0, refundDebt: 0 })
   const activityItems = analytics?.activities || []
+  const chartPeriodLabel = dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Sesuai filter' : '6 bulan terakhir'
   const moduleEntries = Object.entries(moduleBalances).map(([key, value]) => ({ key, name: moduleLabels[key] || key, color: moduleColors[key] || '#777777', ...value }))
   const donutBalances = moduleEntries.filter((item) => Number(item.balance) > 0).map((item) => ({ name: item.name, value: Number(item.balance), color: item.color }))
   const donutTotal = donutBalances.reduce((sum, item) => sum + item.value, 0)
@@ -833,7 +844,7 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
     </section>
     <div className="order-3">
       <Suspense fallback={<div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]"><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /></div>}>
-        <DashboardCharts chartData={chartData} sourceData={sourceData} moduleEntries={moduleEntries} outstanding={outstanding} donutBalances={donutBalances} donutTotal={donutTotal} currency={currency} />
+        <DashboardCharts chartData={chartData} sourceData={sourceData} moduleEntries={moduleEntries} outstanding={outstanding} donutBalances={donutBalances} donutTotal={donutTotal} currency={currency} chartPeriodLabel={chartPeriodLabel} />
       </Suspense>
     </div>
     <section className="order-7 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]"><div className="flex items-center justify-between border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Aktivitas terakhir</h2><p className="mt-1 text-[11px] text-[#929c91]">Transaksi sesuai periode filter</p></div><span className="rounded bg-[#eef2e9] px-2 py-1 text-[10px] font-semibold text-[#638065]">{demo ? 'Data simulasi' : 'Terkini'}</span></div>
