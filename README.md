@@ -154,5 +154,6 @@ Foto kegiatan/aset dapat dilihat oleh siapa pun yang memiliki tautan. Foto bukti
 - Apps Script Web App bukan pengganti backend dengan proteksi tingkat tinggi: spreadsheet dan project script tetap harus dibatasi ke pengelola tepercaya. Sesi login disimpan di `CacheService` selama enam jam.
 - Upload foto dibatasi 5 MB dan format JPG, PNG, WEBP, GIF. Foto besar dikompresi di browser sebelum dikirim jika hasilnya lebih kecil.
 - Dashboard menyediakan filter tahun, bulan, dan tanggal untuk ringkasan; tabel inventaris publik menampilkan jumlah dimiliki/tersedia, tarif sewa, serta penyewa yang sedang aktif.
-- Tombol kirim memakai pengunci klik ganda dan menampilkan status proses; setelah selesai, notifikasi hasil ditampilkan.
+- Pembuatan transaksi dan basket memakai ID idempoten untuk iuran, Sukaduka, Punia, Piodalan, aset, sewa, dan modul create lainnya. Mengirim ulang payload dengan ID yang sama tidak membuat baris, saldo, atau audit ganda. Form mempertahankan ID saat retry; jangan ubah isi transaksi selama status belum pasti.
+- Timeout atau koneksi terputus bukan bukti transaksi gagal. Jika form harus ditinggalkan, muat ulang daftar modul terkait dan pastikan transaksi belum tercatat sebelum memasukkannya kembali. Tombol kirim juga memakai pengunci klik ganda dan menampilkan status proses.
 - Grafik UI memiliki data contoh ketika backend belum dikonfigurasi; siapkan agregasi ringkasan produksi sebelum menjadikan grafik tersebut sebagai laporan resmi.

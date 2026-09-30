@@ -131,7 +131,7 @@ function doPost(e) {
     }
     return json_({ ok: true, ...result });
   } catch (error) {
-    return json_({ ok: false, error: error.message });
+    return json_({ ok: false, error: error.message, uncertain: Boolean(error.uncertain) });
   } finally {
     if (lock.hasLock()) lock.releaseLock();
   }
@@ -369,7 +369,10 @@ function batchPayments_(module, records, user) {
   const members = getMasterAnggota_();
   const memberById = {};
   members.forEach(function (member) { memberById[String(member.ID)] = member; });
+  const existingById = {};
+  readRecords_(module).forEach(function (row) { existingById[String(row.id)] = row; });
   const seen = {};
+  const seenIds = {};
   const updates = {};
   const now = new Date().toISOString();
   const cleanRows = records.map(function (record) {
@@ -378,6 +381,52 @@ function batchPayments_(module, records, user) {
     if (!member) throw new Error('Anggota tidak ditemukan pada baris input massal: ' + (record.memberName || memberId || '(tanpa nama)'));
     if (seen[memberId]) throw new Error('Anggota ' + member.Nama + ' tercantum lebih dari sekali. Gabungkan pembayarannya dalam satu baris.');
     seen[memberId] = true;
+    const requestId = String(record.id || '').trim();
+    if (requestId && seenIds[requestId]) throw new Error('ID transaksi yang sama tercantum lebih dari sekali.');
+    if (requestId) seenIds[requestId] = true;
+    const existing = requestId ? existingById[requestId] : null;
+    if (existing) {
+      const matchesRequest = module === 'TRANSAKSI_IURAN'
+        ? String(existing.memberId) === memberId
+          && String(existing.date) === String(record.date)
+          && String(existing.periodId) === String(record.periodId)
+          && Number(existing.allocatedContribution) === Number(record.allocatedContribution)
+          && Number(existing.cashPhysical) === Number(record.cashPhysical)
+          && Number(existing.changePaid || 0) === (Number(record.changePaid) || 0)
+          && String(existing.notes || '') === String(record.notes || '')
+        : String(existing.memberId) === memberId
+          && String(existing.date) === String(record.date)
+          && String(existing.purpose || '').trim() === String(record.purpose || '').trim()
+          && Number(existing.amount) === Number(record.amount)
+          && Number(existing.chargeAmount || 0) === (Number(record.chargeAmount) || 0)
+          && Number(existing.cashPhysical) === Number(record.cashPhysical)
+          && Number(existing.changePaid || 0) === (Number(record.changePaid) || 0)
+          && String(existing.notes || '') === String(record.notes || '');
+      if (!matchesRequest) throw new Error('ID transaksi iuran sudah dipakai untuk data berbeda. Muat ulang data sebelum membuat transaksi baru.');
+      if (module === 'TRANSAKSI_IURAN') {
+        const currentArrears = Number(member.Sisa_Hutang_Iuran) || 0;
+        const currentRefundDebt = Number(member.Sisa_Hutang_Kembalian) || 0;
+        if (currentArrears === (Number(existing.openingArrears) || 0)
+          && currentRefundDebt === (Number(existing.openingRefundDebt) || 0)) {
+          updates[memberId] = {
+            arrears: Number(existing.arrears) || 0,
+            refundDebt: Number(existing.refundDebt) || 0,
+            sukadukaArrears: Number(member.Sisa_Hutang_Sukaduka) || 0,
+          };
+        }
+      } else {
+        const openingRefundDebt = Number(existing.refundDebt) - Number(existing.refundDebtAdded || 0);
+        if ((Number(member.Sisa_Hutang_Sukaduka) || 0) === (Number(existing.openingArrears) || 0)
+          && (Number(member.Sisa_Hutang_Kembalian) || 0) === openingRefundDebt) {
+          updates[memberId] = {
+            arrears: Number(member.Sisa_Hutang_Iuran) || 0,
+            refundDebt: Number(existing.refundDebt) || 0,
+            sukadukaArrears: Number(existing.arrears) || 0,
+          };
+        }
+      }
+      return existing;
+    }
     if (!record.date) throw new Error('Tanggal wajib diisi untuk ' + member.Nama + '.');
     const balance = updates[memberId] || {
       arrears: Number(member.Sisa_Hutang_Iuran) || 0,
@@ -397,7 +446,7 @@ function batchPayments_(module, records, user) {
       if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
       const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
       entry = {
-        id: Utilities.getUuid(), date: record.date, periodId: periodId, memberId: member.ID, memberName: member.Nama,
+        id: requestId || Utilities.getUuid(), date: record.date, periodId: periodId, memberId: member.ID, memberName: member.Nama,
         target: balance.arrears, allocatedContribution: allocated, cashPhysical: cash, changeDue: changeDue,
         changePaid: changePaid, openingArrears: balance.arrears, arrears: balance.arrears - allocated,
         openingRefundDebt: balance.refundDebt, refundDebtAdded: refundDebt - balance.refundDebt,
@@ -419,7 +468,7 @@ function batchPayments_(module, records, user) {
       if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
       const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
       entry = {
-        id: Utilities.getUuid(), date: record.date, direction: 'Masuk', recipient: member.Nama, purpose: purpose,
+        id: requestId || Utilities.getUuid(), date: record.date, direction: 'Masuk', recipient: member.Nama, purpose: purpose,
         amount: amount, notes: String(record.notes || ''), createdBy: user.username, createdAt: now,
         memberId: member.ID, memberName: member.Nama, cashPhysical: cash, changeDue: changeDue,
         changePaid: changePaid, refundDebtAdded: refundDebt - balance.refundDebt,
@@ -433,29 +482,45 @@ function batchPayments_(module, records, user) {
     return entry;
   });
 
-  const sheet = spreadsheet_().getSheetByName(module);
-  const headers = SHEETS[module];
-  sheet.getRange(sheet.getLastRow() + 1, 1, cleanRows.length, headers.length)
-    .setValues(cleanRows.map(function (entry) { return headers.map(function (key) { return normalizeCell_(entry[key]); }); }));
-  const masterSheet = spreadsheet_().getSheetByName('MASTER_ANGGOTA');
-  const masterValues = masterSheet.getRange(2, 1, masterSheet.getLastRow() - 1, SHEETS.MASTER_ANGGOTA.length).getValues();
-  masterValues.forEach(function (row) {
-    const update = updates[String(row[0])];
-    if (!update) return;
-    row[2] = update.arrears;
-    row[3] = update.refundDebt;
-  });
-  masterSheet.getRange(2, 1, masterValues.length, SHEETS.MASTER_ANGGOTA.length).setValues(masterValues);
-  const auditSheet = spreadsheet_().getSheetByName('AuditLog');
-  const auditRows = cleanRows.map(function (entry) {
-    return [Utilities.getUuid(), now, user.id, user.username, 'batchCreate', module, entry.id, entry.memberName];
-  });
-  auditSheet.getRange(auditSheet.getLastRow() + 1, 1, auditRows.length, SHEETS.AuditLog.length).setValues(auditRows);
+  const rowsToInsert = cleanRows.filter(function (entry) { return !existingById[String(entry.id)]; });
+  try {
+    const sheet = spreadsheet_().getSheetByName(module);
+    const headers = SHEETS[module];
+    if (rowsToInsert.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, headers.length)
+        .setValues(rowsToInsert.map(function (entry) { return headers.map(function (key) { return normalizeCell_(entry[key]); }); }));
+    }
+    const masterSheet = spreadsheet_().getSheetByName('MASTER_ANGGOTA');
+    if (Object.keys(updates).length) {
+      const masterValues = masterSheet.getRange(2, 1, masterSheet.getLastRow() - 1, SHEETS.MASTER_ANGGOTA.length).getValues();
+      masterValues.forEach(function (row) {
+        const update = updates[String(row[0])];
+        if (!update) return;
+        row[2] = update.arrears;
+        row[3] = update.refundDebt;
+        row[4] = update.sukadukaArrears;
+      });
+      masterSheet.getRange(2, 1, masterValues.length, SHEETS.MASTER_ANGGOTA.length).setValues(masterValues);
+    }
+    const auditSheet = spreadsheet_().getSheetByName('AuditLog');
+    const auditedIds = {};
+    readAuditLog_().forEach(function (row) {
+      if (row.action === 'batchCreate' && row.module === module) auditedIds[String(row.recordId)] = true;
+    });
+    const auditRows = cleanRows.filter(function (entry) { return !auditedIds[String(entry.id)]; }).map(function (entry) {
+      return [Utilities.getUuid(), now, user.id, user.username, 'batchCreate', module, entry.id, entry.memberName];
+    });
+    if (auditRows.length) auditSheet.getRange(auditSheet.getLastRow() + 1, 1, auditRows.length, SHEETS.AuditLog.length).setValues(auditRows);
+  } catch (error) {
+    error.uncertain = true;
+    throw error;
+  }
   return {
     records: cleanRows,
-    members: Object.keys(updates).map(function (id) {
+    members: Object.keys(seen).map(function (id) {
       const source = memberById[id];
-      return { ID: source.ID, Nama: source.Nama, Sisa_Hutang_Iuran: updates[id].arrears, Sisa_Hutang_Kembalian: updates[id].refundDebt, Sisa_Hutang_Sukaduka: updates[id].sukadukaArrears };
+      const update = updates[id];
+      return { ID: source.ID, Nama: source.Nama, Sisa_Hutang_Iuran: update ? update.arrears : source.Sisa_Hutang_Iuran, Sisa_Hutang_Kembalian: update ? update.refundDebt : source.Sisa_Hutang_Kembalian, Sisa_Hutang_Sukaduka: update ? update.sukadukaArrears : source.Sisa_Hutang_Sukaduka };
     }),
   };
 }
@@ -468,9 +533,19 @@ function batchCreateRecords_(module, records, user) {
   if (module === 'Piodalan') {
     readRecords_('Anggota').filter(function (member) { return member.status === 'Aktif'; }).forEach(function (member) { membersById[String(member.id)] = member; });
   }
+  const existingById = {};
+  readRecords_(module).forEach(function (record) { existingById[String(record.id)] = record; });
+  const seenIds = {};
   const cleanRows = records.map(function (record, index) {
     const clean = sanitizeRecord_(module, record || {});
-    clean.id = Utilities.getUuid();
+    clean.id = clean.id || Utilities.getUuid();
+    if (seenIds[String(clean.id)]) throw new Error('ID transaksi yang sama tercantum lebih dari sekali.');
+    seenIds[String(clean.id)] = true;
+    const existing = existingById[String(clean.id)];
+    if (existing) {
+      if (!recordPayloadMatches_(existing, clean)) throw new Error('ID transaksi sudah dipakai untuk data berbeda. Muat ulang data sebelum membuat transaksi baru.');
+      return existing;
+    }
     clean.createdBy = user.username;
     clean.createdAt = now;
     if (module === 'Punia') validatePuniaRecord_(clean, index + 1);
@@ -484,15 +559,25 @@ function batchCreateRecords_(module, records, user) {
     }
     return clean;
   });
-  const headers = SHEETS[module];
-  const sheet = spreadsheet_().getSheetByName(module);
-  sheet.getRange(sheet.getLastRow() + 1, 1, cleanRows.length, headers.length)
-    .setValues(cleanRows.map(function (record) { return headers.map(function (key) { return normalizeCell_(record[key]); }); }));
-  const auditSheet = spreadsheet_().getSheetByName('AuditLog');
-  auditSheet.getRange(auditSheet.getLastRow() + 1, 1, cleanRows.length, SHEETS.AuditLog.length)
-    .setValues(cleanRows.map(function (record) {
+  const rowsToInsert = cleanRows.filter(function (record) { return !existingById[String(record.id)]; });
+  try {
+    const headers = SHEETS[module];
+    const sheet = spreadsheet_().getSheetByName(module);
+    if (rowsToInsert.length) sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, headers.length)
+      .setValues(rowsToInsert.map(function (record) { return headers.map(function (key) { return normalizeCell_(record[key]); }); }));
+    const auditSheet = spreadsheet_().getSheetByName('AuditLog');
+    const auditedIds = {};
+    readAuditLog_().forEach(function (row) {
+      if (row.action === 'batchCreate' && row.module === module) auditedIds[String(row.recordId)] = true;
+    });
+    const auditRows = cleanRows.filter(function (record) { return !auditedIds[String(record.id)]; }).map(function (record) {
       return [Utilities.getUuid(), now, user.id, user.username, 'batchCreate', module, record.id, record.donor || record.eventName || ''];
-    }));
+    });
+    if (auditRows.length) auditSheet.getRange(auditSheet.getLastRow() + 1, 1, auditRows.length, SHEETS.AuditLog.length).setValues(auditRows);
+  } catch (error) {
+    error.uncertain = true;
+    throw error;
+  }
   return { records: cleanRows };
 }
 
@@ -651,6 +736,15 @@ function createRecord_(module, record, user) {
   if (module === 'TRANSAKSI_IURAN') return saveIuranTransaction_('create', record, user);
   if (module === 'Sukaduka' && record.direction === 'Masuk') return saveSukadukaIncoming_('create', record, user);
   const clean = sanitizeRecord_(module, record);
+  clean.id = clean.id || Utilities.getUuid();
+  const duplicate = readRecords_(module).find(function (row) { return String(row.id) === String(clean.id); });
+  if (duplicate) {
+    if (!recordPayloadMatches_(duplicate, clean)) throw new Error('ID transaksi sudah dipakai untuk data berbeda. Muat ulang data sebelum membuat transaksi baru.');
+    if (!readAuditLog_().some(function (row) { return row.action === 'create' && row.module === module && String(row.recordId) === String(clean.id); })) {
+      audit_(user, 'create', module, clean.id, 'Pemulihan audit saat konfirmasi ulang');
+    }
+    return { record: duplicate };
+  }
   if (module === 'Users') {
     const password = String(record.password || '');
     if (password.length < 12) throw new Error('Kata sandi pengguna minimal 12 karakter.');
@@ -659,7 +753,6 @@ function createRecord_(module, record, user) {
     clean.passwordHash = hashPassword_(password, clean.salt);
     clean.status = clean.status || 'Aktif';
   }
-  clean.id = clean.id || Utilities.getUuid();
   clean.createdBy = clean.createdBy || user.username;
   clean.createdAt = clean.createdAt || new Date().toISOString();
   if (module === 'SewaAset') validateRentalAvailability_(clean);
@@ -671,6 +764,15 @@ function createRecord_(module, record, user) {
   if (module === 'Anggota') upsertMasterAnggota_(clean);
   audit_(user, 'create', module, clean.id, '');
   return { record: clean };
+}
+
+function recordPayloadMatches_(existing, record) {
+  const ignored = { id: true, createdBy: true, createdAt: true, updatedAt: true, password: true, passwordHash: true, salt: true };
+  return Object.keys(record).filter(function (key) { return !ignored[key]; }).every(function (key) {
+    const oldValue = existing[key] === null || existing[key] === undefined ? '' : existing[key];
+    const newValue = record[key] === null || record[key] === undefined ? '' : record[key];
+    return String(oldValue) === String(newValue);
+  });
 }
 
 function updateRecord_(module, record, user, internal) {
@@ -916,6 +1018,27 @@ function saveIuranTransaction_(mode, input, user) {
   const memberLocation = findMasterAnggota_(record.memberId);
   const existingRows = readRecords_('TRANSAKSI_IURAN');
   const existing = mode === 'update' ? existingRows.find(function (row) { return String(row.id) === String(record.id); }) : null;
+  const duplicate = mode === 'create' && record.id ? existingRows.find(function (row) { return String(row.id) === String(record.id); }) : null;
+  if (duplicate) {
+    const matchesRequest = String(duplicate.memberId) === String(record.memberId)
+      && String(duplicate.date) === String(record.date)
+      && String(duplicate.periodId) === String(record.periodId)
+      && Number(duplicate.allocatedContribution) === Number(record.allocatedContribution)
+      && Number(duplicate.cashPhysical) === Number(record.cashPhysical)
+      && Number(duplicate.changePaid || 0) === (Number(record.changePaid) || 0)
+      && String(duplicate.notes || '') === String(record.notes || '');
+    if (!matchesRequest) throw new Error('ID transaksi iuran sudah dipakai untuk data berbeda. Muat ulang data sebelum membuat transaksi baru.');
+    if (!readAuditLog_().some(function (row) { return row.action === 'create' && row.module === 'TRANSAKSI_IURAN' && String(row.recordId) === String(duplicate.id); })) {
+      audit_(user, 'create', 'TRANSAKSI_IURAN', duplicate.id, duplicate.memberName);
+    }
+    const currentArrears = Number(memberLocation.member.Sisa_Hutang_Iuran) || 0;
+    const currentRefundDebt = Number(memberLocation.member.Sisa_Hutang_Kembalian) || 0;
+    if (currentArrears === (Number(duplicate.openingArrears) || 0)
+      && currentRefundDebt === (Number(duplicate.openingRefundDebt) || 0)) {
+      updateMasterBalance_(duplicate.memberId, Number(duplicate.arrears) || 0, Number(duplicate.refundDebt) || 0);
+    }
+    return { record: duplicate, member: findMasterAnggota_(record.memberId).member };
+  }
   if (mode === 'update' && !existing) throw new Error('Transaksi iuran tidak ditemukan.');
   if (existing && String(existing.memberId) !== String(record.memberId)) throw new Error('Anggota pada transaksi tidak dapat diganti.');
 
@@ -935,7 +1058,7 @@ function saveIuranTransaction_(mode, input, user) {
   const refundDebt = Math.max(0, openingRefundDebt + changeDue - changePaid);
   const refundDebtAdded = refundDebt - openingRefundDebt;
   const clean = {
-    id: existing ? existing.id : Utilities.getUuid(),
+    id: existing ? existing.id : record.id || Utilities.getUuid(),
     date: record.date,
     periodId: String(record.periodId),
     memberId: memberLocation.member.ID,
@@ -1011,6 +1134,27 @@ function saveSukadukaIncoming_(mode, input, user) {
   const location = findMasterAnggota_(record.memberId);
   const rows = readRecords_('Sukaduka');
   const existing = mode === 'update' ? rows.find(function (row) { return String(row.id) === String(record.id); }) : null;
+  const duplicate = mode === 'create' && record.id ? rows.find(function (row) { return String(row.id) === String(record.id); }) : null;
+  if (duplicate) {
+    const matchesRequest = String(duplicate.memberId) === String(record.memberId)
+      && String(duplicate.date) === String(record.date)
+      && String(duplicate.purpose) === String(record.purpose)
+      && Number(duplicate.amount) === Number(record.amount)
+      && Number(duplicate.chargeAmount || 0) === (Number(record.chargeAmount) || 0)
+      && Number(duplicate.cashPhysical) === Number(record.cashPhysical)
+      && Number(duplicate.changePaid || 0) === (Number(record.changePaid) || 0)
+      && String(duplicate.notes || '') === String(record.notes || '');
+    if (!matchesRequest) throw new Error('ID transaksi Sukaduka sudah dipakai untuk data berbeda. Muat ulang data sebelum membuat transaksi baru.');
+    if (!readAuditLog_().some(function (row) { return row.action === mode && row.module === 'Sukaduka' && String(row.recordId) === String(duplicate.id); })) {
+      audit_(user, mode, 'Sukaduka', duplicate.id, duplicate.memberName);
+    }
+    const openingRefundDebt = Number(duplicate.refundDebt) - Number(duplicate.refundDebtAdded || 0);
+    if ((Number(location.member.Sisa_Hutang_Kembalian) || 0) === openingRefundDebt
+      && (Number(location.member.Sisa_Hutang_Sukaduka) || 0) === (Number(duplicate.openingArrears) || 0)) {
+      updateMasterBalance_(duplicate.memberId, location.member.Sisa_Hutang_Iuran, Number(duplicate.refundDebt) || 0, Number(duplicate.arrears) || 0);
+    }
+    return { record: duplicate, member: findMasterAnggota_(record.memberId).member };
+  }
   if (mode === 'update' && (!existing || !existing.memberId)) throw new Error('Transaksi penerimaan sukaduka tidak ditemukan.');
   if (existing && String(existing.memberId) !== String(record.memberId)) throw new Error('Anggota pada transaksi tidak dapat diganti.');
   const amount = Number(record.amount);
@@ -1029,7 +1173,7 @@ function saveSukadukaIncoming_(mode, input, user) {
   const refundDebt = Math.max(0, openingRefundDebt + changeDue - changePaid);
   const refundDebtAdded = refundDebt - openingRefundDebt;
   const clean = {
-    id: existing ? existing.id : Utilities.getUuid(),
+    id: existing ? existing.id : record.id || Utilities.getUuid(),
     date: record.date, direction: 'Masuk', recipient: location.member.Nama,
     purpose: String(record.purpose), amount: amount, memberId: location.member.ID,
     memberName: location.member.Nama, cashPhysical: cashPhysical, changeDue: changeDue,
@@ -1044,9 +1188,10 @@ function saveSukadukaIncoming_(mode, input, user) {
   const sheet = spreadsheet_().getSheetByName('Sukaduka');
   const headers = SHEETS.Sukaduka;
   const oldRefundDebt = Number(location.member.Sisa_Hutang_Kembalian) || 0;
+  const oldSukadukaArrears = Number(location.member.Sisa_Hutang_Sukaduka) || 0;
   let member;
   try {
-    member = updateMasterRefundDebt_(clean.memberId, clean.refundDebt);
+    member = updateMasterBalance_(clean.memberId, location.member.Sisa_Hutang_Iuran, clean.refundDebt, clean.arrears);
     if (existing) {
       const values = sheet.getDataRange().getValues();
       const idColumn = headers.indexOf('id');
@@ -1058,7 +1203,7 @@ function saveSukadukaIncoming_(mode, input, user) {
     }
     member.Sisa_Hutang_Sukaduka = clean.arrears;
   } catch (error) {
-    updateMasterRefundDebt_(clean.memberId, oldRefundDebt);
+    updateMasterBalance_(clean.memberId, location.member.Sisa_Hutang_Iuran, oldRefundDebt, oldSukadukaArrears);
     throw error;
   }
   audit_(user, mode, 'Sukaduka', clean.id, clean.memberName);
@@ -1145,6 +1290,14 @@ function readRecords_(module) {
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues()
     .filter(function (row) { return row.some(function (value) { return value !== ''; }); })
     .map(function (row) { return rowToObject_(headers, row); });
+}
+
+function readAuditLog_() {
+  const sheet = spreadsheet_().getSheetByName('AuditLog');
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, SHEETS.AuditLog.length).getValues()
+    .filter(function (row) { return row.some(function (value) { return value !== ''; }); })
+    .map(function (row) { return rowToObject_(SHEETS.AuditLog, row); });
 }
 
 function appendRecord_(module, record) {
@@ -1277,8 +1430,10 @@ function summaryRows_(snapshot, module) {
 
 function filteredSummarySnapshot_(snapshot, filters) {
   const year = String(filters.year || '').replace(/\D/g, '').slice(0, 4);
-  const month = String(filters.month || '').replace(/\D/g, '').slice(-2).padStart(2, '0');
-  const day = String(filters.day || '').replace(/\D/g, '').slice(-2).padStart(2, '0');
+  const rawMonth = String(filters.month || '').replace(/\D/g, '').slice(-2);
+  const rawDay = String(filters.day || '').replace(/\D/g, '').slice(-2);
+  const month = rawMonth ? rawMonth.padStart(2, '0') : '';
+  const day = rawDay ? rawDay.padStart(2, '0') : '';
   if (!year && !month && !day) return snapshot;
   Object.keys(snapshot).forEach(function (module) {
     if (module === 'Aset' || module === 'Anggota' || module === 'MASTER_ANGGOTA') return;
@@ -1601,10 +1756,15 @@ function sukadukaCashOut_(rows) {
 }
 
 function audit_(user, action, module, recordId, details) {
-  appendRecord_('AuditLog', {
-    id: Utilities.getUuid(), timestamp: new Date().toISOString(), userId: user.id,
-    username: user.username, action: action, module: module, recordId: recordId, details: details,
-  });
+  try {
+    appendRecord_('AuditLog', {
+      id: Utilities.getUuid(), timestamp: new Date().toISOString(), userId: user.id,
+      username: user.username, action: action, module: module, recordId: recordId, details: details,
+    });
+  } catch (error) {
+    error.uncertain = true;
+    throw error;
+  }
 }
 
 function spreadsheet_() {

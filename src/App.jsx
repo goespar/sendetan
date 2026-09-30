@@ -100,6 +100,7 @@ const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777',
 const openingBalanceDefaults = { iuran: 1215000, sukaduka: 920000, sesari: 0 }
 const emptyOpeningBalances = Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, { amount: 0, date: '', notes: '', configured: false }]))
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
+const createTransactionId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
 function matchesDateFilter(row, filters) {
   const date = String(row.date || row.eventDate || row.periodId || '').slice(0, 10)
@@ -144,6 +145,7 @@ function App() {
   const [dashboardFilter, setDashboardFilter] = useState({ year: '', month: '', day: '' })
   const [busyAction, setBusyAction] = useState('')
   const operationRef = useRef(false)
+  const uploadedPhotoUrls = useRef(new Map())
   const [dashboardHidden, setDashboardHidden] = useState(localStorage.getItem('takora-dashboard-hidden') === 'true')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(localStorage.getItem('takora-sidebar-collapsed') === 'true')
   const [login, setLogin] = useState({ username: '', password: '', role: 'Bendahara' })
@@ -333,24 +335,28 @@ function App() {
 
   async function saveRecord(event) {
     event.preventDefault()
-    const formData = new FormData(event.currentTarget)
-    const values = Object.fromEntries(formData.entries())
+    const form = event.currentTarget
+    if (!editing && !form.dataset.requestId) form.dataset.requestId = createTransactionId(page.api.slice(0, 2).toUpperCase())
+    const pendingPayload = form.dataset.requestPayload
+    const formData = pendingPayload ? null : new FormData(form)
+    const values = pendingPayload ? JSON.parse(pendingPayload) : Object.fromEntries(formData.entries())
     if (active === 'piodalan' && ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(values.category) && !String(values.donor || '').trim()) {
       setNotice('Nama penyumbang wajib diisi untuk transaksi punia piodalan.')
       return
     }
-    if (active === 'aset' && formData.get('photoFile')?.size) {
+    if (active === 'aset' && formData?.get('photoFile')?.size) {
       try {
-        const uploaded = await uploadPhoto(formData.get('photoFile'), token)
-        values.photoUrl = uploaded.url
+        if (!form.dataset.photoUrl) form.dataset.photoUrl = (await uploadPhoto(formData.get('photoFile'), token)).url
+        values.photoUrl = form.dataset.photoUrl
       } catch (error) { setNotice(error.message); return }
     }
-    delete values.photoFile
+    if (!pendingPayload) delete values.photoFile
     if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].some((field) => field in values)) {
       for (const key of Object.keys(values)) if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) values[key] = Number(values[key]) || 0
     }
-    const updated = editing ? { ...editing, ...values } : { id: `${active.slice(0, 2).toUpperCase()}-${Date.now()}`, ...values }
+    const updated = pendingPayload ? values : editing ? { ...editing, ...values } : { id: form.dataset.requestId, ...values }
     try {
+      form.dataset.requestPayload = JSON.stringify(updated)
       let savedRecord = updated
       if (!isDemo) {
         const result = await request(editing ? 'update' : 'create', { module: page.api, record: updated }, token)
@@ -360,13 +366,14 @@ function App() {
       if (active === 'aset') setRentalAssets((previous) => editing ? previous.map((row) => row.id === editing.id ? updated : row) : [updated, ...previous])
       if (active === 'sewa') setRentalRows((previous) => editing ? previous.map((row) => row.id === editing.id ? updated : row) : [updated, ...previous])
       setNotice(editing ? 'Data berhasil diperbarui.' : 'Data berhasil disimpan.')
+      delete form.dataset.requestPayload
       setModal(false)
       setEditing(null)
-    } catch (error) { setNotice(error.message) }
+    } catch (error) { setNotice(error.message); throw error }
   }
 
   async function saveRental(record) {
-    const updated = editing ? { ...editing, ...record } : { id: `SW-${Date.now()}`, ...record }
+    const updated = editing ? { ...editing, ...record } : { ...record, id: record.id || createTransactionId('SW') }
     try {
       let savedRecord = updated
       if (!isDemo) {
@@ -378,15 +385,16 @@ function App() {
       setNotice(editing ? 'Transaksi sewa diperbarui.' : 'Transaksi sewa disimpan.')
       setModal(false)
       setEditing(null)
-    } catch (error) { setNotice(error.message) }
+    } catch (error) { setNotice(error.message); throw error }
   }
 
   async function saveActivity(record) {
-    const updated = editing ? { ...editing, ...record } : { id: `KM-${Date.now()}`, ...record }
+    const updated = editing ? { ...editing, ...record } : { ...record, id: record.id || createTransactionId('KM') }
     try {
       if (record.photoFile?.size) {
-        const uploaded = await uploadPhoto(record.photoFile, token, 'activities')
-        updated.photoUrl = uploaded.url
+        const uploadKey = `activities:${updated.id}`
+        if (!uploadedPhotoUrls.current.has(uploadKey)) uploadedPhotoUrls.current.set(uploadKey, (await uploadPhoto(record.photoFile, token, 'activities')).url)
+        updated.photoUrl = uploadedPhotoUrls.current.get(uploadKey)
       }
       delete updated.photoFile
       let savedRecord = updated
@@ -396,18 +404,20 @@ function App() {
       }
       setRows((previous) => ({ ...previous, kegiatan: editing ? previous.kegiatan.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...(previous.kegiatan || [])] }))
       setPublicActivities((previous) => editing ? previous.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...previous])
+      uploadedPhotoUrls.current.delete(`activities:${updated.id}`)
       setNotice(editing ? 'Dokumentasi kegiatan diperbarui.' : 'Dokumentasi kegiatan dipublikasikan.')
       setModal(false)
       setEditing(null)
-    } catch (error) { setNotice(error.message) }
+    } catch (error) { setNotice(error.message); throw error }
   }
 
   async function saveSukaduka(record) {
-    const updated = editing ? { ...editing, ...record } : { id: `SK-${Date.now()}`, ...record }
+    const updated = editing ? { ...editing, ...record } : { ...record, id: record.id || createTransactionId('SK') }
     try {
       if (record.proofFile?.size) {
-        const uploaded = await uploadPhoto(record.proofFile, token, 'sukaduka')
-        updated.proofPhotoUrl = uploaded.url
+        const uploadKey = `sukaduka:${updated.id}`
+        if (!uploadedPhotoUrls.current.has(uploadKey)) uploadedPhotoUrls.current.set(uploadKey, (await uploadPhoto(record.proofFile, token, 'sukaduka')).url)
+        updated.proofPhotoUrl = uploadedPhotoUrls.current.get(uploadKey)
       }
       delete updated.proofFile
       let savedRecord = updated
@@ -430,14 +440,15 @@ function App() {
       }
       setRows((previous) => ({ ...previous, sukaduka: editing ? previous.sukaduka.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...(previous.sukaduka || [])] }))
       if (savedMember) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(savedMember.ID) ? savedMember : member))
+      uploadedPhotoUrls.current.delete(`sukaduka:${updated.id}`)
       setNotice(editing ? 'Transaksi sukaduka diperbarui.' : 'Transaksi sukaduka disimpan.')
       setModal(false)
       setEditing(null)
-    } catch (error) { setNotice(error.message) }
+    } catch (error) { setNotice(error.message); throw error }
   }
 
   async function saveIuran(record) {
-    const updated = editing ? { ...editing, ...record } : { id: `IU-${Date.now()}`, ...record }
+    const updated = editing ? { ...editing, ...record, id: editing.id } : { ...record, id: record.id || createTransactionId('IU') }
     try {
       let savedRecord = updated
       let savedMember = null
@@ -462,7 +473,7 @@ function App() {
       setNotice(editing ? 'Transaksi iuran diperbarui dan saldo anggota disinkronkan.' : 'Transaksi iuran disimpan dan saldo anggota diperbarui.')
       setModal(false)
       setEditing(null)
-    } catch (error) { setNotice(error.message) }
+    } catch (error) { setNotice(error.message); throw error }
   }
 
   async function saveMasterBalance(record) {
@@ -739,7 +750,7 @@ function App() {
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
           {['iuran', 'sukaduka', 'sesari'].includes(active) && writable && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d9e1d5] bg-white px-4 py-3"><div><p className="text-[10px] font-semibold uppercase text-[#849084]">Saldo awal kas {moduleLabels[active]}</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{openingBalances[active]?.configured ? currency(openingBalances[active].amount) : 'Belum diatur'}</p>{openingBalances[active]?.date && <p className="mt-1 text-[10px] text-[#849084]">Per {readableDate(openingBalances[active].date)}</p>}</div><button onClick={() => setOpeningBalanceModal(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Atur saldo awal</button></div>}
-          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} />}
+          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenOpeningBalance={() => setOpeningBalanceModal(true)} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
@@ -775,7 +786,7 @@ function App() {
           if (updatedMembers.length) setMasterMembers((previous) => previous.map((member) => updatedMembers.find((updated) => String(updated.ID) === String(member.ID)) || member))
           setBatchModal(false)
           setNotice(`${savedRecords.length} pembayaran berhasil disimpan.`)
-        } catch (error) { setNotice(error.message) }
+        } catch (error) { setNotice(error.message); throw error }
       }} />}
       {batchModal && ['punia', 'piodalan'].includes(active) && <BatchLedgerModal module={active} members={masterMembers} onClose={() => setBatchModal(false)} onSave={async (records) => {
         try {
@@ -791,7 +802,7 @@ function App() {
           setBatchModal(false)
           setNotice(`${savedRecords.length} catatan berhasil disimpan.`)
           if (!isDemo) request('summary', {}, token).then(setSummary).catch((error) => setNotice(error.message))
-        } catch (error) { setNotice(error.message) }
+        } catch (error) { setNotice(error.message); throw error }
       }} />}
       {balanceModal && <MasterBalanceModal members={masterMembers} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveMasterBalance(record))} />}
       {openingBalanceModal && <OpeningBalanceModal balances={openingBalances} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setOpeningBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveOpeningBalances(record))} />}
@@ -802,7 +813,7 @@ function App() {
   )
 }
 
-function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanReport, assets, dashboardFilter, onDashboardFilterChange, onOpenGallery, demo }) {
+function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanReport, assets, dashboardFilter, onDashboardFilterChange, onOpenOpeningBalance, onOpenGallery, demo }) {
   const publicMode = role === 'Publik'
   const visibleCards = publicMode ? cards.filter((card) => !/tunggakan/i.test(card.label)) : cards
   const chartData = analytics?.monthly || (demo ? cashBars : [])
@@ -812,6 +823,7 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
   const activityItems = analytics?.activities || []
   const chartPeriodLabel = dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Sesuai filter' : '6 bulan terakhir'
   const moduleEntries = Object.entries(moduleBalances).map(([key, value]) => ({ key, name: moduleLabels[key] || key, color: moduleColors[key] || '#777777', ...value }))
+  const cashDataMissing = !demo && cards.length > 0 && cards.slice(0, 3).every((card) => !Number(card.value))
   const donutBalances = moduleEntries.filter((item) => Number(item.balance) > 0).map((item) => ({ name: item.name, value: Number(item.balance), color: item.color }))
   const donutTotal = donutBalances.reduce((sum, item) => sum + item.value, 0)
   const piodalanTotals = piodalanReport.reduce((totals, item) => ({
@@ -828,6 +840,7 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
         <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#638367]"><TrendingUp size={12} />{card.trend}<span className="font-normal text-[#9aa399]"> periode ini</span></div>
       </div> })}
     </div>
+    {cashDataMissing && <div role="status" className="order-2 mt-3 rounded-md border border-[#e7dfc9] bg-[#fffaf0] px-4 py-3 text-xs leading-5 text-[#725e37]">{role === 'Publik' ? 'Ringkasan kas belum tersedia. Hubungi Bendahara.' : 'Perhitungan ringkasan kas perlu pembaruan backend. Deploy versi Apps Script terbaru untuk memuat kembali saldo awal dan transaksi.'}</div>}
     <section className="order-4 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Inventaris aset</h2><p className="mt-1 text-[11px] text-[#929c91]">Data barang yang sudah dicatat pada menu Aset &amp; sewa alat.</p></div><span className="text-[10px] text-[#849084]">{assets.length} jenis barang</span></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama barang</th><th className="px-4 py-3 text-right">Jumlah</th><th className="px-4 py-3 text-right">Tersedia kini</th><th className="px-4 py-3">Sedang disewa oleh</th><th className="px-4 py-3 text-right">Harga beli</th><th className="px-4 py-3 text-right">Sewa Semeton</th><th className="px-4 py-3 text-right">Sewa luar</th><th className="px-4 py-3">Kondisi</th><th className="px-4 py-3 text-center">Foto</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{assets.length ? assets.map((asset) => <tr key={asset.id}><td className="px-4 py-3 font-semibold text-[#3c5043]">{asset.assetName || '-'}</td><td className="px-4 py-3 text-right">{Number(asset.quantity || 0)}</td><td className="px-4 py-3 text-right font-semibold">{Number(asset.available || 0)}</td><td className="px-4 py-3">{asset.currentRentals?.length ? asset.currentRentals.map((rental) => `${rental.renter} (${rental.quantity})`).join(', ') : '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.purchasePrice)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.rentalRateSemeton || asset.rentalRate)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.rentalRateLuar || asset.rentalRate)}</td><td className="px-4 py-3">{asset.condition || '-'}</td><td className="px-4 py-2 text-center">{asset.photoUrl ? <a href={asset.photoUrl} target="_blank" rel="noreferrer" className="inline-flex" aria-label={`Lihat foto ${asset.assetName}`}><img src={asset.photoUrl} alt={asset.assetName || 'Foto aset'} loading="lazy" className="h-10 w-14 rounded border border-[#e6e7dd] object-cover" /></a> : '-'}</td></tr>) : <tr><td colSpan="9" className="px-4 py-8 text-center text-[#849084]">Belum ada data aset.</td></tr>}</tbody></table></div>
@@ -950,6 +963,7 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const submitLock = useRef(false)
+  const pendingSubmission = useRef(null)
   const [values, setValues] = useState(() => Object.fromEntries(members.map((member) => [String(member.ID), {
     amount: '', chargeAmount: '', cashPhysical: '', changePaid: '', purpose: '', notes: '',
   }])))
@@ -1049,14 +1063,33 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
         ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
         : { memberId: member.ID, memberName: member.Nama, date: paymentDate, chargeAmount, amount, cashPhysical, changePaid: Number(value.changePaid) || 0, purpose: value.purpose, notes: value.notes || '' }
     })
+    const fingerprint = JSON.stringify(records)
+    const pending = pendingSubmission.current
+    if (pending && pending.fingerprint !== fingerprint) {
+      setMessage('Pengiriman sebelumnya belum dipastikan. Kirim ulang data yang sama; jangan ubah transaksi sebelum memeriksa daftar iuran.')
+      return
+    }
+    const prefix = isIuran ? 'IU' : 'SK'
+    const submittedRecords = pending?.fingerprint === fingerprint
+      ? pending.records
+      : records.map((record) => ({ ...record, id: createTransactionId(prefix) }))
+    pendingSubmission.current = { fingerprint, records: submittedRecords }
     submitLock.current = true
     setBusy(true)
-    try { await onSave(records) } catch (error) { setMessage(error.message || 'Pembayaran gagal disimpan.') } finally { submitLock.current = false; setBusy(false) }
+    try {
+      await onSave(submittedRecords)
+      pendingSubmission.current = null
+    } catch (error) {
+      if (!error.uncertain) pendingSubmission.current = null
+      setMessage(error.message || 'Pembayaran gagal disimpan.')
+    } finally { submitLock.current = false; setBusy(false) }
   }
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+  const submissionUncertain = Boolean(pendingSubmission.current)
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-6xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e]" aria-label="Tutup"><X size={18} /></button></header>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></header>
+      <fieldset disabled={busy || submissionUncertain} className="contents">
       <div className="flex flex-wrap items-end gap-3 border-b border-[#eceee6] p-4 sm:px-6">
         <label className="text-[11px] font-semibold">Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>
         {isIuran && <label className="text-[11px] font-semibold">Periode<input type="month" value={periodId} onChange={(event) => setPeriodId(event.target.value)} className={`${inputClass} mt-1`} /></label>}
@@ -1074,7 +1107,8 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
           })}</tbody>
         </table>
       </div>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{readyCount} anggota akan dicatat{message && <p role="status" className="mt-1 font-semibold text-[#b5122a]">{message}</p>}</div><div className="flex gap-2"><button onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : `Simpan ${readyCount} pembayaran`}</button></div></footer>
+      </fieldset>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{readyCount} anggota akan dicatat{message && <p role="status" className="mt-1 font-semibold text-[#b5122a]">{message}</p>}</div><div className="flex gap-2"><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : `Simpan ${readyCount} pembayaran`}</button></div></footer>
     </section>
   </div>
 }
@@ -1085,7 +1119,9 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   const [records, setRecords] = useState(() => Array.from({ length: 5 }, () => blankRecord()))
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
   const submitLock = useRef(false)
+  const pendingSubmission = useRef(null)
   const [wijilanMode, setWijilanMode] = useState(false)
   const [wijilanEvent, setWijilanEvent] = useState('')
   const inputClass = 'w-full min-w-[110px] rounded border border-[#e1e5dc] bg-white px-2 py-2 text-xs outline-none focus:border-[#b5122a]'
@@ -1206,9 +1242,23 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
     if (submitLock.current) return
     let prepared
     try { prepared = prepareRecords() } catch (error) { setMessage(error.message); return }
+    const fingerprint = JSON.stringify(prepared)
+    const pending = pendingSubmission.current
+    if (pending && pending.fingerprint !== fingerprint) {
+      setMessage('Pengiriman sebelumnya belum dipastikan. Kembalikan data seperti semula lalu kirim ulang, atau periksa daftar transaksi sebelum membuat pengiriman baru.')
+      return
+    }
+    const recordsToSave = pending?.records || prepared.map((record) => ({ ...record, id: createTransactionId(isPunia ? 'PU' : 'PI') }))
+    pendingSubmission.current = { fingerprint, records: recordsToSave }
     submitLock.current = true
     setBusy(true)
-    try { await onSave(prepared) } finally { submitLock.current = false; setBusy(false) }
+    try { await onSave(recordsToSave); pendingSubmission.current = null; setSubmissionUncertain(false) }
+    catch (error) {
+      if (!error.uncertain) pendingSubmission.current = null
+      setSubmissionUncertain(Boolean(error.uncertain))
+      setMessage(error.message || 'Status penyimpanan belum dapat dipastikan.')
+    }
+    finally { submitLock.current = false; setBusy(false) }
   }
 
   function textCell(index, field, placeholder = '', type = 'text') {
@@ -1219,9 +1269,10 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
     return <select value={records[index][field]} onChange={(event) => updateRow(index, field, event.target.value)} className={inputClass}>{options.map((option) => <option key={option}>{option}</option>)}</select>
   }
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-7xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy} aria-label="Tutup" className="rounded p-1.5"><X size={18} /></button></header>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy || submissionUncertain} aria-label="Tutup" className="rounded p-1.5 disabled:opacity-50"><X size={18} /></button></header>
+      <fieldset disabled={busy || submissionUncertain} className="contents">
       <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>{!isPunia && <><button onClick={startWijilanForAll} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Wijilan semua anggota</button><button onClick={exportWijilanTemplate} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Template Wijilan anggota</button></>}<button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
       {wijilanMode && <div className="border-b border-[#eceee6] px-4 py-3 sm:px-6"><label className="block max-w-xl text-[11px] font-semibold">Nama piodalan<input value={wijilanEvent} onChange={(event) => setWijilanEvent(event.target.value)} placeholder="Contoh: Piodalan Pura Desa" className={`${inputClass} mt-1`} /></label><p className="mt-1 text-[10px] text-[#849084]">Satu baris disediakan untuk setiap anggota aktif. Isi nominal yang disetor; baris kosong dilewati.</p></div>}
       <div className="min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[1160px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[9px] font-bold uppercase text-[#89958a]"><tr>{(isPunia ? ['Tanggal', 'Nama pemberi', 'Jenis', 'Nama piodalan', 'Barang', 'Jumlah', 'Satuan', 'Nominal/nilai', 'Catatan'] : ['Tanggal', 'Nama piodalan', 'Kategori', 'Nama pemberi', 'Barang', 'Jumlah', 'Satuan', 'Arus', 'Nominal', 'Keterangan']).map((label) => <th key={label} className="px-2 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#eff0ea]">{records.map((row, index) => <tr key={index}>
@@ -1247,26 +1298,39 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
           <td className="px-2 py-2">{textCell(index, 'description', 'Keterangan')}</td>
         </>}
       </tr>)}</tbody></table></div>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{message && <p role="status" className="font-semibold text-[#b5122a]">{message}</p>}Nama pemberi akan ditampilkan pada dashboard publik.</div><div className="flex gap-2"><button onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : `Simpan ${readyCount} baris`}</button></div></footer>
+      </fieldset>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{message && <p role="status" className="font-semibold text-[#b5122a]">{message}</p>}Nama pemberi akan ditampilkan pada dashboard publik.</div><div className="flex gap-2"><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : `Simpan ${readyCount} baris`}</button></div></footer>
     </section>
   </div>
 }
 
 function RecordModal({ page, editing, members, contacts, assets, rentalRows, busy, onClose, onSave, onSaveIuran, onSaveSukaduka, onSaveRental, onSaveActivity }) {
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const [message, setMessage] = useState('')
+  async function submit(event) {
+    try { await onSave(event) }
+    catch (error) {
+      if (error.uncertain) setSubmissionUncertain(true)
+      setMessage(error.message || 'Status penyimpanan belum dapat dipastikan.')
+    }
+  }
   if (page.api === 'TRANSAKSI_IURAN') return <IuranModal members={members} editing={editing} busy={busy} onClose={onClose} onSave={onSaveIuran} />
   if (page.api === 'Sukaduka') return <SukadukaModal members={members} editing={editing} busy={busy} onClose={onClose} onSave={onSaveSukaduka} />
   if (page.api === 'SewaAset') return <RentalModal assets={assets} rentalRows={rentalRows} editing={editing} busy={busy} onClose={onClose} onSave={onSaveRental} />
   if (page.api === 'Notulensi') return <NotulensiModal contacts={contacts} editing={editing} busy={busy} onClose={onClose} onSave={onSave} />
   if (page.api === 'KegiatanMedia') return <ActivityMediaModal editing={editing} busy={busy} onClose={onClose} onSave={onSaveActivity} />
   const today = new Date().toISOString().slice(0, 10)
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
     <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah catatan' : `Tambah ${page.title.toLowerCase()}`}</h2><p className="mt-1 text-xs text-[#8c978d]">Lengkapi informasi berikut.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
-      <form onSubmit={onSave} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah catatan' : `Tambah ${page.title.toLowerCase()}`}</h2><p className="mt-1 text-xs text-[#8c978d]">Lengkapi informasi berikut.</p></div><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+      {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
+      <form onSubmit={(event) => { event.preventDefault(); submit(event) }} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <fieldset disabled={busy || submissionUncertain} className="contents">
         {page.fields.map(([key, label, type]) => <label key={key} className={`block ${type === 'textarea' || key === 'photoFile' ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">{label}{key === 'purpose' && <span className="ml-1 text-[#c16e52]">*</span>}</span>
           {type.startsWith('select:') ? <select name={key} defaultValue={editing?.[key] || ''} required className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]"><option value="" disabled>Pilih {label.toLowerCase()}</option>{type.slice(7).split('|').map((option) => <option key={option}>{option}</option>)}</select> : type === 'textarea' ? <textarea name={key} defaultValue={editing?.[key] || ''} rows={key === 'minutes' || key === 'followUp' ? '8' : '3'} className="w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" /> : type === 'file' ? <input name={key} type="file" accept="image/*" className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-[#e9efe5] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#496b4d]" /> : <input name={key} type={type} required={key === 'date' || key === 'memberName' || key === 'amount' || key === 'description' && page.api === 'PengeluaranIuran' || (key === 'password' && !editing)} minLength={key === 'password' ? 12 : undefined} min={type === 'number' ? '0' : undefined} step={type === 'number' ? 'any' : undefined} defaultValue={key === 'password' ? '' : editing?.[key] ?? (key === 'date' ? today : '')} placeholder={key === 'password' && editing ? 'Kosongkan jika tidak diubah' : undefined} readOnly={key === 'photoUrl'} className={`w-full rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs outline-none focus:border-[#789578] ${key === 'photoUrl' ? 'bg-[#f5f6f1] text-[#809080]' : 'bg-white'}`} />}
         </label>)}
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
+        </fieldset>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
       </form>
     </div>
   </div>
@@ -1287,6 +1351,9 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
     notes: editing?.notes || '',
   })
   const [proofFile, setProofFile] = useState(null)
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const [message, setMessage] = useState('')
+  const transactionId = useRef(editing?.id || createTransactionId('SK'))
   const member = members.find((entry) => String(entry.ID) === String(form.memberId))
   const amount = Number(form.amount) || 0
   const chargeAmount = Number(form.chargeAmount) || 0
@@ -1303,12 +1370,12 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
   const readonlyClass = `${inputClass} bg-[#f5f6f1] font-semibold text-[#809080]`
 
   function setValue(key, value) { setForm((previous) => ({ ...previous, [key]: value })) }
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault()
     if (!valid) return
     const incoming = form.direction === 'Masuk'
-    onSave({
-      id: editing?.id, date: form.date, direction: form.direction,
+    try { await onSave({
+      id: transactionId.current, date: form.date, direction: form.direction,
       recipient: incoming ? member.Nama : form.recipient,
       memberId: incoming ? member.ID : '', memberName: incoming ? member.Nama : '',
       purpose: form.purpose, amount, chargeAmount,
@@ -1321,12 +1388,17 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
       refundDebt: incoming ? openingRefundDebt + changeDue - changePaid : 0,
       notes: form.notes,
       proofFile,
-    })
+    }) } catch (error) {
+      if (error.uncertain) setSubmissionUncertain(true)
+      setMessage(error.message || 'Status transaksi belum dapat dipastikan.')
+    }
   }
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sukaduka' : 'Catat sukaduka'}</h2><p className="mt-1 text-xs text-[#8c978d]">Tagihan dan pembayaran memperbarui saldo tunggakan anggota otomatis.</p></div><button type="button" onClick={onClose} className="rounded p-1.5 text-[#7d8b7e]" aria-label="Tutup"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sukaduka' : 'Catat sukaduka'}</h2><p className="mt-1 text-xs text-[#8c978d]">Tagihan dan pembayaran memperbarui saldo tunggakan anggota otomatis.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+    {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <fieldset disabled={busy || submissionUncertain} className="contents">
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal transaksi</span><input type="date" value={form.date} onChange={(event) => setValue('date', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Arus kas</span><select value={form.direction} disabled={Boolean(editing)} onChange={(event) => setValue('direction', event.target.value)} className={inputClass}><option>Masuk</option><option>Keluar</option></select></label>
       {form.direction === 'Masuk' ? <>
@@ -1344,8 +1416,9 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan / peruntukan <span className="text-[#b5122a]">*</span></span><input required value={form.purpose} onChange={(event) => setValue('purpose', event.target.value)} className={inputClass} /></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Foto bukti serah terima</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setProofFile(event.target.files?.[0] || null)} className={inputClass} /><span className="mt-1 block text-[10px] text-[#888]">Foto tersimpan di folder Drive Foto Sukaduka (maks. 5 MB).{editing?.proofPhotoUrl && <a className="ml-1 font-semibold text-[#b5122a] underline" href={editing.proofPhotoUrl} target="_blank" rel="noreferrer">Lihat bukti saat ini</a>}</span></label>
       {form.direction === 'Keluar' && <label><span className="mb-1.5 block text-[11px] font-semibold">Nominal</span><input type="number" min="1" value={form.amount} onChange={(event) => setValue('amount', event.target.value)} className={inputClass} /></label>}
+      </fieldset>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Periksa anggota, peruntukan, tagihan, alokasi pembayaran, uang fisik, dan kembalian.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan transaksi'}</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : 'Simpan transaksi'}</button></div>
     </form>
   </div></div>
 }
@@ -1359,6 +1432,9 @@ function RentalModal({ assets, rentalRows, editing, busy, onClose, onSave }) {
     quantity: Number(editing?.quantity || 1), maintenanceCost: Number(editing?.maintenanceCost || 0),
     status: editing?.status || 'Berjalan', notes: editing?.notes || '',
   })
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const [message, setMessage] = useState('')
+  const transactionId = useRef(editing?.id || createTransactionId('SW'))
   const asset = assets.find((item) => String(item.id) === String(form.assetId))
   function availableFor(item) {
     if (!item || item.condition === 'Rusak' || !form.startDate || !form.endDate) return 0
@@ -1372,14 +1448,21 @@ function RentalModal({ assets, rentalRows, editing, busy, onClose, onSave }) {
   const valid = Boolean(asset && form.renter && form.startDate && form.endDate && form.endDate >= form.startDate) && Number(form.quantity) > 0 && (form.status === 'Dibatalkan' || Number(form.quantity) <= available)
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   function setValue(key, value) { setForm((previous) => ({ ...previous, [key]: value })) }
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault()
     if (!valid) return
-    onSave({ id: editing?.id, date: form.date, assetId: asset.id, assetName: asset.assetName, renter: form.renter, customerType: form.customerType, startDate: form.startDate, endDate: form.endDate, quantity: Number(form.quantity), rentalIncome, maintenanceCost: Number(form.maintenanceCost) || 0, status: form.status, notes: form.notes })
+    try {
+      await onSave({ id: transactionId.current, date: form.date, assetId: asset.id, assetName: asset.assetName, renter: form.renter, customerType: form.customerType, startDate: form.startDate, endDate: form.endDate, quantity: Number(form.quantity), rentalIncome, maintenanceCost: Number(form.maintenanceCost) || 0, status: form.status, notes: form.notes })
+    } catch (error) {
+      if (error.uncertain) setSubmissionUncertain(true)
+      setMessage(error.message || 'Status transaksi sewa belum dapat dipastikan.')
+    }
   }
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sewa' : 'Tambah transaksi sewa'}</h2><p className="mt-1 text-xs text-[#8c978d]">Stok dihitung untuk rentang tanggal yang dipilih.</p></div><button type="button" onClick={onClose} className="rounded p-1.5" aria-label="Tutup"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sewa' : 'Tambah transaksi sewa'}</h2><p className="mt-1 text-xs text-[#8c978d]">Stok dihitung untuk rentang tanggal yang dipilih.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+    {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <fieldset disabled={busy || submissionUncertain} className="contents">
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal transaksi</span><input type="date" value={form.date} onChange={(event) => setValue('date', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Status</span><select value={form.status} onChange={(event) => setValue('status', event.target.value)} className={inputClass}><option>Berjalan</option><option>Selesai</option><option>Dibatalkan</option></select></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Pilih alat</span><select required value={form.assetId} onChange={(event) => setValue('assetId', event.target.value)} className={inputClass}><option value="">Pilih inventaris</option>{assets.map((item) => <option key={item.id} value={item.id}>{item.assetName} · Semeton {currency(item.rentalRateSemeton || item.rentalRate)} / luar {currency(item.rentalRateLuar || item.rentalRate)} · stok {availableFor(item)}</option>)}</select></label>
@@ -1393,8 +1476,9 @@ function RentalModal({ assets, rentalRows, editing, busy, onClose, onSave }) {
       <label><span className="mb-1.5 block text-[11px] font-semibold">Total pemasukan sewa</span><input readOnly value={rentalIncome} className={`${inputClass} bg-[#f5f6f1]`} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Biaya perawatan</span><input type="number" min="0" value={form.maintenanceCost} onChange={(event) => setValue('maintenanceCost', event.target.value)} className={inputClass} /></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan</span><textarea rows="3" value={form.notes} onChange={(event) => setValue('notes', event.target.value)} className={inputClass} /></label>
+      </fieldset>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pilih alat dan tanggal yang valid, serta jumlah sewa tidak melebihi stok tersedia.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan transaksi'}</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : 'Simpan transaksi'}</button></div>
     </form>
   </div></div>
 }
@@ -1410,19 +1494,28 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
     visibility: editing?.visibility || 'Publik',
   })
   const [photoFile, setPhotoFile] = useState(null)
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const [message, setMessage] = useState('')
+  const transactionId = useRef(editing?.id || createTransactionId('KM'))
   const hasPhoto = Boolean(photoFile || editing?.photoUrl)
   const validYoutube = Boolean(youtubeEmbedUrl(form.youtubeUrl))
   const valid = Boolean(form.title.trim() && form.eventDate) && (form.mediaType === 'photo' ? hasPhoto : validYoutube)
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   function setValue(key, value) { setForm((previous) => ({ ...previous, [key]: value })) }
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault()
     if (!valid) return
-    onSave({ ...form, title: form.title.trim(), photoFile, photoUrl: editing?.photoUrl || '' })
+    try { await onSave({ ...form, id: transactionId.current, title: form.title.trim(), photoFile, photoUrl: editing?.photoUrl || '' }) }
+    catch (error) {
+      if (error.uncertain) setSubmissionUncertain(true)
+      setMessage(error.message || 'Status dokumentasi belum dapat dipastikan.')
+    }
   }
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#151515]/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-white p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah dokumentasi' : 'Tambah dokumentasi kegiatan'}</h2><p className="mt-1 text-xs text-[#888]">Foto tersimpan di Drive; video ditampilkan dari YouTube.</p></div><button type="button" onClick={onClose} className="rounded p-1.5" aria-label="Tutup"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#151515]/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-white p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah dokumentasi' : 'Tambah dokumentasi kegiatan'}</h2><p className="mt-1 text-xs text-[#888]">Foto tersimpan di Drive; video ditampilkan dari YouTube.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+    {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <fieldset disabled={busy || submissionUncertain} className="contents">
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Judul kegiatan</span><input required value={form.title} onChange={(event) => setValue('title', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal kegiatan</span><input type="date" required value={form.eventDate} onChange={(event) => setValue('eventDate', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Jenis media</span><select value={form.mediaType} onChange={(event) => setValue('mediaType', event.target.value)} className={inputClass}><option value="photo">Foto kegiatan</option><option value="youtube">Video YouTube</option></select></label>
@@ -1431,7 +1524,8 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
       <label><span className="mb-1.5 block text-[11px] font-semibold">Publikasi</span><select value={form.visibility} onChange={(event) => setValue('visibility', event.target.value)} className={inputClass}><option>Publik</option><option>Draft</option></select></label>
       <p className="self-center text-[10px] text-[#777]">{form.visibility === 'Publik' ? 'Tampil di galeri publik.' : 'Hanya dapat dilihat pengelola.'}</p>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Lengkapi judul/tanggal dan pilih foto atau URL YouTube yang valid.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Mengirim...' : 'Simpan dokumentasi'}</button></div>
+      </fieldset>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Mengirim...' : submissionUncertain ? 'Coba konfirmasi dokumentasi' : 'Simpan dokumentasi'}</button></div>
     </form>
   </div></div>
 }
@@ -1579,6 +1673,10 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
     changePaid: Number(editing?.changePaid || 0),
     notes: editing?.notes || '',
   })
+  const [message, setMessage] = useState('')
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const transactionId = useRef(editing?.id || createTransactionId('IU'))
+  const pendingRecord = useRef(null)
   const selectedMember = members.find((member) => String(member.ID) === String(form.memberId))
   const target = editing
     ? Number(selectedMember?.Sisa_Hutang_Iuran || 0) + Number(editing.allocatedContribution || 0)
@@ -1597,11 +1695,12 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
     setForm((previous) => ({ ...previous, [key]: value }))
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault()
     if (!valid) return
-    onSave({
-      id: editing?.id,
+    try {
+      const record = pendingRecord.current || {
+      id: transactionId.current,
       date: form.date,
       periodId: form.periodId,
       memberId: selectedMember.ID,
@@ -1617,16 +1716,27 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
       refundDebtAdded,
       refundDebt,
       notes: form.notes,
-    })
+      }
+      pendingRecord.current = record
+      await onSave(record)
+      pendingRecord.current = null
+      setSubmissionUncertain(false)
+    } catch (error) {
+      if (error.uncertain) setSubmissionUncertain(true)
+      else pendingRecord.current = null
+      setMessage(error.message || 'Status transaksi belum dapat dipastikan.')
+    }
   }
 
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   const readOnlyClass = `${inputClass} bg-[#f5f6f1] font-semibold text-[#809080]`
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
     <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi iuran' : 'Catat pembayaran iuran'}</h2><p className="mt-1 text-xs text-[#8c978d]">Saldo anggota diperbarui setelah transaksi disimpan.</p></div><button type="button" onClick={onClose} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9]" aria-label="Tutup"><X size={18} /></button></div>
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi iuran' : 'Catat pembayaran iuran'}</h2><p className="mt-1 text-xs text-[#8c978d]">Saldo anggota diperbarui setelah transaksi disimpan.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+      {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
       <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <fieldset disabled={busy || submissionUncertain} className="contents">
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Tanggal transaksi</span><input type="date" required value={form.date} onChange={(event) => update('date', event.target.value)} className={inputClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Periode</span><input type="month" required value={form.periodId} onChange={(event) => update('periodId', event.target.value)} className={inputClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Nama anggota</span><select required value={form.memberId} onChange={(event) => setForm((previous) => ({ ...previous, memberId: event.target.value, allocatedContribution: 0, cashPhysical: 0, changePaid: 0 }))} disabled={!members.length || Boolean(editing)} className={inputClass}><option value="" disabled>{members.length ? 'Pilih anggota dari master' : 'Data MASTER_ANGGOTA belum tersedia'}</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama}</option>)}</select></label>
@@ -1639,8 +1749,9 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang kembalian</span><input readOnly value={openingRefundDebt + refundDebtAdded} className={readOnlyClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang iuran (akhir)</span><input readOnly value={arrears} className={readOnlyClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Catatan</span><input value={form.notes} onChange={(event) => update('notes', event.target.value)} className={inputClass} /></label>
+        </fieldset>
         {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan alokasi tidak melebihi hutang dan uang fisik mencukupi alokasi serta kembalian yang diberikan.</p>}
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
       </form>
     </div>
   </div>

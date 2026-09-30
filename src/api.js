@@ -4,8 +4,9 @@ export const isDemo = !endpoint?.trim()
 
 export async function request(action, payload = {}, token = '') {
   if (isDemo) return { demo: true }
+  const mutation = ['create', 'update', 'batchPayments', 'batchCreate'].includes(action)
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 60000)
+  const timeout = window.setTimeout(() => controller.abort(), 300000)
   let response
   try {
     response = await fetch(endpoint, {
@@ -15,15 +16,29 @@ export async function request(action, payload = {}, token = '') {
       signal: controller.signal,
     })
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error('Permintaan melewati batas 60 detik. Periksa koneksi lalu muat ulang data sebelum mengirim ulang.')
-    throw new Error('Koneksi ke server gagal. Periksa jaringan dan URL Apps Script.')
+    const message = error.name === 'AbortError'
+      ? 'Permintaan melewati batas 5 menit.'
+      : 'Koneksi ke server terputus.'
+    const failure = new Error(mutation
+      ? `${message} Status transaksi belum dapat dipastikan. Jangan ubah isi transaksi; coba kirim ulang data yang sama agar server tidak mencatatnya dua kali.`
+      : `${message} Periksa koneksi dan URL Apps Script.`)
+    failure.uncertain = mutation
+    throw failure
   } finally {
     window.clearTimeout(timeout)
   }
   let result
   try { result = await response.json() }
-  catch { throw new Error('Server mengirim respons yang tidak valid. Periksa deployment Apps Script.') }
-  if (!response.ok || result.error) throw new Error(result.error || `HTTP ${response.status}`)
+  catch {
+    const failure = new Error('Server mengirim respons yang tidak valid. Status transaksi belum dapat dipastikan. Jangan ubah isi transaksi; muat ulang data sebelum mencoba lagi.')
+    failure.uncertain = mutation
+    throw failure
+  }
+  if (!response.ok || result.error) {
+    const failure = new Error(result.error || `HTTP ${response.status}`)
+    failure.uncertain = mutation && Boolean(result.uncertain || !response.ok)
+    throw failure
+  }
   return result
 }
 
