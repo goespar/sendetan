@@ -820,7 +820,7 @@ function App() {
               if (active === 'iuran') member.Sisa_Hutang_Iuran = Math.max(0, openingArrears - amount)
               else member.Sisa_Hutang_Sukaduka = Math.max(0, openingArrears + chargeAmount - amount)
               member.Sisa_Hutang_Kembalian = refundDebt
-              return active === 'iuran' ? { ...record, id: `IU-${Date.now()}-${record.memberId}`, memberName: member.Nama, target: openingArrears, changeDue, openingArrears, arrears: openingArrears - amount, openingRefundDebt, refundDebtAdded: refundDebt - openingRefundDebt, refundDebt } : { ...record, id: `SK-${Date.now()}-${record.memberId}`, direction: 'Masuk', recipient: member.Nama, memberName: member.Nama, chargeAmount, openingArrears, arrears: Math.max(0, openingArrears + chargeAmount - amount), changeDue, refundDebtAdded: refundDebt - openingRefundDebt, refundDebt }
+              return active === 'iuran' ? { ...record, id: `IU-${Date.now()}-${record.memberId}`, memberName: member.Nama, target: openingArrears, changeDue, openingArrears, arrears: Math.max(0, openingArrears - amount), openingRefundDebt, refundDebtAdded: refundDebt - openingRefundDebt, refundDebt } : { ...record, id: `SK-${Date.now()}-${record.memberId}`, direction: 'Masuk', recipient: member.Nama, memberName: member.Nama, chargeAmount, openingArrears, arrears: Math.max(0, openingArrears + chargeAmount - amount), changeDue, refundDebtAdded: refundDebt - openingRefundDebt, refundDebt }
             })
             updatedMembers = [...balances.values()]
           }
@@ -1098,8 +1098,6 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
       const cashPhysical = Number(value.cashPhysical) || 0
       const paymentDate = value.date || date
       if (!paymentDate || amount < 0 || cashPhysical < amount || (isIuran && amount <= 0) || (!isIuran && amount + chargeAmount <= 0)) throw new Error(`Periksa nominal dan uang fisik untuk ${member.Nama}.`)
-      if (isIuran && amount > Number(member.Sisa_Hutang_Iuran || 0)) throw new Error(`Nominal iuran ${member.Nama} melebihi hutang saat ini.`)
-      if (!isIuran && amount > Number(member.Sisa_Hutang_Sukaduka || 0) + chargeAmount) throw new Error(`Alokasi pembayaran ${member.Nama} melebihi tunggakan Sukaduka.`)
       if (!isIuran && !String(value.purpose || '').trim()) throw new Error(`Peruntukan sukaduka wajib diisi untuk ${member.Nama}.`)
       return isIuran
         ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
@@ -1412,7 +1410,7 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
   const openingArrears = Math.max(0, Number(member?.Sisa_Hutang_Sukaduka || 0) - (editingTracksArrears ? Number(editing.chargeAmount || 0) - Number(editing.amount || 0) : 0))
   const totalDue = openingArrears + chargeAmount
   const endingArrears = Math.max(0, totalDue - amount)
-  const valid = Boolean(form.date && form.purpose) && (form.direction === 'Keluar' ? Boolean(form.recipient) && amount > 0 : Boolean(member) && chargeAmount >= 0 && amount >= 0 && amount + chargeAmount > 0 && amount <= totalDue && cash >= amount && changePaid <= openingRefundDebt + changeDue)
+  const valid = Boolean(form.date && form.purpose) && (form.direction === 'Keluar' ? Boolean(form.recipient) && amount > 0 : Boolean(member) && chargeAmount >= 0 && amount >= 0 && amount + chargeAmount > 0 && cash >= amount && changePaid <= openingRefundDebt + changeDue)
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   const readonlyClass = `${inputClass} bg-[#f5f6f1] font-semibold text-[#809080]`
 
@@ -1454,7 +1452,7 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
         <label><span className="mb-1.5 block text-[11px] font-semibold">Tunggakan sebelumnya</span><input readOnly value={openingArrears} className={`${inputClass} bg-[#f5f6f1]`} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Tagihan sukaduka baru</span><input type="number" min="0" step="1" value={form.chargeAmount} onChange={(event) => setValue('chargeAmount', event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Total tunggakan yang bisa dibayar</span><input readOnly value={totalDue} className={`${inputClass} bg-[#f5f6f1]`} /></label>
-        <label><span className="mb-1.5 block text-[11px] font-semibold">Dialokasikan untuk sukaduka</span><input type="number" min="0" max={totalDue} step="1" value={form.amount} onChange={(event) => setValue('amount', event.target.value)} className={inputClass} /></label>
+        <label><span className="mb-1.5 block text-[11px] font-semibold">Setoran sukaduka</span><input type="number" min="0" step="1" value={form.amount} onChange={(event) => setValue('amount', event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Uang fisik diterima</span><input type="number" min={amount} step="1" value={form.cashPhysical} onChange={(event) => setValue('cashPhysical', event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian seharusnya</span><input readOnly value={changeDue} className={readonlyClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian diberikan</span><input type="number" min="0" max={openingRefundDebt + changeDue} step="1" value={form.changePaid} onChange={(event) => setValue('changePaid', event.target.value)} className={inputClass} /></label>
@@ -1759,7 +1757,7 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
   const refundDebt = Math.max(0, openingRefundDebt + changeDue - changePaid)
   const refundDebtAdded = refundDebt - openingRefundDebt
   const arrears = Math.max(0, target - allocation)
-  const valid = Boolean(selectedMember) && allocation <= target && cashReceived >= allocation && changePaid <= openingRefundDebt + changeDue
+  const valid = Boolean(selectedMember) && cashReceived >= allocation && changePaid <= openingRefundDebt + changeDue
 
   function update(key, value) {
     setForm((previous) => ({ ...previous, [key]: value }))
@@ -1814,8 +1812,8 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Periode</span><input type="month" required value={form.periodId} onChange={(event) => update('periodId', event.target.value)} className={inputClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Nama anggota</span><select required value={form.memberId} onChange={(event) => setForm((previous) => ({ ...previous, memberId: event.target.value, allocatedContribution: 0, cashPhysical: 0, changePaid: 0 }))} disabled={!members.length || Boolean(editing)} className={inputClass}><option value="" disabled>{members.length ? 'Pilih anggota dari master' : 'Data MASTER_ANGGOTA belum tersedia'}</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama}</option>)}</select></label>
         {selectedMember && <div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] px-3 py-2.5 text-[10px] text-[#788579] sm:col-span-2">Hutang kembalian sebelumnya: <b>{currency(selectedMember.Sisa_Hutang_Kembalian)}</b></div>}
-        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Target iuran</span><input readOnly value={target} className={readOnlyClass} /></label>
-        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Uang untuk iuran</span><input type="number" min="0" max={target} step="1" required value={form.allocatedContribution} onChange={(event) => update('allocatedContribution', event.target.value)} className={inputClass} /></label>
+        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Tunggakan sebelum setor</span><input readOnly value={target} className={readOnlyClass} /></label>
+        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Setoran iuran</span><input type="number" min="0" step="1" required value={form.allocatedContribution} onChange={(event) => update('allocatedContribution', event.target.value)} className={inputClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Uang fisik diterima</span><input type="number" min={allocation} step="1" required value={form.cashPhysical} onChange={(event) => update('cashPhysical', event.target.value)} className={inputClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Kembalian seharusnya</span><input readOnly value={changeDue} className={readOnlyClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Kembalian diberikan</span><input type="number" min="0" max={openingRefundDebt + changeDue} step="1" required value={form.changePaid} onChange={(event) => update('changePaid', event.target.value)} className={inputClass} /></label>
@@ -1823,7 +1821,7 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang iuran (akhir)</span><input readOnly value={arrears} className={readOnlyClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Catatan</span><input value={form.notes} onChange={(event) => update('notes', event.target.value)} className={inputClass} /></label>
         </fieldset>
-        {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan alokasi tidak melebihi hutang dan uang fisik mencukupi alokasi serta kembalian yang diberikan.</p>}
+        {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan uang fisik mencukupi setoran serta kembalian yang diberikan.</p>}
         <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
       </form>
     </div>

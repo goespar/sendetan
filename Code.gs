@@ -441,14 +441,13 @@ function batchPayments_(module, records, user) {
       const changePaid = Number(record.changePaid) || 0;
       if (!/^\d{4}-\d{2}$/.test(periodId)) throw new Error('Periode tidak valid untuk ' + member.Nama + '.');
       if (![allocated, cash, changePaid].every(Number.isFinite) || allocated <= 0 || cash < allocated || changePaid < 0) throw new Error('Nominal iuran tidak valid untuk ' + member.Nama + '.');
-      if (allocated > balance.arrears) throw new Error('Pembayaran ' + member.Nama + ' melebihi hutang iuran ' + balance.arrears + '.');
       const changeDue = cash - allocated;
       if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
       const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
       entry = {
         id: requestId || Utilities.getUuid(), date: record.date, periodId: periodId, memberId: member.ID, memberName: member.Nama,
         target: balance.arrears, allocatedContribution: allocated, cashPhysical: cash, changeDue: changeDue,
-        changePaid: changePaid, openingArrears: balance.arrears, arrears: balance.arrears - allocated,
+        changePaid: changePaid, openingArrears: balance.arrears, arrears: Math.max(0, balance.arrears - allocated),
         openingRefundDebt: balance.refundDebt, refundDebtAdded: refundDebt - balance.refundDebt,
         refundDebt: refundDebt, notes: String(record.notes || ''), createdBy: user.username,
         createdAt: now, updatedAt: now,
@@ -463,7 +462,6 @@ function batchPayments_(module, records, user) {
       const openingArrears = balance.sukadukaArrears;
       const purpose = String(record.purpose || '').trim();
       if (!purpose || ![amount, cash, changePaid, chargeAmount].every(Number.isFinite) || amount < 0 || chargeAmount < 0 || amount + chargeAmount <= 0 || cash < amount || changePaid < 0) throw new Error('Data pembayaran sukaduka tidak valid untuk ' + member.Nama + '.');
-      if (amount > openingArrears + chargeAmount) throw new Error('Alokasi sukaduka melebihi tunggakan ' + member.Nama + '.');
       const changeDue = cash - amount;
       if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
       const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
@@ -1051,7 +1049,6 @@ function saveIuranTransaction_(mode, input, user) {
   if (![allocatedContribution, cashPhysical, changePaid].every(Number.isFinite) || allocatedContribution < 0 || cashPhysical < 0 || changePaid < 0) {
     throw new Error('Nominal transaksi harus berupa angka nol atau lebih.');
   }
-  if (allocatedContribution > openingArrears) throw new Error('Uang untuk iuran melebihi target hutang anggota.');
   if (cashPhysical < allocatedContribution) throw new Error('Uang fisik diterima tidak boleh kurang dari uang yang dialokasikan untuk iuran.');
   const changeDue = cashPhysical - allocatedContribution;
   if (changePaid > openingRefundDebt + changeDue) throw new Error('Kembalian diberikan tidak boleh melebihi hutang kembalian sebelumnya ditambah kembalian transaksi ini.');
@@ -1070,7 +1067,7 @@ function saveIuranTransaction_(mode, input, user) {
     changeDue: changeDue,
     changePaid: changePaid,
     openingArrears: openingArrears,
-    arrears: openingArrears - allocatedContribution,
+    arrears: Math.max(0, openingArrears - allocatedContribution),
     openingRefundDebt: openingRefundDebt,
     refundDebtAdded: refundDebtAdded,
     refundDebt: refundDebt,
@@ -1168,7 +1165,6 @@ function saveSukadukaIncoming_(mode, input, user) {
   if (![amount, cashPhysical, changePaid, chargeAmount].every(Number.isFinite) || amount < 0 || chargeAmount < 0 || amount + chargeAmount <= 0 || cashPhysical < amount || changePaid < 0) {
     throw new Error('Nominal penerimaan tidak valid atau uang fisik kurang dari uang untuk sukaduka.');
   }
-  if (amount > openingArrears + chargeAmount) throw new Error('Alokasi pembayaran sukaduka melebihi tunggakan anggota.');
   const changeDue = cashPhysical - amount;
   if (changePaid > openingRefundDebt + changeDue) throw new Error('Kembalian diberikan tidak boleh melebihi hutang kembalian sebelumnya ditambah kembalian transaksi ini.');
   const refundDebt = Math.max(0, openingRefundDebt + changeDue - changePaid);
