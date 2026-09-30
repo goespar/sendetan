@@ -121,7 +121,7 @@ function App() {
   const [role, setRole] = useState(savedSession ? (localStorage.getItem('takora-role') || 'Bendahara') : 'Publik')
   const [token, setToken] = useState(localStorage.getItem('takora-token') || '')
   const [userName, setUserName] = useState(savedSession ? (localStorage.getItem('takora-name') || 'I Made Sudarma') : 'Anggota')
-  const [active, setActive] = useState('dashboard')
+  const [active, setActive] = useState(() => sessionStorage.getItem('takora-active') || 'dashboard')
   const [rows, setRows] = useState(() => isDemo ? demoCache('rows', initialRows) : Object.fromEntries(Object.keys(initialRows).map((key) => [key, []])))
   const [masterMembers, setMasterMembers] = useState(() => isDemo ? demoCache('members', initialMasterMembers) : [])
   const [contacts, setContacts] = useState(() => isDemo ? demoCache('contacts', initialRows.anggota) : [])
@@ -166,6 +166,10 @@ function App() {
     localStorage.setItem('takora-demo-rentals', JSON.stringify(rentalRows))
     localStorage.setItem('takora-demo-opening-balances', JSON.stringify(openingBalances))
   }, [rows, masterMembers, contacts, rentalAssets, rentalRows, openingBalances])
+
+  useEffect(() => {
+    sessionStorage.setItem('takora-active', active)
+  }, [active])
 
   useEffect(() => {
     if (!allowed.includes(active)) setActive('dashboard')
@@ -476,6 +480,44 @@ function App() {
     } catch (error) { setNotice(error.message); throw error }
   }
 
+  async function refreshActiveModuleData() {
+    if (isDemo || !token || !page) return
+    if (active === 'iuran' || active === 'sukaduka') {
+      const [transactions, members] = await Promise.all([
+        request('list', { module: page.api }, token),
+        request('masterAnggota', {}, token),
+      ])
+      setRows((previous) => ({ ...previous, [active]: transactions.data || [] }))
+      setMasterMembers(members.members || [])
+      return
+    }
+    if (active === 'aset' || active === 'sewa') {
+      const [assets, rentals] = await Promise.all([
+        request('list', { module: 'Aset' }, token),
+        request('list', { module: 'SewaAset' }, token),
+      ])
+      setRentalAssets(assets.data || [])
+      setRentalRows(rentals.data || [])
+      setRows((previous) => ({ ...previous, aset: assets.data || [], sewa: rentals.data || [] }))
+      return
+    }
+    const result = await request('list', { module: page.api }, token)
+    setRows((previous) => ({ ...previous, [active]: result.data || [] }))
+  }
+
+  function closeRecordModal() {
+    if (operationRef.current) return
+    setModal(false)
+    setEditing(null)
+    refreshActiveModuleData().catch((error) => setNotice(error.message))
+  }
+
+  function closeBatchModal() {
+    if (operationRef.current) return
+    setBatchModal(false)
+    refreshActiveModuleData().catch((error) => setNotice(error.message))
+  }
+
   async function saveMasterBalance(record) {
     try {
       let member
@@ -755,8 +797,8 @@ function App() {
         </div>
       </main>
 
-      {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) { setModal(false); setEditing(null) } }} onSave={(event) => runExclusive('save', () => saveRecord(event))} onSaveIuran={(record) => runExclusive('save', () => saveIuran(record))} onSaveSukaduka={(record) => runExclusive('save', () => saveSukaduka(record))} onSaveRental={(record) => runExclusive('save', () => saveRental(record))} onSaveActivity={(record) => runExclusive('save', () => saveActivity(record))} />}
-      {batchModal && ['iuran', 'sukaduka'].includes(active) && <BatchPaymentModal module={active === 'iuran' ? 'TRANSAKSI_IURAN' : 'Sukaduka'} members={masterMembers} onClose={() => setBatchModal(false)} onSave={async (records) => {
+      {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} busy={Boolean(busyAction)} onClose={closeRecordModal} onSave={(event) => runExclusive('save', () => saveRecord(event))} onSaveIuran={(record) => runExclusive('save', () => saveIuran(record))} onSaveSukaduka={(record) => runExclusive('save', () => saveSukaduka(record))} onSaveRental={(record) => runExclusive('save', () => saveRental(record))} onSaveActivity={(record) => runExclusive('save', () => saveActivity(record))} />}
+      {batchModal && ['iuran', 'sukaduka'].includes(active) && <BatchPaymentModal module={active === 'iuran' ? 'TRANSAKSI_IURAN' : 'Sukaduka'} members={masterMembers} onClose={closeBatchModal} onSave={async (records) => {
         try {
           let savedRecords = records
           let updatedMembers = []
@@ -788,7 +830,7 @@ function App() {
           setNotice(`${savedRecords.length} pembayaran berhasil disimpan.`)
         } catch (error) { setNotice(error.message); throw error }
       }} />}
-      {batchModal && ['punia', 'piodalan'].includes(active) && <BatchLedgerModal module={active} members={masterMembers} onClose={() => setBatchModal(false)} onSave={async (records) => {
+      {batchModal && ['punia', 'piodalan'].includes(active) && <BatchLedgerModal module={active} members={masterMembers} onClose={closeBatchModal} onSave={async (records) => {
         try {
           let savedRecords = records
           if (!isDemo) {
@@ -808,7 +850,7 @@ function App() {
       {openingBalanceModal && <OpeningBalanceModal balances={openingBalances} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setOpeningBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveOpeningBalances(record))} />}
       {sukadukaBalanceModal && <SukadukaBalanceModal members={masterMembers} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setSukadukaBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveSukadukaBalance(record))} />}
       {loginOpen && <LoginModal login={login} setLogin={setLogin} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setLoginOpen(false) }} onSubmit={(event) => runExclusive('login', () => signIn(event))} demo={isDemo} />}
-      {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}</div>}
+      {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}<button type="button" onClick={() => setNotice('')} className="ml-1 rounded p-1 hover:bg-white/15" aria-label="Tutup notifikasi"><X size={15} /></button></div>}
     </div>
   )
 }
@@ -1086,9 +1128,9 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   }
 
   const submissionUncertain = Boolean(pendingSubmission.current)
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-6xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></header>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></header>
       <fieldset disabled={busy || submissionUncertain} className="contents">
       <div className="flex flex-wrap items-end gap-3 border-b border-[#eceee6] p-4 sm:px-6">
         <label className="text-[11px] font-semibold">Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>
@@ -1108,7 +1150,7 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
         </table>
       </div>
       </fieldset>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{readyCount} anggota akan dicatat{message && <p role="status" className="mt-1 font-semibold text-[#b5122a]">{message}</p>}</div><div className="flex gap-2"><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : `Simpan ${readyCount} pembayaran`}</button></div></footer>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{readyCount} anggota akan dicatat{message && <p role="status" className="mt-1 font-semibold text-[#b5122a]">{message}</p>}</div><div className="flex gap-2"><button onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : `Simpan ${readyCount} pembayaran`}</button></div></footer>
     </section>
   </div>
 }
@@ -1269,9 +1311,9 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
     return <select value={records[index][field]} onChange={(event) => updateRow(index, field, event.target.value)} className={inputClass}>{options.map((option) => <option key={option}>{option}</option>)}</select>
   }
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-7xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy || submissionUncertain} aria-label="Tutup" className="rounded p-1.5 disabled:opacity-50"><X size={18} /></button></header>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy} aria-label="Tutup" className="rounded p-1.5 disabled:opacity-50"><X size={18} /></button></header>
       <fieldset disabled={busy || submissionUncertain} className="contents">
       <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>{!isPunia && <><button onClick={startWijilanForAll} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Wijilan semua anggota</button><button onClick={exportWijilanTemplate} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Template Wijilan anggota</button></>}<button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
       {wijilanMode && <div className="border-b border-[#eceee6] px-4 py-3 sm:px-6"><label className="block max-w-xl text-[11px] font-semibold">Nama piodalan<input value={wijilanEvent} onChange={(event) => setWijilanEvent(event.target.value)} placeholder="Contoh: Piodalan Pura Desa" className={`${inputClass} mt-1`} /></label><p className="mt-1 text-[10px] text-[#849084]">Satu baris disediakan untuk setiap anggota aktif. Isi nominal yang disetor; baris kosong dilewati.</p></div>}
@@ -1299,7 +1341,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
         </>}
       </tr>)}</tbody></table></div>
       </fieldset>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{message && <p role="status" className="font-semibold text-[#b5122a]">{message}</p>}Nama pemberi akan ditampilkan pada dashboard publik.</div><div className="flex gap-2"><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : `Simpan ${readyCount} baris`}</button></div></footer>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><div className="text-xs text-[#68776b]">{message && <p role="status" className="font-semibold text-[#b5122a]">{message}</p>}Nama pemberi akan ditampilkan pada dashboard publik.</div><div className="flex gap-2"><button onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button onClick={submit} disabled={busy || !readyCount} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : `Simpan ${readyCount} baris`}</button></div></footer>
     </section>
   </div>
 }
@@ -1308,9 +1350,14 @@ function RecordModal({ page, editing, members, contacts, assets, rentalRows, bus
   const [submissionUncertain, setSubmissionUncertain] = useState(false)
   const [message, setMessage] = useState('')
   async function submit(event) {
+    const form = event.currentTarget
     try { await onSave(event) }
     catch (error) {
       if (error.uncertain) setSubmissionUncertain(true)
+      else {
+        delete form.dataset.requestId
+        delete form.dataset.requestPayload
+      }
       setMessage(error.message || 'Status penyimpanan belum dapat dipastikan.')
     }
   }
@@ -1320,9 +1367,9 @@ function RecordModal({ page, editing, members, contacts, assets, rentalRows, bus
   if (page.api === 'Notulensi') return <NotulensiModal contacts={contacts} editing={editing} busy={busy} onClose={onClose} onSave={onSave} />
   if (page.api === 'KegiatanMedia') return <ActivityMediaModal editing={editing} busy={busy} onClose={onClose} onSave={onSaveActivity} />
   const today = new Date().toISOString().slice(0, 10)
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah catatan' : `Tambah ${page.title.toLowerCase()}`}</h2><p className="mt-1 text-xs text-[#8c978d]">Lengkapi informasi berikut.</p></div><button onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah catatan' : `Tambah ${page.title.toLowerCase()}`}</h2><p className="mt-1 text-xs text-[#8c978d]">Lengkapi informasi berikut.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
       {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
       <form onSubmit={(event) => { event.preventDefault(); submit(event) }} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <fieldset disabled={busy || submissionUncertain} className="contents">
@@ -1330,7 +1377,7 @@ function RecordModal({ page, editing, members, contacts, assets, rentalRows, bus
           {type.startsWith('select:') ? <select name={key} defaultValue={editing?.[key] || ''} required className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]"><option value="" disabled>Pilih {label.toLowerCase()}</option>{type.slice(7).split('|').map((option) => <option key={option}>{option}</option>)}</select> : type === 'textarea' ? <textarea name={key} defaultValue={editing?.[key] || ''} rows={key === 'minutes' || key === 'followUp' ? '8' : '3'} className="w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" /> : type === 'file' ? <input name={key} type="file" accept="image/*" className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-[#e9efe5] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#496b4d]" /> : <input name={key} type={type} required={key === 'date' || key === 'memberName' || key === 'amount' || key === 'description' && page.api === 'PengeluaranIuran' || (key === 'password' && !editing)} minLength={key === 'password' ? 12 : undefined} min={type === 'number' ? '0' : undefined} step={type === 'number' ? 'any' : undefined} defaultValue={key === 'password' ? '' : editing?.[key] ?? (key === 'date' ? today : '')} placeholder={key === 'password' && editing ? 'Kosongkan jika tidak diubah' : undefined} readOnly={key === 'photoUrl'} className={`w-full rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs outline-none focus:border-[#789578] ${key === 'photoUrl' ? 'bg-[#f5f6f1] text-[#809080]' : 'bg-white'}`} />}
         </label>)}
         </fieldset>
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
       </form>
     </div>
   </div>
@@ -1388,14 +1435,15 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
       refundDebt: incoming ? openingRefundDebt + changeDue - changePaid : 0,
       notes: form.notes,
       proofFile,
-    }) } catch (error) {
+    }) ; setSubmissionUncertain(false) } catch (error) {
       if (error.uncertain) setSubmissionUncertain(true)
+      else transactionId.current = createTransactionId('SK')
       setMessage(error.message || 'Status transaksi belum dapat dipastikan.')
     }
   }
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sukaduka' : 'Catat sukaduka'}</h2><p className="mt-1 text-xs text-[#8c978d]">Tagihan dan pembayaran memperbarui saldo tunggakan anggota otomatis.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sukaduka' : 'Catat sukaduka'}</h2><p className="mt-1 text-xs text-[#8c978d]">Tagihan dan pembayaran memperbarui saldo tunggakan anggota otomatis.</p></div><button type="button" onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
     {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
       <fieldset disabled={busy || submissionUncertain} className="contents">
@@ -1418,7 +1466,7 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
       {form.direction === 'Keluar' && <label><span className="mb-1.5 block text-[11px] font-semibold">Nominal</span><input type="number" min="1" value={form.amount} onChange={(event) => setValue('amount', event.target.value)} className={inputClass} /></label>}
       </fieldset>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Periksa anggota, peruntukan, tagihan, alokasi pembayaran, uang fisik, dan kembalian.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : 'Simpan transaksi'}</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : 'Simpan transaksi'}</button></div>
     </form>
   </div></div>
 }
@@ -1453,13 +1501,15 @@ function RentalModal({ assets, rentalRows, editing, busy, onClose, onSave }) {
     if (!valid) return
     try {
       await onSave({ id: transactionId.current, date: form.date, assetId: asset.id, assetName: asset.assetName, renter: form.renter, customerType: form.customerType, startDate: form.startDate, endDate: form.endDate, quantity: Number(form.quantity), rentalIncome, maintenanceCost: Number(form.maintenanceCost) || 0, status: form.status, notes: form.notes })
+      setSubmissionUncertain(false)
     } catch (error) {
       if (error.uncertain) setSubmissionUncertain(true)
+      else transactionId.current = createTransactionId('SW')
       setMessage(error.message || 'Status transaksi sewa belum dapat dipastikan.')
     }
   }
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sewa' : 'Tambah transaksi sewa'}</h2><p className="mt-1 text-xs text-[#8c978d]">Stok dihitung untuk rentang tanggal yang dipilih.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi sewa' : 'Tambah transaksi sewa'}</h2><p className="mt-1 text-xs text-[#8c978d]">Stok dihitung untuk rentang tanggal yang dipilih.</p></div><button type="button" onClick={onClose} disabled={busy} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
     {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
       <fieldset disabled={busy || submissionUncertain} className="contents">
@@ -1478,7 +1528,7 @@ function RentalModal({ assets, rentalRows, editing, busy, onClose, onSave }) {
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan</span><textarea rows="3" value={form.notes} onChange={(event) => setValue('notes', event.target.value)} className={inputClass} /></label>
       </fieldset>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pilih alat dan tanggal yang valid, serta jumlah sewa tidak melebihi stok tersedia.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : 'Simpan transaksi'}</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : 'Simpan transaksi'}</button></div>
     </form>
   </div></div>
 }
@@ -1511,8 +1561,8 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
       setMessage(error.message || 'Status dokumentasi belum dapat dipastikan.')
     }
   }
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#151515]/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-white p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah dokumentasi' : 'Tambah dokumentasi kegiatan'}</h2><p className="mt-1 text-xs text-[#888]">Foto tersimpan di Drive; video ditampilkan dari YouTube.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#151515]/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-white p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah dokumentasi' : 'Tambah dokumentasi kegiatan'}</h2><p className="mt-1 text-xs text-[#888]">Foto tersimpan di Drive; video ditampilkan dari YouTube.</p></div><button type="button" onClick={onClose} disabled={busy} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
     {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
     <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
       <fieldset disabled={busy || submissionUncertain} className="contents">
@@ -1525,7 +1575,7 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
       <p className="self-center text-[10px] text-[#777]">{form.visibility === 'Publik' ? 'Tampil di galeri publik.' : 'Hanya dapat dilihat pengelola.'}</p>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Lengkapi judul/tanggal dan pilih foto atau URL YouTube yang valid.</p>}
       </fieldset>
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Mengirim...' : submissionUncertain ? 'Coba konfirmasi dokumentasi' : 'Simpan dokumentasi'}</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Mengirim...' : submissionUncertain ? 'Coba konfirmasi dokumentasi' : 'Simpan dokumentasi'}</button></div>
     </form>
   </div></div>
 }
@@ -1534,6 +1584,8 @@ function NotulensiModal({ contacts, editing, busy, onClose, onSave }) {
   const formRef = useRef(null)
   const [shareMode, setShareMode] = useState('group')
   const [contactId, setContactId] = useState('')
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const [message, setMessage] = useState('')
   const today = new Date().toISOString().slice(0, 10)
   function share() {
     const values = Object.fromEntries(new FormData(formRef.current).entries())
@@ -1544,13 +1596,31 @@ function NotulensiModal({ contacts, editing, busy, onClose, onSave }) {
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
+  async function submit(event) {
+    event.preventDefault()
+    const form = event.currentTarget
+    try {
+      await onSave(event)
+      setSubmissionUncertain(false)
+    } catch (error) {
+      if (error.uncertain) setSubmissionUncertain(true)
+      else {
+        delete form.dataset.requestId
+        delete form.dataset.requestPayload
+      }
+      setMessage(error.message || 'Status penyimpanan notulensi belum dapat dipastikan.')
+    }
+  }
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah notulensi' : 'Tambah notulensi'}</h2><p className="mt-1 text-xs text-[#8c978d]">Simpan catatan atau buka WhatsApp dengan pesan siap dibagikan.</p></div><button type="button" onClick={onClose} className="rounded p-1.5" aria-label="Tutup"><X size={18} /></button></div>
-    <form ref={formRef} onSubmit={onSave} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+    <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah notulensi' : 'Tambah notulensi'}</h2><p className="mt-1 text-xs text-[#8c978d]">Simpan catatan atau buka WhatsApp dengan pesan siap dibagikan.</p></div><button type="button" onClick={onClose} disabled={busy} className="rounded p-1.5 disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+    {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
+    <form ref={formRef} onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <fieldset disabled={busy || submissionUncertain} className="contents">
       {[['date', 'Tanggal rapat', 'date'], ['title', 'Agenda / judul', 'text'], ['attendees', 'Peserta', 'text'], ['minutes', 'Catatan dan keputusan', 'textarea'], ['followUp', 'Tindak lanjut', 'textarea']].map(([key, label, type]) => <label key={key} className={type === 'textarea' ? 'sm:col-span-2' : ''}><span className="mb-1.5 block text-[11px] font-semibold">{label}</span>{type === 'textarea' ? <textarea name={key} rows="8" defaultValue={editing?.[key] || ''} className={`${inputClass} resize-y`} /> : <input name={key} type={type} required={key === 'date' || key === 'title'} defaultValue={editing?.[key] || (key === 'date' ? today : '')} className={inputClass} />}</label>)}
       <div className="rounded-md border border-[#e6e7dd] bg-white p-3 sm:col-span-2"><div className="mb-2 flex items-center gap-2 text-xs font-semibold"><MessageCircle size={15} className="text-[#b5122a]" />Bagikan melalui WhatsApp</div><div className="grid gap-2 sm:grid-cols-2"><select value={shareMode} onChange={(event) => setShareMode(event.target.value)} className={inputClass}><option value="group">Grup WhatsApp (pilih grup setelah dibuka)</option><option value="personal">WhatsApp pribadi</option></select>{shareMode === 'personal' && <select value={contactId} onChange={(event) => setContactId(event.target.value)} className={inputClass}><option value="">Pilih anggota</option>{contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.memberName} · {contact.phone}</option>)}</select>}</div></div>
-      <div className="mt-2 flex flex-wrap justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button type="button" onClick={share} disabled={busy || shareMode === 'personal' && !contactId} className="flex items-center gap-2 rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50"><MessageCircle size={14} /> Buka WhatsApp</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan catatan'}</button></div>
+      </fieldset>
+      <div className="mt-2 flex flex-wrap justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button type="button" onClick={share} disabled={busy || submissionUncertain || shareMode === 'personal' && !contactId} className="flex items-center gap-2 rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><MessageCircle size={14} /> Buka WhatsApp</button><button disabled={busy || submissionUncertain} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi catatan' : 'Simpan catatan'}</button></div>
     </form>
   </div></div>
 }
@@ -1723,7 +1793,10 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
       setSubmissionUncertain(false)
     } catch (error) {
       if (error.uncertain) setSubmissionUncertain(true)
-      else pendingRecord.current = null
+      else {
+        pendingRecord.current = null
+        transactionId.current = createTransactionId('IU')
+      }
       setMessage(error.message || 'Status transaksi belum dapat dipastikan.')
     }
   }
@@ -1731,9 +1804,9 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   const readOnlyClass = `${inputClass} bg-[#f5f6f1] font-semibold text-[#809080]`
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !submissionUncertain) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi iuran' : 'Catat pembayaran iuran'}</h2><p className="mt-1 text-xs text-[#8c978d]">Saldo anggota diperbarui setelah transaksi disimpan.</p></div><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah transaksi iuran' : 'Catat pembayaran iuran'}</h2><p className="mt-1 text-xs text-[#8c978d]">Saldo anggota diperbarui setelah transaksi disimpan.</p></div><button type="button" onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
       {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
       <form onSubmit={submit} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <fieldset disabled={busy || submissionUncertain} className="contents">
@@ -1751,7 +1824,7 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Catatan</span><input value={form.notes} onChange={(event) => update('notes', event.target.value)} className={inputClass} /></label>
         </fieldset>
         {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan alokasi tidak melebihi hutang dan uang fisik mencukupi alokasi serta kembalian yang diberikan.</p>}
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy || submissionUncertain} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
       </form>
     </div>
   </div>

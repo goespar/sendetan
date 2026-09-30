@@ -1015,7 +1015,6 @@ function saveIuranTransaction_(mode, input, user) {
   const record = input || {};
   if (!record.memberId) throw new Error('Pilih anggota terlebih dahulu.');
   if (!record.date || !record.periodId) throw new Error('Tanggal dan periode iuran wajib diisi.');
-  const memberLocation = findMasterAnggota_(record.memberId);
   const existingRows = readRecords_('TRANSAKSI_IURAN');
   const existing = mode === 'update' ? existingRows.find(function (row) { return String(row.id) === String(record.id); }) : null;
   const duplicate = mode === 'create' && record.id ? existingRows.find(function (row) { return String(row.id) === String(record.id); }) : null;
@@ -1031,6 +1030,7 @@ function saveIuranTransaction_(mode, input, user) {
     if (!readAuditLog_().some(function (row) { return row.action === 'create' && row.module === 'TRANSAKSI_IURAN' && String(row.recordId) === String(duplicate.id); })) {
       audit_(user, 'create', 'TRANSAKSI_IURAN', duplicate.id, duplicate.memberName);
     }
+    const memberLocation = findMasterAnggota_(record.memberId);
     const currentArrears = Number(memberLocation.member.Sisa_Hutang_Iuran) || 0;
     const currentRefundDebt = Number(memberLocation.member.Sisa_Hutang_Kembalian) || 0;
     if (currentArrears === (Number(duplicate.openingArrears) || 0)
@@ -1041,6 +1041,7 @@ function saveIuranTransaction_(mode, input, user) {
   }
   if (mode === 'update' && !existing) throw new Error('Transaksi iuran tidak ditemukan.');
   if (existing && String(existing.memberId) !== String(record.memberId)) throw new Error('Anggota pada transaksi tidak dapat diganti.');
+  const memberLocation = findMasterAnggota_(record.memberId);
 
   const openingArrears = (Number(memberLocation.member.Sisa_Hutang_Iuran) || 0) + (existing ? Number(existing.allocatedContribution) || 0 : 0);
   const openingRefundDebt = Math.max(0, (Number(memberLocation.member.Sisa_Hutang_Kembalian) || 0) - (existing ? Number(existing.refundDebtAdded) || 0 : 0));
@@ -1287,9 +1288,10 @@ function readRecords_(module) {
   const sheet = spreadsheet_().getSheetByName(module);
   if (!sheet || sheet.getLastRow() < 2) return [];
   const headers = SHEETS[module];
+  const timeZone = spreadsheet_().getSpreadsheetTimeZone();
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues()
     .filter(function (row) { return row.some(function (value) { return value !== ''; }); })
-    .map(function (row) { return rowToObject_(headers, row); });
+    .map(function (row) { return rowToObject_(headers, row, timeZone); });
 }
 
 function readAuditLog_() {
@@ -1329,9 +1331,16 @@ function publicRecords_(module) {
   });
 }
 
-function rowToObject_(headers, row) {
+function rowToObject_(headers, row, timeZone) {
   const result = {};
-  headers.forEach(function (header, index) { result[header] = row[index] instanceof Date ? row[index].toISOString() : row[index]; });
+  headers.forEach(function (header, index) {
+    const value = row[index];
+    if (value instanceof Date && ['date', 'periodId', 'eventDate', 'startDate', 'endDate'].includes(header)) {
+      result[header] = Utilities.formatDate(value, timeZone || Session.getScriptTimeZone(), header === 'periodId' ? 'yyyy-MM' : 'yyyy-MM-dd');
+    } else {
+      result[header] = value instanceof Date ? value.toISOString() : value;
+    }
+  });
   return result;
 }
 
