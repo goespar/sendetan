@@ -28,7 +28,7 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `Users` | `id`, `name`, `username`, `passwordHash`, `salt`, `role`, `status`, `createdAt`, `lastLoginAt` |
 | `Anggota` | `id`, `memberNo`, `memberName`, `phone`, `address`, `status`, `joinedAt`, `notes` |
 | `IuranPeriode` | `id`, `period`, `openedAt`, `closedAt`, `status`, `monthlyTarget`, `memberCount`, `totalBilled`, `carryArrears`, `carryRefundDebt`, `notes`, `createdBy` |
-| `MASTER_ANGGOTA` | `ID`, `Nama`, `Sisa_Hutang_Iuran`, `Sisa_Hutang_Kembalian` |
+| `MASTER_ANGGOTA` | `ID`, `Nama`, `Sisa_Hutang_Iuran`, `Sisa_Hutang_Kembalian`, `Sisa_Hutang_Sukaduka` |
 | `SaldoAwal` | `id`, `module`, `amount`, `date`, `notes`, `updatedBy`, `updatedAt` |
 | `TRANSAKSI_IURAN` | `id`, `date`, `periodId`, `memberId`, `memberName`, `target`, `allocatedContribution`, `cashPhysical`, `changeDue`, `changePaid`, `openingArrears`, `arrears`, `openingRefundDebt`, `refundDebtAdded`, `refundDebt`, `notes`, `createdBy`, `createdAt`, `updatedAt` |
 | `PengeluaranIuran` | `id`, `date`, `category`, `description`, `amount`, `payee`, `createdBy`, `createdAt`, `updatedAt` |
@@ -67,7 +67,7 @@ Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Bas
 | --- | --- |
 | Admin | Semua modul dan pengelolaan akun |
 | Ketua | Membaca seluruh modul, laporan, dan persetujuan akhir |
-| Bendahara | CRUD iuran, sesari, sukaduka, punia, dan piodalan |
+| Bendahara | CRUD iuran, sesari, sukaduka, punia, piodalan, anggota, aset, sewa, inventaris, notulensi, dan galeri |
 | Sekretaris | CRUD anggota, aset, log inventaris, sewa aset, notulensi, dan galeri; upload foto aset/kegiatan |
 | Anggota / Publik | Ringkasan transparansi agregat, tanpa rincian anggota |
 
@@ -152,5 +152,7 @@ Foto kegiatan/aset dapat dilihat oleh siapa pun yang memiliki tautan. Foto bukti
 ## Catatan operasional
 
 - Apps Script Web App bukan pengganti backend dengan proteksi tingkat tinggi: spreadsheet dan project script tetap harus dibatasi ke pengelola tepercaya. Sesi login disimpan di `CacheService` selama enam jam.
-- Upload foto dibatasi 5 MB dan format JPG, PNG, WEBP, GIF.
+- Upload foto dibatasi 5 MB dan format JPG, PNG, WEBP, GIF. Foto besar dikompresi di browser sebelum dikirim jika hasilnya lebih kecil.
+- Dashboard menyediakan filter tahun, bulan, dan tanggal untuk ringkasan; tabel inventaris publik menampilkan jumlah dimiliki/tersedia, tarif sewa, serta penyewa yang sedang aktif.
+- Tombol kirim memakai pengunci klik ganda dan menampilkan status proses; setelah selesai, notifikasi hasil ditampilkan.
 - Grafik UI memiliki data contoh ketika backend belum dikonfigurasi; siapkan agregasi ringkasan produksi sebelum menjadikan grafik tersebut sebagai laporan resmi.

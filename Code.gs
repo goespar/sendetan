@@ -31,7 +31,7 @@ function doGet(e) {
     const action = params.action || 'health';
     if (action === 'health') return json_({ ok: true, service: 'TAKORA API', version: 1 });
     if (action === 'publicGallery') return json_({ ok: true, data: publicGallery_() });
-    if (action === 'publicSummary') return json_({ ok: true, summary: publicSummary_() });
+    if (action === 'publicSummary') return json_({ ok: true, summary: publicSummary_(params) });
     const user = authenticate_(params.token);
     if (action === 'masterAnggota') {
       assertRole_(user, 'list', 'MASTER_ANGGOTA');
@@ -62,7 +62,7 @@ function doPost(e) {
     const action = body.action;
     if (action === 'login') return json_(login_(body.username, body.password));
     if (action === 'publicGallery') return json_({ ok: true, data: publicGallery_() });
-    if (action === 'publicSummary') return json_({ ok: true, summary: publicSummary_() });
+    if (action === 'publicSummary') return json_({ ok: true, summary: publicSummary_(body.filters || {}) });
 
     const user = authenticate_(body.token);
     if (action === 'logout') {
@@ -71,7 +71,7 @@ function doPost(e) {
     }
     if (action === 'summary') {
       assertRole_(user, 'summary', '');
-      return json_({ ok: true, ...summary_() });
+      return json_({ ok: true, ...summary_(body.filters || {}) });
     }
     if (action === 'list') {
       assertRole_(user, 'list', body.module);
@@ -284,7 +284,7 @@ function assertRole_(user, action, module) {
   if (role === 'Admin') return;
   if (action === 'summary' || action === 'list') {
     if (action === 'list' && module === 'MASTER_ANGGOTA' && ['Ketua', 'Bendahara'].indexOf(role) !== -1) return;
-    if (role === 'Ketua' || role === 'Bendahara' && FINANCE_MODULES.indexOf(module) !== -1 || role === 'Sekretaris' && SECRETARY_MODULES.indexOf(module) !== -1) return;
+    if (role === 'Ketua' || role === 'Bendahara' && (FINANCE_MODULES.indexOf(module) !== -1 || SECRETARY_MODULES.indexOf(module) !== -1) || role === 'Sekretaris' && SECRETARY_MODULES.indexOf(module) !== -1) return;
     throw new Error('Peran Anda tidak memiliki akses baca untuk data ini.');
   }
   if (action === 'approve') {
@@ -294,11 +294,12 @@ function assertRole_(user, action, module) {
   if (action === 'upload') {
     const folder = String(module).toLowerCase();
     if (role === 'Sekretaris' && ['assets', 'activities', 'sukaduka'].indexOf(folder) !== -1) return;
+    if (role === 'Bendahara' && ['assets', 'activities'].indexOf(folder) !== -1) return;
     if (role === 'Bendahara' && folder === 'sukaduka') return;
     throw new Error('Peran Anda tidak diizinkan mengunggah file ke folder tersebut.');
   }
   if (action === 'create' || action === 'update' || action === 'delete') {
-    if (role === 'Bendahara' && FINANCE_MODULES.indexOf(module) !== -1) return;
+    if (role === 'Bendahara' && (FINANCE_MODULES.indexOf(module) !== -1 || SECRETARY_MODULES.indexOf(module) !== -1)) return;
     if (role === 'Sekretaris' && SECRETARY_MODULES.indexOf(module) !== -1) return;
   }
   throw new Error('Peran Anda tidak diizinkan melakukan tindakan ini.');
@@ -594,7 +595,41 @@ function publicGallery_() {
     return String(right.eventDate || right.createdAt || '').localeCompare(String(left.eventDate || left.createdAt || ''));
   }).map(function (item) {
     delete item.createdBy;
+    item.photoUrl = driveImageUrl_(item.photoUrl);
     return item;
+  });
+}
+
+function driveImageUrl_(value) {
+  const url = String(value || '');
+  const match = url.match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?.*?id=|thumbnail\?id=))([\w-]+)/);
+  return match ? 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w1200' : url;
+}
+
+function assetInventory_(snapshot) {
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const rentals = summaryRows_(snapshot, 'SewaAset');
+  return summaryRows_(snapshot, 'Aset').map(function (asset) {
+    const currentRentals = rentals.filter(function (rental) {
+      return String(rental.assetId) === String(asset.id) && !['Dibatalkan', 'Selesai'].includes(rental.status) && String(rental.startDate || '').slice(0, 10) <= today && String(rental.endDate || '').slice(0, 10) >= today;
+    });
+    const rented = currentRentals.reduce(function (sum, rental) { return sum + Number(rental.quantity || 0); }, 0);
+    return {
+      id: asset.id,
+      assetName: asset.assetName,
+      category: asset.category,
+      condition: asset.condition,
+      quantity: Number(asset.quantity) || 0,
+      purchasePrice: Number(asset.purchasePrice) || 0,
+      available: Math.max(0, (Number(asset.quantity) || 0) - rented),
+      rentalRateSemeton: Number(asset.rentalRateSemeton || asset.rentalRate) || 0,
+      rentalRateLuar: Number(asset.rentalRateLuar || asset.rentalRate) || 0,
+      photoUrl: driveImageUrl_(asset.photoUrl),
+      currentRenter: currentRentals.map(function (rental) { return rental.renter + ' (' + (Number(rental.quantity) || 0) + ')'; }).join(', '),
+      currentRentals: currentRentals.map(function (rental) {
+        return { renter: rental.renter, quantity: Number(rental.quantity) || 0, startDate: rental.startDate, endDate: rental.endDate };
+      }),
+    };
   });
 }
 
@@ -1066,9 +1101,9 @@ function validateRentalAvailability_(record, excludeId) {
   if (asset.condition === 'Rusak') throw new Error('Alat dalam kondisi rusak dan tidak tersedia untuk disewa.');
 
   const overlapping = readRecords_('SewaAset').filter(function (row) {
-    if (String(row.id) === String(excludeId || '') || String(row.assetId) !== String(asset.id) || row.status === 'Dibatalkan') return false;
+    if (String(row.id) === String(excludeId || '') || String(row.assetId) !== String(asset.id) || ['Dibatalkan', 'Selesai'].includes(row.status)) return false;
     if (!row.startDate || !row.endDate) return false;
-    return String(row.startDate) <= String(record.endDate) && String(row.endDate) >= String(record.startDate);
+    return String(row.startDate).slice(0, 10) <= String(record.endDate).slice(0, 10) && String(row.endDate).slice(0, 10) >= String(record.startDate).slice(0, 10);
   }).reduce(function (total, row) { return total + (Number(row.quantity) || 0); }, 0);
   const available = Math.max(0, (Number(asset.quantity) || 0) - overlapping);
   if (quantity > available) throw new Error('Stok tidak cukup pada tanggal tersebut. Tersedia ' + available + ' item.');
@@ -1119,10 +1154,23 @@ function appendRecord_(module, record) {
 }
 
 function publicRecords_(module) {
+  if (module === 'Aset') {
+    const records = readRecords_('Aset');
+    const inventory = assetInventory_({ Aset: records, SewaAset: readRecords_('SewaAset') });
+    return records.map(function (record) {
+      const current = inventory.find(function (item) { return String(item.id) === String(record.id); }) || {};
+      return Object.assign({}, record, current, { photoUrl: driveImageUrl_(record.photoUrl) });
+    });
+  }
   return readRecords_(module).map(function (record) {
     if (module === 'Users') {
       delete record.passwordHash;
       delete record.salt;
+    }
+    if (module === 'KegiatanMedia') record.photoUrl = driveImageUrl_(record.photoUrl);
+    if (module === 'SewaAset') {
+      record.startDate = String(record.startDate || '').slice(0, 10);
+      record.endDate = String(record.endDate || '').slice(0, 10);
     }
     return record;
   });
@@ -1156,7 +1204,7 @@ function validateModule_(module) {
 }
 
 function summarySnapshot_() {
-  const names = ['Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA', 'SaldoAwal'];
+  const names = ['Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'Aset', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA', 'SaldoAwal'];
   const snapshot = {};
   names.forEach(function (name) { snapshot[name] = readRecords_(name); });
   return snapshot;
@@ -1227,6 +1275,24 @@ function summaryRows_(snapshot, module) {
   return snapshot ? snapshot[module] || [] : readRecords_(module);
 }
 
+function filteredSummarySnapshot_(snapshot, filters) {
+  const year = String(filters.year || '').replace(/\D/g, '').slice(0, 4);
+  const month = String(filters.month || '').replace(/\D/g, '').slice(-2).padStart(2, '0');
+  const day = String(filters.day || '').replace(/\D/g, '').slice(-2).padStart(2, '0');
+  if (!year && !month && !day) return snapshot;
+  Object.keys(snapshot).forEach(function (module) {
+    if (module === 'Aset' || module === 'Anggota' || module === 'MASTER_ANGGOTA') return;
+    snapshot[module] = snapshot[module].filter(function (row) {
+      const value = String(row.date || row.eventDate || row.periodId || '');
+      if (year && value.slice(0, 4) !== year) return false;
+      if (month && value.slice(5, 7) !== month) return false;
+      if (day && value.slice(8, 10) !== day) return false;
+      return true;
+    });
+  });
+  return snapshot;
+}
+
 function getOpeningBalancesFromSnapshot_(snapshot) {
   const balances = { iuran: 0, sukaduka: 0, sesari: 0 };
   summaryRows_(snapshot, 'SaldoAwal').forEach(function (record) {
@@ -1237,18 +1303,20 @@ function getOpeningBalancesFromSnapshot_(snapshot) {
   return balances;
 }
 
-function summary_() {
-  const snapshot = summarySnapshot_();
+function summary_(filters) {
+  const rawSnapshot = summarySnapshot_();
+  const assets = assetInventory_(rawSnapshot);
+  const allTotals = summaryTotals_(rawSnapshot);
+  const snapshot = filteredSummarySnapshot_(rawSnapshot, filters || {});
   const totals = summaryTotals_(snapshot);
   const masterMembers = getMasterAnggota_(snapshot);
   const arrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
   const sukadukaArrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Sukaduka || 0); }, 0);
-  const analytics = analytics_(snapshot);
-  const currentMonth = analytics.monthly[analytics.monthly.length - 1] || { masuk: 0, keluar: 0 };
+  const analytics = analytics_(snapshot, filters || {});
   const cards = [
-    { label: 'Saldo kas gabungan', value: totals.income - totals.expenses, trend: 'Akumulasi tercatat' },
-    { label: 'Penerimaan bulan ini', value: Math.round(currentMonth.masuk * 1000000), trend: 'Seluruh modul kas' },
-    { label: 'Pengeluaran bulan ini', value: Math.round(currentMonth.keluar * 1000000), trend: 'Seluruh modul kas' },
+    { label: 'Saldo kas sesuai filter', value: totals.income - totals.expenses, trend: 'Periode terpilih' },
+    { label: 'Penerimaan sesuai filter', value: totals.income, trend: 'Seluruh modul kas' },
+    { label: 'Pengeluaran sesuai filter', value: totals.expenses, trend: 'Seluruh modul kas' },
     { label: 'Tunggakan iuran', value: arrears, trend: 'Saldo kewajiban anggota' },
   ];
   const balances = moduleBalances_(snapshot, masterMembers);
@@ -1263,25 +1331,31 @@ function summary_() {
     modules: balances.modules,
     outstanding: balances.outstanding,
     donations: publicDonations_(snapshot),
+    activities: recentActivities_(snapshot),
     piodalanReport: piodalanReport,
+    assets: assets,
     generatedAt: new Date().toISOString(),
   };
   return {
     cards: cards,
-    totals: { income: totals.income, expenses: totals.expenses, arrears: arrears, refundDebt: balances.refundDebt },
+    totals: { income: allTotals.income, expenses: allTotals.expenses, arrears: arrears, refundDebt: balances.refundDebt },
     monthly: analytics.monthly,
     sources: analytics.sources,
     modules: balances.modules,
     outstanding: { arrears: arrears, sukadukaArrears: sukadukaArrears, refundDebt: balances.refundDebt },
+    activities: recentActivities_(snapshot),
     piodalanReport: piodalanReport,
+    assets: assets,
     public: publicData,
   };
 }
 
-function publicSummary_() {
-  const snapshot = summarySnapshot_();
+function publicSummary_(filters) {
+  const rawSnapshot = summarySnapshot_();
+  const assets = assetInventory_(rawSnapshot);
+  const snapshot = filteredSummarySnapshot_(rawSnapshot, filters || {});
   const totals = summaryTotals_(snapshot);
-  const analytics = analytics_(snapshot);
+  const analytics = analytics_(snapshot, filters || {});
   const members = summaryRows_(snapshot, 'Anggota').filter(function (row) { return row.status === 'Aktif'; }).length;
   const masterMembers = getMasterAnggota_(snapshot);
   const balances = moduleBalances_(snapshot, masterMembers);
@@ -1296,7 +1370,9 @@ function publicSummary_() {
     modules: balances.modules,
     outstanding: balances.outstanding,
     donations: publicDonations_(snapshot),
+    activities: recentActivities_(snapshot),
     piodalanReport: piodalanReport,
+    assets: assets,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -1347,6 +1423,28 @@ function publicDonations_(snapshot) {
     .slice(0, 100);
 }
 
+function recentActivities_(snapshot) {
+  const items = [];
+  function add(row, activity, category, incoming, amount) {
+    if (!row.date || !(Number(amount) > 0)) return;
+    items.push({ date: String(row.date).slice(0, 10), activity: activity, category: category, incoming: incoming, amount: Number(amount) || 0 });
+  }
+  summaryRows_(snapshot, 'Sesari').forEach(function (row) { add(row, row.description || row.category || 'Transaksi Sesari', 'Sesari', row.direction === 'Masuk', row.amount); });
+  summaryRows_(snapshot, 'TRANSAKSI_IURAN').forEach(function (row) { add(row, 'Pembayaran iuran anggota', 'Iuran', true, row.cashPhysical); });
+  summaryRows_(snapshot, 'PengeluaranIuran').forEach(function (row) { add(row, row.category || 'Pengeluaran iuran', 'Iuran', false, row.amount); });
+  summaryRows_(snapshot, 'Sukaduka').forEach(function (row) { add(row, 'Transaksi Sukaduka', 'Sukaduka', row.direction === 'Masuk', row.direction === 'Masuk' ? row.cashPhysical || row.amount : row.amount); });
+  summaryRows_(snapshot, 'Piodalan').forEach(function (row) {
+    if (row.category !== 'Punia barang') add(row, row.eventName || row.description || 'Transaksi Piodalan', 'Piodalan', row.direction === 'Masuk', row.amount);
+  });
+  summaryRows_(snapshot, 'Punia').forEach(function (row) {
+    if (isCashPunia_(row)) add(row, 'Punia dari ' + (row.donor || 'donatur'), 'Punia', true, row.amount);
+  });
+  summaryRows_(snapshot, 'SewaAset').forEach(function (row) {
+    if (row.status !== 'Dibatalkan') add(row, 'Sewa ' + (row.assetName || 'aset'), 'Sewa alat', true, row.rentalIncome);
+  });
+  return items.sort(function (left, right) { return right.date.localeCompare(left.date); }).slice(0, 12);
+}
+
 function moduleBalances_(snapshot, suppliedMembers) {
   const sesari = summaryRows_(snapshot, 'Sesari');
   const sukaduka = summaryRows_(snapshot, 'Sukaduka');
@@ -1388,18 +1486,23 @@ function moduleBalances_(snapshot, suppliedMembers) {
   return { modules: modules, outstanding: { arrears: arrears, sukadukaArrears: sukadukaArrears, refundDebt: refundDebt }, refundDebt: refundDebt };
 }
 
-function analytics_(snapshot) {
+function analytics_(snapshot, filters) {
   const now = new Date();
   const monthKeys = [];
   const monthLabels = {};
-  for (let offset = 5; offset >= 0; offset--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+  const selectedYear = Number(filters && filters.year) || now.getFullYear();
+  const selectedMonth = Number(filters && filters.month) || 0;
+  const monthRange = filters && filters.year ? (selectedMonth ? [selectedMonth] : Array.from({ length: 12 }, (_, index) => index + 1)) : selectedMonth ? [selectedMonth] : null;
+  const dates = monthRange
+    ? monthRange.map((month) => new Date(selectedYear, month - 1, 1))
+    : Array.from({ length: 6 }, (_, index) => new Date(now.getFullYear(), now.getMonth() - 5 + index, 1));
+  dates.forEach(function (date) {
     const key = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
     monthKeys.push(key);
     monthLabels[key] = Utilities.formatDate(date, Session.getScriptTimeZone(), 'MMM');
-  }
+  });
   const monthly = {};
-  monthKeys.forEach(function (key) { monthly[key] = { month: monthLabels[key], masuk: 0, keluar: 0 }; });
+  monthKeys.forEach(function (key) { monthly[key] = { month: monthLabels[key], masuk: 0, keluar: 0, totalMasuk: 0, totalKeluar: 0 }; });
   const sourceTotals = { Iuran: 0, Sesari: 0, Punia: 0 };
   const openingRows = summaryRows_(snapshot, 'SaldoAwal');
   function add(dateValue, direction, amount, source) {
@@ -1409,7 +1512,9 @@ function analytics_(snapshot) {
     const key = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
     if (!monthly[key]) return;
     const value = Math.max(0, Number(amount) || 0);
-    monthly[key][direction === 'Masuk' ? 'masuk' : 'keluar'] += value / 1000000;
+    const isIncome = direction === 'Masuk';
+    monthly[key][isIncome ? 'masuk' : 'keluar'] += value / 1000000;
+    monthly[key][isIncome ? 'totalMasuk' : 'totalKeluar'] += value;
     if (direction === 'Masuk' && source && Object.prototype.hasOwnProperty.call(sourceTotals, source)) sourceTotals[source] += value;
   }
   summaryRows_(snapshot, 'Sesari').forEach(function (row) { add(row.date, row.direction, row.amount, 'Sesari'); });
@@ -1447,7 +1552,13 @@ function analytics_(snapshot) {
   const sources = Object.keys(sourceTotals).map(function (name) {
     return { name: name, value: sourceTotal ? Math.round(sourceTotals[name] / sourceTotal * 100) : 0, color: colors[name] };
   });
-  return { monthly: monthKeys.map(function (key) { return { ...monthly[key], masuk: Number(monthly[key].masuk.toFixed(2)), keluar: Number(monthly[key].keluar.toFixed(2)) }; }), sources: sources };
+  return { monthly: monthKeys.map(function (key) { return {
+    month: monthly[key].month,
+    masuk: Number(monthly[key].masuk.toFixed(2)),
+    keluar: Number(monthly[key].keluar.toFixed(2)),
+    income: monthly[key].totalMasuk,
+    expenses: monthly[key].totalKeluar,
+  }; }), sources: sources };
 }
 
 function summaryTotals_(snapshot) {

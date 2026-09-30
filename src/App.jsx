@@ -12,6 +12,8 @@ import { isDemo, request, uploadPhoto } from './api.js'
 const DashboardCharts = lazy(() => import('./DashboardCharts.jsx'))
 
 const roleNames = { Admin: 'Administrator', Ketua: 'Ketua', Bendahara: 'Bendahara', Sekretaris: 'Sekretaris', Publik: 'Anggota / Publik' }
+const FINANCE_MODULES_UI = ['iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan']
+const ORGANIZATION_MODULES_UI = ['aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan']
 const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'UTAMA' },
   { id: 'iuran', label: 'Iuran anggota', icon: CircleDollarSign, group: 'KEUANGAN' },
@@ -32,7 +34,7 @@ const navigation = [
 const permission = {
   Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users'],
   Ketua: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
-  Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'kegiatan', 'laporan'],
+  Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Sekretaris: ['dashboard', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Publik: ['dashboard', 'kegiatan'],
 }
@@ -43,7 +45,7 @@ const modules = {
   sukaduka: { title: 'Sukaduka', desc: 'Tagihan dan pembayaran per anggota dengan saldo tunggakan otomatis.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['chargeAmount', 'Tagihan baru'], ['amount', 'Dialokasikan'], ['arrears', 'Sisa tunggakan'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
   punia: { title: 'Dana punia', desc: 'Donasi uang, Wijilan atau setoran wajib piodalan, dan barang.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Wijilan / Setoran wajib|Barang'], ['eventName', 'Nama piodalan (opsional)', 'text'], ['itemName', 'Nama barang (jika barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['eventName', 'Piodalan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
   piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal kas / nilai barang', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
-  aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
+  aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['currentRenter', 'Sedang disewa oleh'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
   sewa: { title: 'Transaksi sewa aset', desc: 'Pilih alat berdasarkan stok tersedia, jenis penyewa, dan rentang tanggal sewa.', api: 'SewaAset', fields: [], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['renter', 'Penyewa'], ['customerType', 'Jenis penyewa'], ['startDate', 'Mulai'], ['endDate', 'Selesai'], ['quantity', 'Jumlah'], ['rentalIncome', 'Pemasukan'], ['maintenanceCost', 'Perawatan'], ['status', 'Status']] },
   inventaris: { title: 'Log inventaris', desc: 'Riwayat barang masuk dan keluar dari inventaris.', api: 'InventarisLog', fields: [['date', 'Tanggal transaksi', 'date'], ['assetId', 'ID aset', 'text'], ['assetName', 'Nama barang', 'text'], ['movement', 'Pergerakan', 'select:Masuk|Keluar'], ['quantity', 'Jumlah', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['movement', 'Pergerakan'], ['quantity', 'Jumlah'], ['condition', 'Kondisi'], ['notes', 'Catatan']] },
   anggota: { title: 'Manajemen anggota', desc: 'Data keanggotaan organisasi.', api: 'Anggota', fields: [['memberName', 'Nama lengkap', 'text'], ['memberNo', 'Nomor anggota', 'text'], ['phone', 'Nomor telepon', 'text'], ['address', 'Alamat', 'text'], ['status', 'Status', 'select:Aktif|Nonaktif']], columns: [['memberNo', 'Nomor'], ['memberName', 'Nama anggota'], ['phone', 'Telepon'], ['address', 'Alamat'], ['status', 'Status']] },
@@ -99,6 +101,12 @@ const openingBalanceDefaults = { iuran: 1215000, sukaduka: 920000, sesari: 0 }
 const emptyOpeningBalances = Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, { amount: 0, date: '', notes: '', configured: false }]))
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+function matchesDateFilter(row, filters) {
+  const date = String(row.date || row.eventDate || row.periodId || '').slice(0, 10)
+  return (!filters.year || date.slice(0, 4) === filters.year)
+    && (!filters.month || date.slice(5, 7) === filters.month)
+    && (!filters.day || date.slice(8, 10) === filters.day)
+}
 function demoCache(key, fallback) {
   try {
     const cached = localStorage.getItem(`takora-demo-${key}`)
@@ -133,6 +141,9 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
   const [periodFilter, setPeriodFilter] = useState('')
+  const [dashboardFilter, setDashboardFilter] = useState({ year: String(new Date().getFullYear()), month: '', day: '' })
+  const [busyAction, setBusyAction] = useState('')
+  const operationRef = useRef(false)
   const [dashboardHidden, setDashboardHidden] = useState(localStorage.getItem('takora-dashboard-hidden') === 'true')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(localStorage.getItem('takora-sidebar-collapsed') === 'true')
   const [login, setLogin] = useState({ username: '', password: '', role: 'Bendahara' })
@@ -140,7 +151,7 @@ function App() {
   const allowed = permission[role] || permission.Publik
   const showSidebar = authenticated && role !== 'Publik'
   const menu = navigation.filter((item) => allowed.includes(item.id))
-  const writable = role === 'Admin' || (role === 'Bendahara' && ['iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan'].includes(active)) || (role === 'Sekretaris' && ['aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan'].includes(active))
+  const writable = role === 'Admin' || (role === 'Bendahara' && [...FINANCE_MODULES_UI, ...ORGANIZATION_MODULES_UI].includes(active)) || (role === 'Sekretaris' && ORGANIZATION_MODULES_UI.includes(active))
   const page = modules[active]
   const currentRows = rows[active] || []
 
@@ -160,17 +171,20 @@ function App() {
 
   useEffect(() => {
     if (!isDemo && active === 'dashboard') {
-      const loadSummary = token ? request('summary', {}, token) : request('publicSummary')
+      let cancelled = false
+      const loadSummary = token ? request('summary', { filters: dashboardFilter }, token) : request('publicSummary', { filters: dashboardFilter })
       loadSummary.then((result) => {
+        if (cancelled) return
         if (result.cards) setSummary(result)
-        else if (result.summary) setSummary({ monthly: result.summary.monthly, sources: result.summary.sources, modules: result.summary.modules, outstanding: result.summary.outstanding, donations: result.summary.donations || [], piodalanReport: result.summary.piodalanReport || [], cards: [
-          { label: 'Saldo kas transparansi', value: result.summary.balance, trend: 'Saldo gabungan' },
-          { label: 'Penerimaan tercatat', value: result.summary.income, trend: 'Semua modul kas' },
-          { label: 'Pengeluaran tercatat', value: result.summary.expenses, trend: `${result.summary.activeMembers} anggota aktif` },
+        else if (result.summary) setSummary({ monthly: result.summary.monthly, sources: result.summary.sources, modules: result.summary.modules, outstanding: result.summary.outstanding, donations: result.summary.donations || [], activities: result.summary.activities || [], piodalanReport: result.summary.piodalanReport || [], assets: result.summary.assets || [], cards: [
+          { label: 'Selisih arus kas sesuai filter', value: result.summary.balance, trend: 'Periode terpilih' },
+          { label: 'Penerimaan sesuai filter', value: result.summary.income, trend: 'Seluruh modul kas' },
+          { label: 'Pengeluaran sesuai filter', value: result.summary.expenses, trend: `${result.summary.activeMembers} anggota aktif` },
         ] })
-      }).catch((error) => setNotice(error.message))
+      }).catch((error) => { if (!cancelled) setNotice(error.message) })
+      return () => { cancelled = true }
     }
-  }, [token, active])
+  }, [token, active, dashboardFilter.year, dashboardFilter.month, dashboardFilter.day])
 
   useEffect(() => {
     if (isDemo) return
@@ -244,6 +258,17 @@ function App() {
     return matchesSearch && (!periodFilter || rowPeriod === periodFilter)
   }), [currentRows, query, periodFilter])
 
+  async function runExclusive(action, callback) {
+    if (operationRef.current) return
+    operationRef.current = true
+    setBusyAction(action)
+    try { return await callback() }
+    finally {
+      operationRef.current = false
+      setBusyAction('')
+    }
+  }
+
   function toggleDashboard() {
     setDashboardHidden((hidden) => {
       localStorage.setItem('takora-dashboard-hidden', String(!hidden))
@@ -285,11 +310,16 @@ function App() {
       localStorage.setItem('takora-role', result.user.role)
       localStorage.setItem('takora-name', result.user.name)
       setLoginOpen(false)
+      setNotice('Berhasil masuk. Sesi aktif.')
     } catch (error) { setNotice(error.message) }
   }
 
-  function signOut() {
-    if (!isDemo && token) request('logout', {}, token).catch(() => {})
+  async function signOut() {
+    let serverLogoutSucceeded = false
+    if (!isDemo && token) {
+      try { await request('logout', {}, token); serverLogoutSucceeded = true }
+      catch { setNotice('Keluar berhasil di perangkat ini. Sesi server akan berakhir otomatis.') }
+    }
     setToken('')
     setRole('Publik')
     setAuthenticated(false)
@@ -298,6 +328,7 @@ function App() {
     localStorage.removeItem('takora-role')
     localStorage.removeItem('takora-name')
     setActive('dashboard')
+    if (isDemo || !token || serverLogoutSucceeded) setNotice('Berhasil keluar.')
   }
 
   async function saveRecord(event) {
@@ -364,6 +395,7 @@ function App() {
         savedRecord = result.record || updated
       }
       setRows((previous) => ({ ...previous, kegiatan: editing ? previous.kegiatan.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...(previous.kegiatan || [])] }))
+      setPublicActivities((previous) => editing ? previous.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...previous])
       setNotice(editing ? 'Dokumentasi kegiatan diperbarui.' : 'Dokumentasi kegiatan dipublikasikan.')
       setModal(false)
       setEditing(null)
@@ -508,8 +540,9 @@ function App() {
       }
       setRows((previous) => ({ ...previous, [active]: (previous[active] || []).filter((row) => row.id !== id) }))
       if (active === 'sewa') setRentalRows((previous) => previous.filter((row) => row.id !== id))
+      if (active === 'kegiatan') setPublicActivities((previous) => previous.filter((row) => row.id !== id))
       if (['iuran', 'sukaduka'].includes(active) && result?.member) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(result.member.ID) ? result.member : member))
-      setNotice('Catatan dihapus.')
+      setNotice('Catatan berhasil dihapus.')
     } catch (error) { setNotice(error.message) }
   }
 
@@ -548,10 +581,10 @@ function App() {
 
   const dashboardDonations = isDemo
     ? [...(rows.punia || []).map((row) => ({ ...row, module: 'Dana Punia' })), ...(rows.piodalan || []).filter((row) => ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(row.category)).map((row) => ({ ...row, donor: row.donor || row.description, donationType: row.category === 'Punia barang' ? 'Barang' : 'Uang Tunai', module: 'Piodalan' }))]
-      .filter((row) => row.donor).sort((left, right) => String(right.date || '').localeCompare(String(left.date || ''))).slice(0, 100)
+      .filter((row) => row.donor && matchesDateFilter(row, dashboardFilter)).sort((left, right) => String(right.date || '').localeCompare(String(left.date || ''))).slice(0, 100)
     : summary?.donations || summary?.public?.donations || []
   const dashboardPiodalanReport = isDemo
-    ? Object.values((rows.piodalan || []).reduce((events, row) => {
+    ? Object.values((rows.piodalan || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((events, row) => {
       const eventName = String(row.eventName || '').trim()
       if (!eventName) return events
       const event = events[eventName] || { eventName, income: 0, expenses: 0, goodsValue: 0 }
@@ -564,12 +597,84 @@ function App() {
       return events
     }, {})).sort((left, right) => left.eventName.localeCompare(right.eventName, 'id'))
     : summary?.piodalanReport || summary?.public?.piodalanReport || []
-  const summaryCards = summary?.cards || [
-    { label: 'Saldo kas gabungan', value: isDemo ? 24750000 : 0, icon: Landmark, trend: isDemo ? '+8,2%' : 'Menunggu data' },
-    { label: 'Penerimaan bulan ini', value: isDemo ? 4680000 : 0, icon: ArrowDownLeft, trend: isDemo ? '32 transaksi' : 'Menunggu data' },
-    { label: 'Pengeluaran bulan ini', value: isDemo ? 1920000 : 0, icon: ArrowUpRight, trend: isDemo ? '18 transaksi' : 'Menunggu data' },
-    { label: 'Tunggakan iuran', value: isDemo ? 850000 : 0, icon: Activity, trend: isDemo ? '4 anggota' : 'Menunggu data' },
-  ]
+  const demoDashboard = useMemo(() => {
+    const entries = []
+    function add(row, category, activity, direction, amount, source = '') {
+      if (Number(amount) > 0 && matchesDateFilter(row, dashboardFilter)) entries.push({ date: String(row.date || '').slice(0, 10), category, activity, incoming: direction === 'Masuk', amount: Number(amount), source })
+    }
+    ;(rows.sesari || []).forEach((row) => add(row, 'Sesari', row.description || row.category || 'Transaksi Sesari', row.direction, row.amount, 'Sesari'))
+    ;(rows.iuran || []).forEach((row) => add(row, 'Iuran', `Iuran ${row.memberName || 'anggota'}`, 'Masuk', row.cashPhysical, 'Iuran'))
+    ;(rows.iuran || []).forEach((row) => add(row, 'Iuran', 'Kembalian iuran', 'Keluar', row.changePaid))
+    ;(rows.pengeluaranIuran || []).forEach((row) => add(row, 'Iuran', row.category || 'Pengeluaran iuran', 'Keluar', row.amount))
+    ;(rows.sukaduka || []).forEach((row) => {
+      add(row, 'Sukaduka', row.purpose || 'Transaksi Sukaduka', row.direction, row.direction === 'Masuk' ? row.cashPhysical || row.amount : row.amount)
+      if (row.direction === 'Masuk') add(row, 'Sukaduka', 'Kembalian Sukaduka', 'Keluar', row.changePaid)
+    })
+    ;(rows.punia || []).forEach((row) => {
+      if (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType)) add(row, 'Punia', `Punia dari ${row.donor || 'donatur'}`, 'Masuk', row.amount, 'Punia')
+    })
+    ;(rows.piodalan || []).forEach((row) => {
+      if (row.category !== 'Punia barang') add(row, 'Piodalan', row.eventName || row.description || 'Transaksi Piodalan', row.direction, row.amount, row.category === 'Punia uang' ? 'Punia' : row.category === 'Sesari piodalan' ? 'Sesari' : '')
+    })
+    ;(rows.sewa || []).forEach((row) => {
+      if (row.status !== 'Dibatalkan') {
+        add(row, 'Sewa alat', `Sewa ${row.assetName || 'aset'}`, 'Masuk', row.rentalIncome)
+        add(row, 'Sewa alat', 'Perawatan aset', 'Keluar', row.maintenanceCost)
+      }
+    })
+    const modules = Object.fromEntries(Object.keys(demoModuleBalances).map((key) => [key, { incoming: 0, outgoing: 0, balance: 0, unpaid: demoModuleBalances[key].unpaid || 0 }]))
+    const sourceTotals = { Iuran: 0, Sesari: 0, Punia: 0 }
+    const monthlyTotals = new Map()
+    entries.forEach((entry) => {
+      const monthKey = entry.date.slice(0, 7)
+      const month = monthlyTotals.get(monthKey) || { month: readableDate(`${monthKey}-01`).replace(/\s\d{4}$/, ''), masuk: 0, keluar: 0, income: 0, expenses: 0 }
+      const field = entry.incoming ? 'incoming' : 'outgoing'
+      const chartField = entry.incoming ? 'masuk' : 'keluar'
+      const totalField = entry.incoming ? 'income' : 'expenses'
+      month[chartField] += entry.amount / 1000000
+      month[totalField] += entry.amount
+      monthlyTotals.set(monthKey, month)
+      if (entry.category === 'Iuran') modules.iuran[field] += entry.amount
+      if (entry.category === 'Sesari') modules.sesari[field] += entry.amount
+      if (entry.category === 'Sukaduka') modules.sukaduka[field] += entry.amount
+      if (entry.category === 'Punia') modules.punia[field] += entry.amount
+      if (entry.category === 'Piodalan') modules.piodalan[field] += entry.amount
+      if (entry.category === 'Sewa alat') modules.sewa[field] += entry.amount
+      if (entry.incoming && entry.source) sourceTotals[entry.source] += entry.amount
+    })
+    Object.values(modules).forEach((module) => { module.balance = module.incoming - module.outgoing })
+    const sourceTotal = Object.values(sourceTotals).reduce((sum, amount) => sum + amount, 0)
+    const colors = { Iuran: '#b5122a', Sesari: '#242424', Punia: '#777777' }
+    const sources = Object.entries(sourceTotals).map(([name, amount]) => ({ name, value: sourceTotal ? Math.round(amount / sourceTotal * 100) : 0, color: colors[name] }))
+    const selectedYear = dashboardFilter.year || String(new Date().getFullYear())
+    const selectedMonths = dashboardFilter.month ? [Number(dashboardFilter.month)] : Array.from({ length: 12 }, (_, index) => index + 1)
+    const monthly = selectedMonths.map((monthNumber) => {
+      const key = `${selectedYear}-${String(monthNumber).padStart(2, '0')}`
+      return monthlyTotals.get(key) || { month: new Date(Number(selectedYear), monthNumber - 1, 1).toLocaleDateString('id-ID', { month: 'short' }), masuk: 0, keluar: 0, income: 0, expenses: 0 }
+    })
+    return {
+      cards: [
+        { label: 'Selisih arus kas sesuai filter', value: entries.reduce((sum, entry) => sum + (entry.incoming ? entry.amount : -entry.amount), 0), icon: Landmark, trend: 'Periode terpilih' },
+        { label: 'Penerimaan sesuai filter', value: entries.filter((entry) => entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowDownLeft, trend: 'Data simulasi' },
+        { label: 'Pengeluaran sesuai filter', value: entries.filter((entry) => !entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowUpRight, trend: 'Data simulasi' },
+        { label: 'Tunggakan iuran', value: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Iuran || 0), 0), icon: Activity, trend: 'Saldo kewajiban anggota' },
+      ],
+      monthly,
+      sources,
+      modules,
+      outstanding: { arrears: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Iuran || 0), 0), refundDebt: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Kembalian || 0), 0) },
+      activities: entries.sort((left, right) => right.date.localeCompare(left.date)).slice(0, 12),
+    }
+  }, [rows, dashboardFilter, masterMembers])
+  useEffect(() => {
+    if (isDemo) setSummary(demoDashboard)
+  }, [demoDashboard])
+  const summaryCards = summary?.cards || (isDemo ? demoDashboard.cards : [
+    { label: 'Saldo kas gabungan', value: 0, icon: Landmark, trend: 'Menunggu data' },
+    { label: 'Penerimaan sesuai filter', value: 0, icon: ArrowDownLeft, trend: 'Menunggu data' },
+    { label: 'Pengeluaran sesuai filter', value: 0, icon: ArrowUpRight, trend: 'Menunggu data' },
+    { label: 'Tunggakan iuran', value: 0, icon: Activity, trend: 'Menunggu data' },
+  ])
 
   return (
     <div className="tridatu-theme min-h-screen bg-[#f6f5ee] text-[#243a31]">
@@ -604,7 +709,7 @@ function App() {
           <div className={`flex items-center gap-3 rounded-md px-2 py-2 ${sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`}>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e8eddf] text-xs font-bold text-[#46694b]">{userName.slice(0, 1).toUpperCase()}</div>
             <div className={`min-w-0 flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}><p className="truncate text-xs font-bold">{userName}</p><p className="mt-0.5 truncate text-[10px] text-[#829085]">{roleNames[role]}</p></div>
-            <button onClick={signOut} className="rounded p-1.5 text-[#8b978c] hover:bg-[#f0f1e9]" title="Keluar" aria-label="Keluar"><LogOut size={16} /></button>
+            <button onClick={() => runExclusive('logout', signOut)} disabled={Boolean(busyAction)} className="rounded p-1.5 text-[#8b978c] hover:bg-[#f0f1e9] disabled:cursor-wait disabled:opacity-50" title="Keluar" aria-label="Keluar"><LogOut size={16} /></button>
           </div>
           <p className={`mt-1 px-2 text-[9px] text-[#9aa399] ${sidebarCollapsed ? 'lg:hidden' : ''}`}>{isDemo ? 'MODE DEMO' : 'DATA TERSINKRON'}</p>
         </div>
@@ -624,12 +729,12 @@ function App() {
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
           {['iuran', 'sukaduka', 'sesari'].includes(active) && writable && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d9e1d5] bg-white px-4 py-3"><div><p className="text-[10px] font-semibold uppercase text-[#849084]">Saldo awal kas {moduleLabels[active]}</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{openingBalances[active]?.configured ? currency(openingBalances[active].amount) : 'Belum diatur'}</p>{openingBalances[active]?.date && <p className="mt-1 text-[10px] text-[#849084]">Per {readableDate(openingBalances[active].date)}</p>}</div><button onClick={() => setOpeningBalanceModal(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Atur saldo awal</button></div>}
-          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} onApprove={async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini disetujui.'); } catch (error) { setNotice(error.message) } }} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={deleteRecord} onCloseBook={closeBook} onEditBalance={() => setBalanceModal(true)} />}
+          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
 
-      {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onClose={() => { setModal(false); setEditing(null) }} onSave={saveRecord} onSaveIuran={saveIuran} onSaveSukaduka={saveSukaduka} onSaveRental={saveRental} onSaveActivity={saveActivity} />}
+      {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) { setModal(false); setEditing(null) } }} onSave={(event) => runExclusive('save', () => saveRecord(event))} onSaveIuran={(record) => runExclusive('save', () => saveIuran(record))} onSaveSukaduka={(record) => runExclusive('save', () => saveSukaduka(record))} onSaveRental={(record) => runExclusive('save', () => saveRental(record))} onSaveActivity={(record) => runExclusive('save', () => saveActivity(record))} />}
       {batchModal && ['iuran', 'sukaduka'].includes(active) && <BatchPaymentModal module={active === 'iuran' ? 'TRANSAKSI_IURAN' : 'Sukaduka'} members={masterMembers} onClose={() => setBatchModal(false)} onSave={async (records) => {
         try {
           let savedRecords = records
@@ -678,22 +783,23 @@ function App() {
           if (!isDemo) request('summary', {}, token).then(setSummary).catch((error) => setNotice(error.message))
         } catch (error) { setNotice(error.message) }
       }} />}
-      {balanceModal && <MasterBalanceModal members={masterMembers} onClose={() => setBalanceModal(false)} onSave={saveMasterBalance} />}
-      {openingBalanceModal && <OpeningBalanceModal balances={openingBalances} onClose={() => setOpeningBalanceModal(false)} onSave={saveOpeningBalances} />}
-      {sukadukaBalanceModal && <SukadukaBalanceModal members={masterMembers} onClose={() => setSukadukaBalanceModal(false)} onSave={saveSukadukaBalance} />}
-      {loginOpen && <LoginModal login={login} setLogin={setLogin} onClose={() => setLoginOpen(false)} onSubmit={signIn} demo={isDemo} />}
+      {balanceModal && <MasterBalanceModal members={masterMembers} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveMasterBalance(record))} />}
+      {openingBalanceModal && <OpeningBalanceModal balances={openingBalances} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setOpeningBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveOpeningBalances(record))} />}
+      {sukadukaBalanceModal && <SukadukaBalanceModal members={masterMembers} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setSukadukaBalanceModal(false) }} onSave={(record) => runExclusive('save', () => saveSukadukaBalance(record))} />}
+      {loginOpen && <LoginModal login={login} setLogin={setLogin} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setLoginOpen(false) }} onSubmit={(event) => runExclusive('login', () => signIn(event))} demo={isDemo} />}
       {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}</div>}
     </div>
   )
 }
 
-function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanReport, onOpenGallery, demo }) {
+function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanReport, assets, dashboardFilter, onDashboardFilterChange, onOpenGallery, demo }) {
   const publicMode = role === 'Publik'
   const visibleCards = publicMode ? cards.filter((card) => !/tunggakan/i.test(card.label)) : cards
   const chartData = analytics?.monthly || (demo ? cashBars : [])
   const sourceData = analytics?.sources?.length ? analytics.sources : demo ? fundSlices : []
   const moduleBalances = analytics?.modules || (demo ? demoModuleBalances : {})
   const outstanding = analytics?.outstanding || (demo ? { arrears: demoModuleBalances.iuran.unpaid, refundDebt: 20000 } : { arrears: 0, refundDebt: 0 })
+  const activityItems = analytics?.activities || []
   const moduleEntries = Object.entries(moduleBalances).map(([key, value]) => ({ key, name: moduleLabels[key] || key, color: moduleColors[key] || '#777777', ...value }))
   const donutBalances = moduleEntries.filter((item) => Number(item.balance) > 0).map((item) => ({ name: item.name, value: Number(item.balance), color: item.color }))
   const donutTotal = donutBalances.reduce((sum, item) => sum + item.value, 0)
@@ -703,31 +809,37 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
     balance: totals.balance + Number(item.balance || 0),
     goodsValue: totals.goodsValue + Number(item.goodsValue || 0),
   }), { income: 0, expenses: 0, balance: 0, goodsValue: 0 })
-  return <div className="animate-rise" data-demo={demo}>
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[#79877b]">Om Swastyastu, <span className="font-semibold text-[#48644d]">{publicMode ? 'Semeton Sendetan' : roleNames[role]}</span></p><p className="mt-1 text-xs text-[#9aa399]">{publicMode ? 'Ringkasan transparansi dana organisasi.' : 'Berikut ringkasan posisi kas dan aktivitas organisasi.'}</p></div><div className="flex items-center gap-2 self-start rounded-md border border-[#e2e5dc] bg-white px-3 py-2 text-xs font-semibold text-[#6e7f71] sm:self-auto"><CalendarDays size={14} /> Tahun berjalan <ChevronDown size={13} /></div></div>
-    <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${visibleCards.length === 3 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
+  return <div className="animate-rise flex flex-col" data-demo={demo}>
+    <div className="order-1 mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[#79877b]">Om Swastyastu, <span className="font-semibold text-[#48644d]">{publicMode ? 'Semeton Sendetan' : roleNames[role]}</span></p><p className="mt-1 text-xs text-[#9aa399]">{publicMode ? 'Ringkasan transparansi dana organisasi.' : 'Berikut ringkasan posisi kas dan aktivitas organisasi.'}</p></div><div className="flex flex-wrap items-center gap-2 self-start rounded-md border border-[#e2e5dc] bg-white p-2 sm:self-auto"><CalendarDays size={14} className="ml-1 text-[#6e7f71]" /><label className="sr-only" htmlFor="dashboard-year">Filter tahun</label><select id="dashboard-year" aria-label="Filter tahun" value={dashboardFilter.year} onChange={(event) => onDashboardFilterChange('year', event.target.value)} className="rounded border border-[#e6e8df] bg-white px-2 py-1.5 text-xs"><option value="">Semua tahun</option>{Array.from({ length: 11 }, (_, index) => new Date().getFullYear() - index).map((year) => <option key={year} value={year}>{year}</option>)}</select><label className="sr-only" htmlFor="dashboard-month">Filter bulan</label><select id="dashboard-month" aria-label="Filter bulan" value={dashboardFilter.month} onChange={(event) => onDashboardFilterChange('month', event.target.value)} className="rounded border border-[#e6e8df] bg-white px-2 py-1.5 text-xs"><option value="">Semua bulan</option>{['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}</select><label className="sr-only" htmlFor="dashboard-day">Filter tanggal</label><select id="dashboard-day" aria-label="Filter tanggal" value={dashboardFilter.day} onChange={(event) => onDashboardFilterChange('day', event.target.value)} className="rounded border border-[#e6e8df] bg-white px-2 py-1.5 text-xs"><option value="">Semua tanggal</option>{Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={String(day).padStart(2, '0')}>{day}</option>)}</select></div></div>
+    <div className={`order-2 grid grid-cols-1 gap-3 sm:grid-cols-2 ${visibleCards.length === 3 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
       {visibleCards.map((card, index) => { const Icon = card.icon || [Landmark, ArrowDownLeft, ArrowUpRight, Activity][index]; return <div key={card.label} className="animate-rise rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4" style={{ animationDelay: `${index * 55}ms` }}>
         <div className="flex items-start justify-between"><div><p className="text-xs font-medium text-[#849084]">{card.label}</p><p className="font-display mt-3 text-[22px] font-extrabold tracking-[-.02em] text-[#293f33] sm:text-[24px]">{currency(card.value)}</p></div><span className={`flex h-9 w-9 items-center justify-center rounded-md ${['bg-[#e9f0e5] text-[#527956]', 'bg-[#f8efd9] text-[#a98239]', 'bg-[#faeae1] text-[#b56d49]', 'bg-[#f6e6e3] text-[#aa6254]'][index % 4]}`}><Icon size={17} /></span></div>
         <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-[#638367]"><TrendingUp size={12} />{card.trend}<span className="font-normal text-[#9aa399]"> periode ini</span></div>
       </div> })}
     </div>
-    <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
+    <section className="order-4 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Inventaris aset</h2><p className="mt-1 text-[11px] text-[#929c91]">Data barang yang sudah dicatat pada menu Aset &amp; sewa alat.</p></div><span className="text-[10px] text-[#849084]">{assets.length} jenis barang</span></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama barang</th><th className="px-4 py-3 text-right">Jumlah</th><th className="px-4 py-3 text-right">Tersedia kini</th><th className="px-4 py-3">Sedang disewa oleh</th><th className="px-4 py-3 text-right">Harga beli</th><th className="px-4 py-3 text-right">Sewa Semeton</th><th className="px-4 py-3 text-right">Sewa luar</th><th className="px-4 py-3">Kondisi</th><th className="px-4 py-3 text-center">Foto</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{assets.length ? assets.map((asset) => <tr key={asset.id}><td className="px-4 py-3 font-semibold text-[#3c5043]">{asset.assetName || '-'}</td><td className="px-4 py-3 text-right">{Number(asset.quantity || 0)}</td><td className="px-4 py-3 text-right font-semibold">{Number(asset.available || 0)}</td><td className="px-4 py-3">{asset.currentRentals?.length ? asset.currentRentals.map((rental) => `${rental.renter} (${rental.quantity})`).join(', ') : '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.purchasePrice)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.rentalRateSemeton || asset.rentalRate)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.rentalRateLuar || asset.rentalRate)}</td><td className="px-4 py-3">{asset.condition || '-'}</td><td className="px-4 py-2 text-center">{asset.photoUrl ? <a href={asset.photoUrl} target="_blank" rel="noreferrer" className="inline-flex" aria-label={`Lihat foto ${asset.assetName}`}><img src={asset.photoUrl} alt={asset.assetName || 'Foto aset'} loading="lazy" className="h-10 w-14 rounded border border-[#e6e7dd] object-cover" /></a> : '-'}</td></tr>) : <tr><td colSpan="9" className="px-4 py-8 text-center text-[#849084]">Belum ada data aset.</td></tr>}</tbody></table></div>
+    </section>
+    <section className="order-5 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Laporan keuangan Piodalan</h2><p className="mt-1 text-[11px] text-[#929c91]">Ringkasan per acara · punia barang dicatat sebagai nilai nonkas</p></div><span className="text-[10px] text-[#849084]">{piodalanReport.length} acara</span></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama piodalan</th><th className="px-4 py-3 text-right">Pemasukan kas</th><th className="px-4 py-3 text-right">Pengeluaran</th><th className="px-4 py-3 text-right">Saldo kas</th><th className="px-4 py-3 text-right">Punia barang (nonkas)</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">
         {piodalanReport.length ? piodalanReport.map((event) => <tr key={event.eventName}><td className="px-4 py-3 font-semibold text-[#3c5043]">{event.eventName}</td><td className="px-4 py-3 text-right">{currency(event.income)}</td><td className="px-4 py-3 text-right">{currency(event.expenses)}</td><td className="px-4 py-3 text-right font-semibold">{currency(event.balance)}</td><td className="px-4 py-3 text-right">{currency(event.goodsValue)}</td></tr>) : <tr><td colSpan="5" className="px-4 py-8 text-center text-[#849084]">Belum ada transaksi Piodalan yang tercatat.</td></tr>}
       </tbody>{piodalanReport.length > 0 && <tfoot className="border-t border-[#e6e7dd] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3">Total</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.income)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.expenses)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.balance)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.goodsValue)}</td></tr></tfoot>}</table></div>
     </section>
-    {donations.length > 0 && <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
+    <section className="order-6 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="flex items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Punia uang dan barang</h2><p className="mt-1 text-[11px] text-[#929c91]">Nama pemberi dan sumbangan yang tercatat · terbaru 20 entri</p></div><span className="text-[10px] text-[#849084]">Publik</span></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Nama pemberi</th><th className="px-4 py-3">Bentuk</th><th className="px-4 py-3">Detail</th><th className="px-4 py-3">Piodalan</th><th className="px-4 py-3 text-right">Nilai</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{donations.slice(0, 20).map((item) => <tr key={`${item.module}-${item.id}`}><td className="whitespace-nowrap px-4 py-3 text-[#788579]">{readableDate(item.date)}</td><td className="px-4 py-3 font-semibold text-[#3c5043]">{item.donor}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? 'Barang' : item.donationType}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? `${item.itemName || '-'}${Number(item.quantity) ? ` · ${item.quantity} ${item.unit || 'unit'}` : ''}` : item.module === 'Piodalan' ? item.category || 'Punia uang' : 'Punia uang'}</td><td className="px-4 py-3">{item.eventName || '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{item.donationType === 'Barang' && !Number(item.amount) ? '-' : currency(item.amount)}</td></tr>)}</tbody></table></div>
-    </section>}
-    <Suspense fallback={<div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]"><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /></div>}>
-      <DashboardCharts chartData={chartData} sourceData={sourceData} moduleEntries={moduleEntries} outstanding={outstanding} donutBalances={donutBalances} donutTotal={donutTotal} currency={currency} />
-    </Suspense>
-    <section className="mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]"><div className="flex items-center justify-between border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Aktivitas terakhir</h2><p className="mt-1 text-[11px] text-[#929c91]">Transaksi tercatat di seluruh modul</p></div><span className="rounded bg-[#eef2e9] px-2 py-1 text-[10px] font-semibold text-[#638065]">{demo ? 'Data simulasi' : 'Terkini'}</span></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="text-[10px] font-semibold uppercase tracking-wide text-[#97a096]"><th className="px-5 py-3">Tanggal</th><th className="px-4 py-3">Aktivitas</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-[#f0f1eb]">{[{ date: '2026-09-28', activity: 'Penerimaan sesari purnama', category: 'Sesari', amount: 350000, incoming: true }, { date: '2026-09-27', activity: 'Iuran Ni Luh Sari', category: 'Iuran', amount: 100000, incoming: true }, { date: '2026-09-25', activity: 'Kebutuhan persembahyangan', category: 'Sesari', amount: 125000, incoming: false }, { date: '2026-09-21', activity: 'Dana belasungkawa', category: 'Sukaduka', amount: 500000, incoming: false }].map((item) => <tr key={item.activity}><td className="whitespace-nowrap px-5 py-3.5 text-[#7e8a7f]">{readableDate(item.date)}</td><td className="whitespace-nowrap px-4 py-3.5 font-semibold text-[#3c5043]">{item.activity}</td><td className="px-4 py-3.5 text-[#788579]">{item.category}</td><td className="px-4 py-3.5"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${item.incoming ? 'bg-[#e9f0e5] text-[#56785a]' : 'bg-[#f8eee0] text-[#9b793b]'}`}>{item.incoming ? 'Penerimaan' : 'Pengeluaran'}</span></td><td className={`whitespace-nowrap px-5 py-3.5 text-right font-bold ${item.incoming ? 'text-[#4c7653]' : 'text-[#a67842]'}`}>{item.incoming ? '+' : '−'} {currency(item.amount)}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Nama pemberi</th><th className="px-4 py-3">Bentuk</th><th className="px-4 py-3">Detail</th><th className="px-4 py-3">Piodalan</th><th className="px-4 py-3 text-right">Nilai</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{donations.length ? donations.slice(0, 20).map((item) => <tr key={`${item.module}-${item.id}`}><td className="whitespace-nowrap px-4 py-3 text-[#788579]">{readableDate(item.date)}</td><td className="px-4 py-3 font-semibold text-[#3c5043]">{item.donor || '-'}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? 'Barang' : item.donationType || 'Uang Tunai'}</td><td className="px-4 py-3">{item.donationType === 'Barang' ? `${item.itemName || '-'}${Number(item.quantity) ? ` · ${item.quantity} ${item.unit || 'unit'}` : ''}` : item.module === 'Piodalan' ? item.category || 'Punia uang' : 'Punia uang'}</td><td className="px-4 py-3">{item.eventName || '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{item.donationType === 'Barang' && !Number(item.amount) ? '-' : currency(item.amount)}</td></tr>) : <tr><td colSpan="6" className="px-4 py-8 text-center text-[#849084]">Belum ada punia pada periode filter ini.</td></tr>}</tbody></table></div>
     </section>
-    <GalleryPreview items={galleryItems} onOpen={onOpenGallery} />
+    <div className="order-3">
+      <Suspense fallback={<div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]"><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /><div className="h-[280px] animate-pulse rounded-md border border-[#e6e7dd] bg-white" /></div>}>
+        <DashboardCharts chartData={chartData} sourceData={sourceData} moduleEntries={moduleEntries} outstanding={outstanding} donutBalances={donutBalances} donutTotal={donutTotal} currency={currency} />
+      </Suspense>
+    </div>
+    <section className="order-7 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-[#fffefa]"><div className="flex items-center justify-between border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Aktivitas terakhir</h2><p className="mt-1 text-[11px] text-[#929c91]">Transaksi sesuai periode filter</p></div><span className="rounded bg-[#eef2e9] px-2 py-1 text-[10px] font-semibold text-[#638065]">{demo ? 'Data simulasi' : 'Terkini'}</span></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead><tr className="text-[10px] font-semibold uppercase tracking-wide text-[#97a096]"><th className="px-5 py-3">Tanggal</th><th className="px-4 py-3">Aktivitas</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-[#f0f1eb]">{activityItems.length ? activityItems.map((item, index) => <tr key={`${item.category}-${item.date}-${index}`}><td className="whitespace-nowrap px-5 py-3.5 text-[#7e8a7f]">{readableDate(item.date)}</td><td className="whitespace-nowrap px-4 py-3.5 font-semibold text-[#3c5043]">{item.activity}</td><td className="px-4 py-3.5 text-[#788579]">{item.category}</td><td className="px-4 py-3.5"><span className={`rounded px-2 py-1 text-[10px] font-semibold ${item.incoming ? 'bg-[#e9f0e5] text-[#56785a]' : 'bg-[#f8eee0] text-[#9b793b]'}`}>{item.incoming ? 'Penerimaan' : 'Pengeluaran'}</span></td><td className={`whitespace-nowrap px-5 py-3.5 text-right font-bold ${item.incoming ? 'text-[#4c7653]' : 'text-[#a67842]'}`}>{item.incoming ? '+' : '−'} {currency(item.amount)}</td></tr>) : <tr><td colSpan="5" className="px-5 py-8 text-center text-[#849084]">Tidak ada aktivitas pada periode ini.</td></tr>}</tbody></table></div>
+    </section>
+    <div className="order-8"><GalleryPreview items={galleryItems} onOpen={onOpenGallery} /></div>
   </div>
 }
 
@@ -750,10 +862,10 @@ function youtubeEmbedUrl(value) {
   } catch { return '' }
 }
 
-function GalleryPage({ items, writable, onAdd, onEdit, onDelete }) {
+function GalleryPage({ items, writable, busy, onAdd, onEdit, onDelete }) {
   const published = items.filter((item) => item.visibility !== 'Draft')
   const drafts = items.filter((item) => item.visibility === 'Draft')
-  return <div className="animate-rise">
+  return <div className={`animate-rise ${busy ? 'pointer-events-none opacity-70' : ''}`} aria-busy={busy}>
     <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="font-display text-xl font-extrabold">Cerita kegiatan krama</p><p className="mt-1 max-w-2xl text-xs leading-5 text-[#849084]">Dokumentasi kegiatan SENDETAN TAKORA TELAGA BETENG.</p></div>{writable && <button onClick={onAdd} className="flex items-center justify-center gap-2 self-start rounded-md bg-[#b5122a] px-3.5 py-2.5 text-xs font-semibold text-white hover:bg-[#941023]"><Plus size={16} /> Tambah dokumentasi</button>}</div>
     {published.length ? <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{published.map((item) => <article key={item.id} className="overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="relative aspect-[16/10] bg-[#171717]">{item.mediaType === 'youtube' && youtubeEmbedUrl(item.youtubeUrl) ? <iframe className="h-full w-full" src={youtubeEmbedUrl(item.youtubeUrl)} title={item.title} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /> : item.photoUrl ? <img src={item.photoUrl} alt={item.title} loading="lazy" className="h-full w-full object-cover" /> : <div className="flex h-full flex-col items-center justify-center gap-2 text-white/75"><Camera size={25} /><span className="text-xs">Foto kegiatan</span></div>}</div>
@@ -787,17 +899,17 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
 }
 
 */
-function ModulePage({ active, page, rows, query, setQuery, loading, writable, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
+function ModulePage({ active, page, rows, query, setQuery, loading, writable, busy, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
   const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
   const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
   const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
-  return <div className="animate-rise">
+  return <div className={`animate-rise ${busy ? 'pointer-events-none opacity-70' : ''}`} aria-busy={busy}>
     <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
-      {active === 'iuran' && writable && <button onClick={onCloseBook} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><BookOpenCheck size={15} /> Tutup buku</button>}
-      {active === 'anggota' && canEditBalances && <button onClick={onEditBalance} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><CircleDollarSign size={15} /> Koreksi saldo</button>}
-      {active === 'sukaduka' && writable && <button onClick={() => setSukadukaBalanceModal(true)} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><CircleDollarSign size={15} /> Edit saldo tunggakan Sukaduka</button>}
-      {['iuran', 'sukaduka', 'punia', 'piodalan'].includes(active) && writable && <button onClick={onBatch} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Input basket / Excel</button>}
-      {writable && <button onClick={onAdd} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white"><Plus size={16} /> Tambah data</button>}
+      {active === 'iuran' && writable && <button onClick={onCloseBook} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50">{busy ? 'Memproses...' : <><BookOpenCheck size={15} /> Tutup buku</>}</button>}
+      {active === 'anggota' && canEditBalances && <button onClick={onEditBalance} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><CircleDollarSign size={15} /> Koreksi saldo</button>}
+      {active === 'sukaduka' && writable && <button onClick={() => setSukadukaBalanceModal(true)} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><CircleDollarSign size={15} /> Edit saldo tunggakan Sukaduka</button>}
+      {['iuran', 'sukaduka', 'punia', 'piodalan'].includes(active) && writable && <button onClick={onBatch} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><FileText size={15} /> Input basket / Excel</button>}
+      {writable && <button onClick={onAdd} disabled={busy} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><Plus size={16} /> Tambah data</button>}
     </div></div>
     {hasCashSummary && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana masuk · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana keluar · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashOut)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Selisih bersih · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn - cashOut)}</p></div></div>}
     <section className="overflow-hidden rounded-md border bg-white"><div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><b className="text-xs">Daftar {page.title.toLowerCase()}</b><div className="flex gap-2"><input aria-label="Cari catatan" placeholder="Cari catatan..." value={query} onChange={(event) => setQuery(event.target.value)} className="rounded-md border px-3 py-2 text-xs" />{hasCashSummary && <input aria-label="Filter periode" type="month" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} className="rounded-md border px-2 py-2 text-xs" />}</div></div>
@@ -805,7 +917,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
         {loading ? <tr><td colSpan={page.columns.length + Number(writable)} className="p-8 text-center">Memuat data...</td></tr> : rows.length === 0 ? <tr><td colSpan={page.columns.length + Number(writable)} className="p-8 text-center">Belum ada catatan</td></tr> : rows.map((row) => <tr key={row.id} className="border-t">{page.columns.map(([key]) => {
           let value = row[key]
           if (['date', 'startDate', 'endDate'].includes(key)) value = readableDate(value)
-          else if (key === 'available') value = Math.max(0, Number(row.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(row.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0))
+          else if (key === 'available') value = Number.isFinite(Number(row.available)) ? Number(row.available) : Math.max(0, Number(row.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(row.id) && !['Dibatalkan', 'Selesai'].includes(rental.status) && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0))
           else if (key === 'currentArrears' || key === 'currentRefundDebt') value = currency(masterMembers.find((member) => String(member.ID) === String(row.memberId))?.[key === 'currentArrears' ? 'Sisa_Hutang_Iuran' : 'Sisa_Hutang_Kembalian'])
               else if (['amount', 'target', 'allocatedContribution', 'chargeAmount', 'openingArrears', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) value = currency(value)
           else if (['photoUrl', 'proofPhotoUrl'].includes(key) && value) value = <a href={value} target="_blank" rel="noreferrer" className="text-[#b5122a] underline">Lihat foto</a>
@@ -826,6 +938,7 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const submitLock = useRef(false)
   const [values, setValues] = useState(() => Object.fromEntries(members.map((member) => [String(member.ID), {
     amount: '', chargeAmount: '', cashPhysical: '', changePaid: '', purpose: '', notes: '',
   }])))
@@ -905,6 +1018,7 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   }
 
   async function submit() {
+    if (submitLock.current) return
     const selected = members.filter((member) => {
       const value = values[String(member.ID)] || {}
       return isIuran ? Number(value.amount) > 0 : Number(value.amount) > 0 || Number(value.chargeAmount) > 0
@@ -924,8 +1038,9 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
         ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
         : { memberId: member.ID, memberName: member.Nama, date: paymentDate, chargeAmount, amount, cashPhysical, changePaid: Number(value.changePaid) || 0, purpose: value.purpose, notes: value.notes || '' }
     })
+    submitLock.current = true
     setBusy(true)
-    try { await onSave(records) } catch (error) { setMessage(error.message || 'Pembayaran gagal disimpan.') } finally { setBusy(false) }
+    try { await onSave(records) } catch (error) { setMessage(error.message || 'Pembayaran gagal disimpan.') } finally { submitLock.current = false; setBusy(false) }
   }
 
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
@@ -959,6 +1074,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   const [records, setRecords] = useState(() => Array.from({ length: 5 }, () => blankRecord()))
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const submitLock = useRef(false)
   const [wijilanMode, setWijilanMode] = useState(false)
   const [wijilanEvent, setWijilanEvent] = useState('')
   const inputClass = 'w-full min-w-[110px] rounded border border-[#e1e5dc] bg-white px-2 py-2 text-xs outline-none focus:border-[#b5122a]'
@@ -1076,10 +1192,12 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   }
 
   async function submit() {
+    if (submitLock.current) return
     let prepared
     try { prepared = prepareRecords() } catch (error) { setMessage(error.message); return }
+    submitLock.current = true
     setBusy(true)
-    try { await onSave(prepared) } finally { setBusy(false) }
+    try { await onSave(prepared) } finally { submitLock.current = false; setBusy(false) }
   }
 
   function textCell(index, field, placeholder = '', type = 'text') {
@@ -1123,27 +1241,27 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   </div>
 }
 
-function RecordModal({ page, editing, members, contacts, assets, rentalRows, onClose, onSave, onSaveIuran, onSaveSukaduka, onSaveRental, onSaveActivity }) {
-  if (page.api === 'TRANSAKSI_IURAN') return <IuranModal members={members} editing={editing} onClose={onClose} onSave={onSaveIuran} />
-  if (page.api === 'Sukaduka') return <SukadukaModal members={members} editing={editing} onClose={onClose} onSave={onSaveSukaduka} />
-  if (page.api === 'SewaAset') return <RentalModal assets={assets} rentalRows={rentalRows} editing={editing} onClose={onClose} onSave={onSaveRental} />
-  if (page.api === 'Notulensi') return <NotulensiModal contacts={contacts} editing={editing} onClose={onClose} onSave={onSave} />
-  if (page.api === 'KegiatanMedia') return <ActivityMediaModal editing={editing} onClose={onClose} onSave={onSaveActivity} />
+function RecordModal({ page, editing, members, contacts, assets, rentalRows, busy, onClose, onSave, onSaveIuran, onSaveSukaduka, onSaveRental, onSaveActivity }) {
+  if (page.api === 'TRANSAKSI_IURAN') return <IuranModal members={members} editing={editing} busy={busy} onClose={onClose} onSave={onSaveIuran} />
+  if (page.api === 'Sukaduka') return <SukadukaModal members={members} editing={editing} busy={busy} onClose={onClose} onSave={onSaveSukaduka} />
+  if (page.api === 'SewaAset') return <RentalModal assets={assets} rentalRows={rentalRows} editing={editing} busy={busy} onClose={onClose} onSave={onSaveRental} />
+  if (page.api === 'Notulensi') return <NotulensiModal contacts={contacts} editing={editing} busy={busy} onClose={onClose} onSave={onSave} />
+  if (page.api === 'KegiatanMedia') return <ActivityMediaModal editing={editing} busy={busy} onClose={onClose} onSave={onSaveActivity} />
   const today = new Date().toISOString().slice(0, 10)
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
-      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah catatan' : `Tambah ${page.title.toLowerCase()}`}</h2><p className="mt-1 text-xs text-[#8c978d]">Lengkapi informasi berikut.</p></div><button onClick={onClose} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9]" aria-label="Tutup"><X size={18} /></button></div>
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah catatan' : `Tambah ${page.title.toLowerCase()}`}</h2><p className="mt-1 text-xs text-[#8c978d]">Lengkapi informasi berikut.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
       <form onSubmit={onSave} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         {page.fields.map(([key, label, type]) => <label key={key} className={`block ${type === 'textarea' || key === 'photoFile' ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">{label}{key === 'purpose' && <span className="ml-1 text-[#c16e52]">*</span>}</span>
           {type.startsWith('select:') ? <select name={key} defaultValue={editing?.[key] || ''} required className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]"><option value="" disabled>Pilih {label.toLowerCase()}</option>{type.slice(7).split('|').map((option) => <option key={option}>{option}</option>)}</select> : type === 'textarea' ? <textarea name={key} defaultValue={editing?.[key] || ''} rows={key === 'minutes' || key === 'followUp' ? '8' : '3'} className="w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" /> : type === 'file' ? <input name={key} type="file" accept="image/*" className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-[#e9efe5] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#496b4d]" /> : <input name={key} type={type} required={key === 'date' || key === 'memberName' || key === 'amount' || key === 'description' && page.api === 'PengeluaranIuran' || (key === 'password' && !editing)} minLength={key === 'password' ? 12 : undefined} min={type === 'number' ? '0' : undefined} step={type === 'number' ? 'any' : undefined} defaultValue={key === 'password' ? '' : editing?.[key] ?? (key === 'date' ? today : '')} placeholder={key === 'password' && editing ? 'Kosongkan jika tidak diubah' : undefined} readOnly={key === 'photoUrl'} className={`w-full rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs outline-none focus:border-[#789578] ${key === 'photoUrl' ? 'bg-[#f5f6f1] text-[#809080]' : 'bg-white'}`} />}
         </label>)}
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4]">Batal</button><button className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33]">{editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
       </form>
     </div>
   </div>
 }
 
-function SukadukaModal({ members, editing, onClose, onSave }) {
+function SukadukaModal({ members, editing, busy, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     date: editing?.date || today,
@@ -1216,12 +1334,12 @@ function SukadukaModal({ members, editing, onClose, onSave }) {
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Foto bukti serah terima</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setProofFile(event.target.files?.[0] || null)} className={inputClass} /><span className="mt-1 block text-[10px] text-[#888]">Foto tersimpan di folder Drive Foto Sukaduka (maks. 5 MB).{editing?.proofPhotoUrl && <a className="ml-1 font-semibold text-[#b5122a] underline" href={editing.proofPhotoUrl} target="_blank" rel="noreferrer">Lihat bukti saat ini</a>}</span></label>
       {form.direction === 'Keluar' && <label><span className="mb-1.5 block text-[11px] font-semibold">Nominal</span><input type="number" min="1" value={form.amount} onChange={(event) => setValue('amount', event.target.value)} className={inputClass} /></label>}
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Periksa anggota, peruntukan, tagihan, alokasi pembayaran, uang fisik, dan kembalian.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button disabled={!valid} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan transaksi</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan transaksi'}</button></div>
     </form>
   </div></div>
 }
 
-function RentalModal({ assets, rentalRows, editing, onClose, onSave }) {
+function RentalModal({ assets, rentalRows, editing, busy, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     date: editing?.date || today, assetId: editing?.assetId || '', renter: editing?.renter || '',
@@ -1233,7 +1351,7 @@ function RentalModal({ assets, rentalRows, editing, onClose, onSave }) {
   const asset = assets.find((item) => String(item.id) === String(form.assetId))
   function availableFor(item) {
     if (!item || item.condition === 'Rusak' || !form.startDate || !form.endDate) return 0
-    const occupied = rentalRows.filter((row) => String(row.assetId) === String(item.id) && row.id !== editing?.id && row.status !== 'Dibatalkan' && row.startDate && row.endDate && row.startDate <= form.endDate && row.endDate >= form.startDate).reduce((sum, row) => sum + Number(row.quantity || 0), 0)
+    const occupied = rentalRows.filter((row) => String(row.assetId) === String(item.id) && row.id !== editing?.id && !['Dibatalkan', 'Selesai'].includes(row.status) && row.startDate && row.endDate && row.startDate <= form.endDate && row.endDate >= form.startDate).reduce((sum, row) => sum + Number(row.quantity || 0), 0)
     return Math.max(0, Number(item.quantity || 0) - occupied)
   }
   const available = availableFor(asset)
@@ -1265,12 +1383,12 @@ function RentalModal({ assets, rentalRows, editing, onClose, onSave }) {
       <label><span className="mb-1.5 block text-[11px] font-semibold">Biaya perawatan</span><input type="number" min="0" value={form.maintenanceCost} onChange={(event) => setValue('maintenanceCost', event.target.value)} className={inputClass} /></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan</span><textarea rows="3" value={form.notes} onChange={(event) => setValue('notes', event.target.value)} className={inputClass} /></label>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pilih alat dan tanggal yang valid, serta jumlah sewa tidak melebihi stok tersedia.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button disabled={!valid} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan transaksi</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan transaksi'}</button></div>
     </form>
   </div></div>
 }
 
-function ActivityMediaModal({ editing, onClose, onSave }) {
+function ActivityMediaModal({ editing, busy, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     title: editing?.title || '',
@@ -1302,12 +1420,12 @@ function ActivityMediaModal({ editing, onClose, onSave }) {
       <label><span className="mb-1.5 block text-[11px] font-semibold">Publikasi</span><select value={form.visibility} onChange={(event) => setValue('visibility', event.target.value)} className={inputClass}><option>Publik</option><option>Draft</option></select></label>
       <p className="self-center text-[10px] text-[#777]">{form.visibility === 'Publik' ? 'Tampil di galeri publik.' : 'Hanya dapat dilihat pengelola.'}</p>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Lengkapi judul/tanggal dan pilih foto atau URL YouTube yang valid.</p>}
-      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button disabled={!valid} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan dokumentasi</button></div>
+      <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Mengirim...' : 'Simpan dokumentasi'}</button></div>
     </form>
   </div></div>
 }
 
-function NotulensiModal({ contacts, editing, onClose, onSave }) {
+function NotulensiModal({ contacts, editing, busy, onClose, onSave }) {
   const formRef = useRef(null)
   const [shareMode, setShareMode] = useState('group')
   const [contactId, setContactId] = useState('')
@@ -1327,12 +1445,12 @@ function NotulensiModal({ contacts, editing, onClose, onSave }) {
     <form ref={formRef} onSubmit={onSave} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
       {[['date', 'Tanggal rapat', 'date'], ['title', 'Agenda / judul', 'text'], ['attendees', 'Peserta', 'text'], ['minutes', 'Catatan dan keputusan', 'textarea'], ['followUp', 'Tindak lanjut', 'textarea']].map(([key, label, type]) => <label key={key} className={type === 'textarea' ? 'sm:col-span-2' : ''}><span className="mb-1.5 block text-[11px] font-semibold">{label}</span>{type === 'textarea' ? <textarea name={key} rows="8" defaultValue={editing?.[key] || ''} className={`${inputClass} resize-y`} /> : <input name={key} type={type} required={key === 'date' || key === 'title'} defaultValue={editing?.[key] || (key === 'date' ? today : '')} className={inputClass} />}</label>)}
       <div className="rounded-md border border-[#e6e7dd] bg-white p-3 sm:col-span-2"><div className="mb-2 flex items-center gap-2 text-xs font-semibold"><MessageCircle size={15} className="text-[#b5122a]" />Bagikan melalui WhatsApp</div><div className="grid gap-2 sm:grid-cols-2"><select value={shareMode} onChange={(event) => setShareMode(event.target.value)} className={inputClass}><option value="group">Grup WhatsApp (pilih grup setelah dibuka)</option><option value="personal">WhatsApp pribadi</option></select>{shareMode === 'personal' && <select value={contactId} onChange={(event) => setContactId(event.target.value)} className={inputClass}><option value="">Pilih anggota</option>{contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.memberName} · {contact.phone}</option>)}</select>}</div></div>
-      <div className="mt-2 flex flex-wrap justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button type="button" onClick={share} disabled={shareMode === 'personal' && !contactId} className="flex items-center gap-2 rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50"><MessageCircle size={14} /> Buka WhatsApp</button><button className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white">Simpan catatan</button></div>
+      <div className="mt-2 flex flex-wrap justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button type="button" onClick={share} disabled={busy || shareMode === 'personal' && !contactId} className="flex items-center gap-2 rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50"><MessageCircle size={14} /> Buka WhatsApp</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan catatan'}</button></div>
     </form>
   </div></div>
 }
 
-function MasterBalanceModal({ members, onClose, onSave }) {
+function MasterBalanceModal({ members, busy, onClose, onSave }) {
   const [form, setForm] = useState({ memberId: '', arrears: '', refundDebt: '', reason: '' })
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
 
@@ -1364,13 +1482,13 @@ function MasterBalanceModal({ members, onClose, onSave }) {
         <label><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang iuran</span><input required type="number" min="0" step="1" value={form.arrears} onChange={(event) => setForm((previous) => ({ ...previous, arrears: event.target.value }))} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang kembalian</span><input required type="number" min="0" step="1" value={form.refundDebt} onChange={(event) => setForm((previous) => ({ ...previous, refundDebt: event.target.value }))} className={inputClass} /></label>
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Alasan koreksi</span><textarea required rows="3" value={form.reason} onChange={(event) => setForm((previous) => ({ ...previous, reason: event.target.value }))} className={inputClass} /></label>
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button disabled={!form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan koreksi</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] disabled:opacity-50">Batal</button><button disabled={busy || !form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan koreksi'}</button></div>
       </form>
     </div>
   </div>
 }
 
-function OpeningBalanceModal({ balances, onClose, onSave }) {
+function OpeningBalanceModal({ balances, busy, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10)
   const configured = Object.values(balances).some((balance) => balance.configured)
   const [form, setForm] = useState(() => ({
@@ -1398,13 +1516,13 @@ function OpeningBalanceModal({ balances, onClose, onSave }) {
         {Object.entries({ iuran: 'Kas Iuran', sukaduka: 'Kas Sukaduka', sesari: 'Kas Sesari' }).map(([module, label]) => <label key={module}><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">{label}</span><input required type="number" min="0" step="1" value={form.balances[module]} onChange={(event) => setForm((previous) => ({ ...previous, balances: { ...previous.balances, [module]: event.target.value } }))} className={inputClass} /></label>)}
         <div className="rounded-md bg-[#f3f5ef] px-3 py-2.5 sm:col-span-2"><p className="text-[10px] text-[#849084]">Total saldo awal</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{currency(total)}</p></div>
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Keterangan sumber saldo</span><textarea required rows="2" value={form.notes} onChange={(event) => setForm((previous) => ({ ...previous, notes: event.target.value }))} className={inputClass} /></label>
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white">Simpan saldo awal</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] disabled:opacity-50">Batal</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan saldo awal'}</button></div>
       </form>
     </div>
   </div>
 }
 
-function SukadukaBalanceModal({ members, onClose, onSave }) {
+function SukadukaBalanceModal({ members, busy, onClose, onSave }) {
   const [form, setForm] = useState({ memberId: '', sukadukaArrears: '', reason: '' })
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
 
@@ -1433,13 +1551,13 @@ function SukadukaBalanceModal({ members, onClose, onSave }) {
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Anggota</span><select required value={form.memberId} onChange={(event) => chooseMember(event.target.value)} className={inputClass}><option value="">{members.length ? 'Pilih anggota' : 'Master anggota belum tersedia'}</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama} · {member.ID}</option>)}</select></label>
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Saldo tunggakan Sukaduka</span><input required type="number" min="0" step="1" value={form.sukadukaArrears} onChange={(event) => setForm((previous) => ({ ...previous, sukadukaArrears: event.target.value }))} className={inputClass} /></label>
         <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Alasan koreksi</span><textarea required rows="3" value={form.reason} onChange={(event) => setForm((previous) => ({ ...previous, reason: event.target.value }))} className={inputClass} /></label>
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b]">Batal</button><button disabled={!form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Simpan saldo</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] disabled:opacity-50">Batal</button><button disabled={busy || !form.memberId || !form.reason.trim()} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : 'Simpan saldo'}</button></div>
       </form>
     </div>
   </div>
 }
 
-function IuranModal({ members, editing, onClose, onSave }) {
+function IuranModal({ members, editing, busy, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     date: editing?.date || today,
@@ -1511,19 +1629,19 @@ function IuranModal({ members, editing, onClose, onSave }) {
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang iuran (akhir)</span><input readOnly value={arrears} className={readOnlyClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Catatan</span><input value={form.notes} onChange={(event) => update('notes', event.target.value)} className={inputClass} /></label>
         {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan alokasi tidak melebihi hutang dan uang fisik mencukupi alokasi serta kembalian yang diberikan.</p>}
-        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4]">Batal</button><button disabled={!valid} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">Batal</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
       </form>
     </div>
   </div>
 }
 
-function LoginModal({ login, setLogin, onClose, onSubmit, demo }) {
+function LoginModal({ login, setLogin, busy, onClose, onSubmit, demo }) {
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#16392c]/40 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="w-full max-w-[420px] rounded-md border border-[#e6e7dd] bg-[#fffefa] p-6 shadow-xl sm:p-7">
     <div className="mb-5 flex items-center justify-between"><div className="flex items-center gap-3"><img src={logo} className="h-11 w-11 object-contain" alt="Logo TAKORA" /><div><h2 className="font-display text-base font-extrabold">Akses organisasi</h2><p className="mt-0.5 text-[11px] text-[#89958a]">Masuk ke ruang kerja TAKORA</p></div></div><button onClick={onClose} className="rounded p-1.5 text-[#7d8b7e] hover:bg-[#f0f1e9]" aria-label="Tutup"><X size={17} /></button></div>
     <form onSubmit={onSubmit} className="space-y-3.5"><label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Username</span><input required={!demo} autoComplete="username" value={login.username} onChange={(event) => setLogin({ ...login, username: event.target.value })} className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" placeholder={demo ? 'Nama pengguna (opsional)' : 'Username'} /></label>
       {demo ? <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Simulasikan peran</span><select value={login.role} onChange={(event) => setLogin({ ...login, role: event.target.value })} className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]">{Object.entries(roleNames).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></label> : <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Kata sandi</span><input required type="password" autoComplete="current-password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" /></label>}
       {demo && <p className="rounded bg-[#f3f4ed] px-3 py-2 text-[10px] leading-4 text-[#788579]">Mode demo: pilih peran untuk mencoba batas akses. Akun produksi dibuat melalui Google Apps Script.</p>}
-      <button className="mt-1 flex w-full items-center justify-center gap-2 rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#294d33]">Masuk <ArrowUpRight size={14} /></button>
+      <button disabled={busy} className="mt-1 flex w-full items-center justify-center gap-2 rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Memproses...' : 'Masuk'} <ArrowUpRight size={14} /></button>
     </form>
   </div></div>
 }

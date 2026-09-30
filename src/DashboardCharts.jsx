@@ -11,7 +11,7 @@ export default function DashboardCharts({ chartData, sourceData, moduleEntries, 
       <section className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4 sm:p-5">
         <div className="mb-4 flex items-start justify-between">
           <div><h2 className="font-display text-sm font-extrabold">Arus kas bulanan</h2><p className="mt-1 text-[11px] text-[#929c91]">Penerimaan dan pengeluaran · dalam juta rupiah</p></div>
-          <span className="rounded border border-[#e6e7dd] px-2 py-1 text-[10px] text-[#748174]">6 bulan terakhir</span>
+          <span className="rounded border border-[#e6e7dd] px-2 py-1 text-[10px] text-[#748174]">Sesuai filter</span>
         </div>
         <div className="h-[250px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 8, right: 3, left: -18, bottom: 0 }} barGap={5}>
           <CartesianGrid vertical={false} stroke="#eceee6" strokeDasharray="3 4" />
@@ -24,7 +24,7 @@ export default function DashboardCharts({ chartData, sourceData, moduleEntries, 
         <div className="mt-3 flex gap-5 text-[10px] text-[#7e8a7f]"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-[#b5122a]" /> Dana masuk</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-[#242424]" /> Dana keluar</span></div>
       </section>
       <section className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4 sm:p-5">
-        <div><h2 className="font-display text-sm font-extrabold">Sumber dana</h2><p className="mt-1 text-[11px] text-[#929c91]">Proporsi penerimaan enam bulan terakhir</p></div>
+        <div><h2 className="font-display text-sm font-extrabold">Sumber dana</h2><p className="mt-1 text-[11px] text-[#929c91]">Proporsi penerimaan sesuai filter</p></div>
         <div className="relative mx-auto mt-2 h-[205px] max-w-[260px]"><ResponsiveContainer width="100%" height="100%"><PieChart>
           <Pie data={sourceData} dataKey="value" nameKey="name" innerRadius={62} outerRadius={86} paddingAngle={3} stroke="none">{sourceData.map((slice) => <Cell key={slice.name} fill={slice.color} />)}</Pie>
           <Tooltip formatter={(value) => [`${value}%`, 'Porsi']} contentStyle={{ border: '1px solid #e5e8df', borderRadius: 6, fontSize: 12 }} />
