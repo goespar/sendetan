@@ -1313,10 +1313,11 @@ function summary_(filters) {
   const arrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Iuran || 0); }, 0);
   const sukadukaArrears = masterMembers.reduce(function (sum, member) { return sum + Number(member.Sisa_Hutang_Sukaduka || 0); }, 0);
   const analytics = analytics_(snapshot, filters || {});
+  const hasFilter = Boolean(filters && (filters.year || filters.month || filters.day));
   const cards = [
-    { label: 'Saldo kas sesuai filter', value: totals.income - totals.expenses, trend: 'Periode terpilih' },
-    { label: 'Penerimaan sesuai filter', value: totals.income, trend: 'Seluruh modul kas' },
-    { label: 'Pengeluaran sesuai filter', value: totals.expenses, trend: 'Seluruh modul kas' },
+    { label: hasFilter ? 'Saldo kas sesuai filter' : 'Saldo kas gabungan · semua', value: totals.income - totals.expenses, trend: hasFilter ? 'Periode terpilih' : 'Semua' },
+    { label: hasFilter ? 'Penerimaan sesuai filter' : 'Penerimaan · semua', value: totals.income, trend: hasFilter ? 'Periode terpilih' : 'Semua' },
+    { label: hasFilter ? 'Pengeluaran sesuai filter' : 'Pengeluaran · semua', value: totals.expenses, trend: hasFilter ? 'Periode terpilih' : 'Semua' },
     { label: 'Tunggakan iuran', value: arrears, trend: 'Saldo kewajiban anggota' },
   ];
   const balances = moduleBalances_(snapshot, masterMembers);

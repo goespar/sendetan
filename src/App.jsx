@@ -177,9 +177,9 @@ function App() {
         if (cancelled) return
         if (result.cards) setSummary(result)
         else if (result.summary) setSummary({ monthly: result.summary.monthly, sources: result.summary.sources, modules: result.summary.modules, outstanding: result.summary.outstanding, donations: result.summary.donations || [], activities: result.summary.activities || [], piodalanReport: result.summary.piodalanReport || [], assets: result.summary.assets || [], cards: [
-          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Selisih arus kas sesuai filter' : 'Saldo kas gabungan · seumur hidup', value: result.summary.balance, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Seluruh riwayat' },
-          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Penerimaan sesuai filter' : 'Penerimaan · seumur hidup', value: result.summary.income, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Seluruh riwayat' },
-          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Pengeluaran sesuai filter' : 'Pengeluaran · seumur hidup', value: result.summary.expenses, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Seluruh riwayat' },
+          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Selisih arus kas sesuai filter' : 'Saldo kas gabungan · semua', value: result.summary.balance, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Semua' },
+          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Penerimaan sesuai filter' : 'Penerimaan · semua', value: result.summary.income, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Semua' },
+          { label: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Pengeluaran sesuai filter' : 'Pengeluaran · semua', value: result.summary.expenses, trend: dashboardFilter.year || dashboardFilter.month || dashboardFilter.day ? 'Periode terpilih' : 'Semua' },
         ] })
       }).catch((error) => { if (!cancelled) setNotice(error.message) })
       return () => { cancelled = true }
@@ -664,9 +664,9 @@ function App() {
     const hasDashboardFilter = Boolean(dashboardFilter.year || dashboardFilter.month || dashboardFilter.day)
     return {
       cards: [
-        { label: hasDashboardFilter ? 'Selisih arus kas sesuai filter' : 'Saldo kas gabungan · seumur hidup', value: entries.reduce((sum, entry) => sum + (entry.incoming ? entry.amount : -entry.amount), 0), icon: Landmark, trend: hasDashboardFilter ? 'Periode terpilih' : 'Seluruh riwayat' },
-        { label: hasDashboardFilter ? 'Penerimaan sesuai filter' : 'Penerimaan · seumur hidup', value: entries.filter((entry) => entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowDownLeft, trend: hasDashboardFilter ? 'Periode terpilih' : 'Seluruh riwayat' },
-        { label: hasDashboardFilter ? 'Pengeluaran sesuai filter' : 'Pengeluaran · seumur hidup', value: entries.filter((entry) => !entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowUpRight, trend: hasDashboardFilter ? 'Periode terpilih' : 'Seluruh riwayat' },
+        { label: hasDashboardFilter ? 'Selisih arus kas sesuai filter' : 'Saldo kas gabungan · semua', value: entries.reduce((sum, entry) => sum + (entry.incoming ? entry.amount : -entry.amount), 0), icon: Landmark, trend: hasDashboardFilter ? 'Periode terpilih' : 'Semua' },
+        { label: hasDashboardFilter ? 'Penerimaan sesuai filter' : 'Penerimaan · semua', value: entries.filter((entry) => entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowDownLeft, trend: hasDashboardFilter ? 'Periode terpilih' : 'Semua' },
+        { label: hasDashboardFilter ? 'Pengeluaran sesuai filter' : 'Pengeluaran · semua', value: entries.filter((entry) => !entry.incoming).reduce((sum, entry) => sum + entry.amount, 0), icon: ArrowUpRight, trend: hasDashboardFilter ? 'Periode terpilih' : 'Semua' },
         { label: 'Tunggakan iuran', value: masterMembers.reduce((sum, member) => sum + Number(member.Sisa_Hutang_Iuran || 0), 0), icon: Activity, trend: 'Saldo kewajiban anggota' },
       ],
       monthly,
