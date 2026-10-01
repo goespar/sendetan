@@ -110,6 +110,9 @@ function doPost(e) {
     } else if (action === 'adjustMemberBalance') {
       if (user.role !== 'Admin') throw new Error('Hanya Admin yang dapat mengoreksi saldo master anggota.');
       result = adjustMemberBalance_(body, user);
+    } else if (action === 'adjustIuranBalance') {
+      if (user.role !== 'Admin' && user.role !== 'Bendahara') throw new Error('Hanya Admin atau Bendahara yang dapat mengoreksi tunggakan iuran.');
+      result = adjustMemberBalance_({ memberId: body.memberId, arrears: body.arrears, reason: body.reason }, user);
     } else if (action === 'adjustSukadukaBalance') {
       if (user.role !== 'Admin' && user.role !== 'Bendahara') throw new Error('Hanya Admin atau Bendahara yang dapat mengoreksi tunggakan Sukaduka.');
       result = adjustMemberBalance_({
@@ -1128,7 +1131,7 @@ function deleteIuranTransaction_(id, user) {
 function saveSukadukaIncoming_(mode, input, user) {
   const record = input || {};
   if (!record.memberId) throw new Error('Pilih anggota untuk penerimaan sukaduka.');
-  if (!record.date || !record.purpose) throw new Error('Tanggal dan peruntukan sukaduka wajib diisi.');
+  if (!record.date) throw new Error('Tanggal transaksi Sukaduka wajib diisi.');
   const location = findMasterAnggota_(record.memberId);
   const rows = readRecords_('Sukaduka');
   const existing = mode === 'update' ? rows.find(function (row) { return String(row.id) === String(record.id); }) : null;
@@ -1210,20 +1213,22 @@ function saveSukadukaIncoming_(mode, input, user) {
 function deleteSukadukaIncoming_(record, user) {
   const location = findMasterAnggota_(record.memberId);
   const oldRefundDebt = Number(location.member.Sisa_Hutang_Kembalian) || 0;
+  const oldSukadukaArrears = Number(location.member.Sisa_Hutang_Sukaduka) || 0;
   const sheet = spreadsheet_().getSheetByName('Sukaduka');
   const rows = sheet.getDataRange().getValues();
   const idColumn = SHEETS.Sukaduka.indexOf('id');
   const rowIndex = rows.findIndex(function (row, index) { return index > 0 && String(row[idColumn]) === String(record.id); });
   if (rowIndex < 1) throw new Error('Transaksi penerimaan sukaduka tidak ditemukan.');
   const updatedRefundDebt = Math.max(0, oldRefundDebt - (Number(record.refundDebtAdded) || 0));
-  const member = updateMasterRefundDebt_(record.memberId, updatedRefundDebt);
+  const arrearsEffect = (Number(record.chargeAmount) || 0) - (Number(record.amount) || 0);
+  const updatedSukadukaArrears = Math.max(0, oldSukadukaArrears - arrearsEffect);
+  const member = updateMasterBalance_(record.memberId, location.member.Sisa_Hutang_Iuran, updatedRefundDebt, updatedSukadukaArrears);
   try {
     sheet.deleteRow(rowIndex + 1);
   } catch (error) {
-    updateMasterRefundDebt_(record.memberId, oldRefundDebt);
+    updateMasterBalance_(record.memberId, location.member.Sisa_Hutang_Iuran, oldRefundDebt, oldSukadukaArrears);
     throw error;
   }
-  member.Sisa_Hutang_Sukaduka = sukadukaArrearsByMember_(readRecords_('Sukaduka'))[String(record.memberId)] || 0;
   audit_(user, 'delete', 'Sukaduka', record.id, record.memberName);
   return { id: record.id, member: member };
 }
