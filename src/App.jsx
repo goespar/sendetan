@@ -3,7 +3,7 @@ import {
   Activity, ArrowDownLeft, ArrowUpRight, Boxes, CalendarDays, ChartNoAxesCombined, Eye, EyeOff,
   Check, ChevronDown, CircleDollarSign, ClipboardList, FileText, HandCoins,
   HeartHandshake, Landmark, LayoutDashboard, LogOut, Menu, Package, Plus,
-  Search, Settings2, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet,
+  Search, Settings2, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet, Download, Printer,
   X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import logo from '../logo takora.png'
@@ -12,6 +12,7 @@ import { isDemo, request, uploadPhoto } from './api.js'
 const DashboardCharts = lazy(() => import('./DashboardCharts.jsx'))
 
 const roleNames = { Admin: 'Administrator', Ketua: 'Ketua', Bendahara: 'Bendahara', Sekretaris: 'Sekretaris', Publik: 'Anggota / Publik' }
+const organizationAddress = 'Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali'
 const FINANCE_MODULES_UI = ['iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan']
 const ORGANIZATION_MODULES_UI = ['aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan']
 const navigation = [
@@ -970,10 +971,98 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
 */
 function ModulePage({ active, page, rows, query, setQuery, loading, writable, busy, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
   const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
+  const exportableModules = ['iuran', 'sukaduka', 'pengeluaranIuran', 'sesari', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi']
   const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
   const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
-  return <div className={`animate-rise ${busy ? 'pointer-events-none opacity-70' : ''}`} aria-busy={busy}>
-    <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
+  const paymentGroups = new Map(masterMembers.map((member) => [String(member.ID), {
+    id: String(member.ID),
+    name: member.Nama,
+    payments: [],
+    total: 0,
+    arrears: Number(active === 'iuran' ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka) || 0,
+  }]))
+  rows.forEach((row) => {
+    const amount = Number(active === 'iuran' ? row.allocatedContribution : row.amount) || 0
+    if (amount <= 0 || active === 'sukaduka' && row.direction !== 'Masuk') return
+    const memberId = String(row.memberId || row.memberName || 'tanpa-anggota')
+    if (!paymentGroups.has(memberId)) paymentGroups.set(memberId, {
+      id: memberId, name: row.memberName || row.Nama || 'Anggota tanpa nama', payments: [], total: 0, arrears: 0,
+    })
+    const member = paymentGroups.get(memberId)
+    member.payments.push({ date: row.date, amount })
+    member.total += amount
+  })
+  const paymentRecap = ['iuran', 'sukaduka'].includes(active)
+    ? [...paymentGroups.values()]
+      .filter((member) => !query || member.name.toLowerCase().includes(query.toLowerCase()) || member.id.toLowerCase().includes(query.toLowerCase()) || member.payments.length)
+      .sort((left, right) => left.name.localeCompare(right.name, 'id'))
+    : []
+  const paymentCountTotal = paymentRecap.reduce((total, member) => total + member.payments.length, 0)
+  const paymentTotal = paymentRecap.reduce((total, member) => total + member.total, 0)
+  const paymentArrearsTotal = paymentRecap.reduce((total, member) => total + member.arrears, 0)
+  const paymentRecapTotalLabel = query ? 'TOTAL ANGGOTA HASIL PENCARIAN' : 'TOTAL SELURUH ANGGOTA'
+  async function exportReport() {
+    const XLSX = await import('xlsx')
+    const exportRows = rows.map((row) => Object.fromEntries(page.columns.map(([key, label]) => {
+      let value = row[key] ?? ''
+      if (key === 'available') value = Number.isFinite(Number(row.available)) ? Number(row.available) : Math.max(0, Number(row.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(row.id) && !['Dibatalkan', 'Selesai'].includes(rental.status) && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0))
+      if (key === 'currentArrears' || key === 'currentRefundDebt') value = Number(masterMembers.find((member) => String(member.ID) === String(row.memberId))?.[key === 'currentArrears' ? 'Sisa_Hutang_Iuran' : 'Sisa_Hutang_Kembalian']) || 0
+      return [label, value]
+    })))
+    const workbook = XLSX.utils.book_new()
+    const makeReportSheet = (headers, values) => {
+      const columnCount = Math.max(5, headers.length)
+      const padRow = (row) => [...row, ...Array(Math.max(0, columnCount - row.length)).fill('')]
+      const signatureLabels = Array(columnCount).fill('')
+      const signatureLines = Array(columnCount).fill('')
+      signatureLabels[0] = 'Ketua'
+      signatureLabels[Math.floor((columnCount - 1) / 2)] = 'Sekretaris'
+      signatureLabels[columnCount - 1] = 'Bendahara'
+      signatureLines[0] = '(................................)'
+      signatureLines[Math.floor((columnCount - 1) / 2)] = '(................................)'
+      signatureLines[columnCount - 1] = '(................................)'
+      const reportPeriod = `${periodFilter ? `Periode: ${periodFilter}` : 'Periode: Semua'}${query ? ` | Pencarian: ${query}` : ''}${['iuran', 'sukaduka'].includes(active) ? ' | Tunggakan: saldo saat ini' : ''}`
+      const sheet = XLSX.utils.aoa_to_sheet([
+        padRow(['SENDETAN TAKORA TELAGA BETENG']),
+        padRow([organizationAddress]),
+        padRow([page.title]),
+        padRow([reportPeriod]),
+        Array(columnCount).fill(''),
+        padRow(headers),
+        ...values.map(padRow),
+        Array(columnCount).fill(''),
+        Array(columnCount).fill(''),
+        signatureLabels,
+        Array(columnCount).fill(''),
+        signatureLines,
+      ])
+      sheet['!merges'] = [0, 1, 2, 3].map((row) => ({ s: { r: row, c: 0 }, e: { r: row, c: columnCount - 1 } }))
+      sheet['!cols'] = Array.from({ length: columnCount }, (_, index) => ({ wch: index < headers.length ? Math.min(32, Math.max(14, String(headers[index]).length + 3)) : 18 }))
+      if (headers.length && values.length) sheet['!autofilter'] = { ref: `A6:${XLSX.utils.encode_col(headers.length - 1)}${6 + values.length}` }
+      return sheet
+    }
+    if (['iuran', 'sukaduka'].includes(active)) {
+      const recapRows = [
+        ...paymentRecap.map((member) => [member.name, member.payments.length, member.total, member.arrears]),
+        [paymentRecapTotalLabel, paymentCountTotal, paymentTotal, paymentArrearsTotal],
+      ]
+      const recapSheet = makeReportSheet(['Anggota', 'Kali pembayaran', 'Total terbayar', 'Tunggakan saat ini'], recapRows)
+      XLSX.utils.book_append_sheet(workbook, recapSheet, 'Rekap per Anggota')
+      const paymentDetails = paymentRecap.flatMap((member) => member.payments.map((payment) => [member.name, payment.date || '', payment.amount]))
+      const paymentDetailsSheet = makeReportSheet(['Anggota', 'Tanggal pembayaran', 'Jumlah pembayaran'], paymentDetails)
+      XLSX.utils.book_append_sheet(workbook, paymentDetailsSheet, 'Rincian Pembayaran')
+    }
+    const detailHeaders = page.columns.map(([, label]) => label)
+    const detailValues = exportRows.map((row) => detailHeaders.map((header) => row[header] ?? ''))
+    const detailSheet = makeReportSheet(detailHeaders, detailValues)
+    XLSX.utils.book_append_sheet(workbook, detailSheet, ['iuran', 'sukaduka'].includes(active) ? 'Rincian Transaksi' : page.title.slice(0, 31))
+    const periodSuffix = periodFilter ? `-${periodFilter}` : ''
+    XLSX.writeFile(workbook, `laporan-${active}${periodSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+  return <div className={`print-report animate-rise ${busy ? 'pointer-events-none opacity-70' : ''}`} aria-busy={busy}>
+    <header className="print-heading"><img src={logo} alt="Logo SENDETAN TAKORA TELAGA BETENG" /><div><h1>SENDETAN TAKORA TELAGA BETENG</h1><p>{organizationAddress}</p><h2>{page.title}</h2><p>{periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}{query ? ` · Pencarian: ${query}` : ''}</p></div></header>
+    <div className="module-toolbar mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
+      {exportableModules.includes(active) && <><button onClick={() => window.print()} className="no-print flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak</button><button onClick={() => exportReport().catch((error) => window.alert(`Ekspor gagal: ${error.message}`))} className="no-print flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><Download size={15} /> Ekspor Excel</button></>}
       {active === 'iuran' && writable && <button onClick={onCloseBook} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50">{busy ? 'Memproses...' : <><BookOpenCheck size={15} /> Tutup buku</>}</button>}
       {active === 'anggota' && canEditBalances && <button onClick={onEditBalance} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><CircleDollarSign size={15} /> Koreksi saldo</button>}
       {active === 'iuran' && writable && <button onClick={onEditBalance} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><CircleDollarSign size={15} /> Edit saldo tunggakan iuran</button>}
@@ -981,9 +1070,13 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
       {['iuran', 'sukaduka', 'punia', 'piodalan'].includes(active) && writable && <button onClick={onBatch} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50"><FileText size={15} /> Input basket / Excel</button>}
       {writable && <button onClick={onAdd} disabled={busy} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3.5 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><Plus size={16} /> Tambah data</button>}
     </div></div>
+    {['iuran', 'sukaduka'].includes(active) && <section className="mb-4 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-3 sm:px-5"><div><h2 className="text-xs font-bold">Rekap pembayaran per anggota</h2><p className="mt-1 text-[10px] text-[#849084]">Jumlah transaksi dan total bayar mengikuti filter; tunggakan adalah saldo saat ini.</p><p className="mt-1 text-[10px] text-[#849084]">{periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}{query ? ' · sesuai pencarian' : ''}</p></div><div className="flex gap-5 text-right"><div><p className="text-[10px] text-[#849084]">Total pembayaran</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{currency(paymentTotal)}</p></div><div><p className="text-[10px] text-[#849084]">Total tunggakan kini</p><p className="mt-1 text-sm font-bold text-[#b5122a]">{currency(paymentArrearsTotal)}</p></div></div></div>
+      {paymentRecap.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-[#fafaf6] text-[10px] text-[#849084]"><tr><th className="px-4 py-2.5 sm:px-5">Anggota / riwayat pembayaran</th><th className="px-4 py-2.5 text-right">Kali bayar</th><th className="px-4 py-2.5 text-right">Total terbayar</th><th className="px-4 py-2.5 text-right">Tunggakan saat ini</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{paymentRecap.map((member) => <tr key={member.id}><td className="px-4 py-3 sm:px-5"><b className="text-[#355d3f]">{member.name}</b>{member.payments.length ? <div className="mt-1.5 space-y-1">{member.payments.map((payment, index) => <p key={`${member.id}-${payment.date}-${index}`} className="text-[10px] text-[#68776b]">{readableDate(payment.date)} · {currency(payment.amount)}</p>)}</div> : <p className="mt-1.5 text-[10px] text-[#929c91]">Belum ada pembayaran pada filter ini</p>}</td><td className="px-4 py-3 text-right">{member.payments.length} kali</td><td className="px-4 py-3 text-right font-semibold">{currency(member.total)}</td><td className="px-4 py-3 text-right font-semibold text-[#b5122a]">{currency(member.arrears)}</td></tr>)}</tbody><tfoot className="border-t-2 border-[#dfe4d9] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3 sm:px-5">{paymentRecapTotalLabel}</td><td className="px-4 py-3 text-right">{paymentCountTotal} kali</td><td className="px-4 py-3 text-right">{currency(paymentTotal)}</td><td className="px-4 py-3 text-right text-[#b5122a]">{currency(paymentArrearsTotal)}</td></tr></tfoot></table></div> : <p className="px-5 py-6 text-center text-xs text-[#89958a]">Belum ada anggota pada rekap ini.</p>}
+    </section>}
     {hasCashSummary && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana masuk · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana keluar · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashOut)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Selisih bersih · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn - cashOut)}</p></div></div>}
-    <section className="overflow-hidden rounded-md border bg-white"><div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><b className="text-xs">Daftar {page.title.toLowerCase()}</b><div className="flex gap-2"><input aria-label="Cari catatan" placeholder="Cari catatan..." value={query} onChange={(event) => setQuery(event.target.value)} className="rounded-md border px-3 py-2 text-xs" />{hasCashSummary && <input aria-label="Filter periode" type="month" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} className="rounded-md border px-2 py-2 text-xs" />}</div></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[690px] text-left text-xs"><thead><tr>{page.columns.map(([key, label]) => <th key={key} className="px-4 py-3">{label}</th>)}{writable && <th className="px-4 py-3 text-right">Aksi</th>}</tr></thead><tbody>
+    <section className="overflow-hidden rounded-md border bg-white"><div className="module-filters flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><b className="text-xs">Daftar {page.title.toLowerCase()}</b><div className="flex gap-2"><input aria-label="Cari catatan" placeholder="Cari catatan..." value={query} onChange={(event) => setQuery(event.target.value)} className="rounded-md border px-3 py-2 text-xs" />{hasCashSummary && <input aria-label="Filter periode" type="month" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} className="rounded-md border px-2 py-2 text-xs" />}</div></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[690px] text-left text-xs"><thead><tr>{page.columns.map(([key, label]) => <th key={key} className="px-4 py-3">{label}</th>)}{writable && <th className="no-print px-4 py-3 text-right">Aksi</th>}</tr></thead><tbody>
         {loading ? <tr><td colSpan={page.columns.length + Number(writable)} className="p-8 text-center">Memuat data...</td></tr> : rows.length === 0 ? <tr><td colSpan={page.columns.length + Number(writable)} className="p-8 text-center">Belum ada catatan</td></tr> : rows.map((row) => <tr key={row.id} className="border-t">{page.columns.map(([key]) => {
           let value = row[key]
           if (['date', 'startDate', 'endDate'].includes(key)) value = readableDate(value)
@@ -992,10 +1085,11 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
               else if (['amount', 'target', 'allocatedContribution', 'chargeAmount', 'openingArrears', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) value = currency(value)
           else if (['photoUrl', 'proofPhotoUrl'].includes(key) && value) value = <a href={value} target="_blank" rel="noreferrer" className="text-[#b5122a] underline">Lihat foto</a>
           return <td key={key} className="max-w-[240px] truncate whitespace-nowrap px-4 py-3">{value || '-'}</td>
-        })}{writable && <td className="whitespace-nowrap px-4 py-3 text-right"><button onClick={() => onEdit(row)} aria-label="Ubah" className="p-1.5"><Pencil size={14} /></button><button onClick={() => onDelete(row.id)} aria-label="Hapus" className="p-1.5 text-[#b5122a]"><Trash2 size={14} /></button></td>}</tr>)}</tbody></table></div>
+        })}{writable && <td className="no-print whitespace-nowrap px-4 py-3 text-right"><button onClick={() => onEdit(row)} aria-label="Ubah" className="p-1.5"><Pencil size={14} /></button><button onClick={() => onDelete(row.id)} aria-label="Hapus" className="p-1.5 text-[#b5122a]"><Trash2 size={14} /></button></td>}</tr>)}</tbody></table></div>
       <div className="flex justify-between border-t px-5 py-3 text-[10px] text-[#98a096]"><span>Menampilkan {rows.length} catatan</span><span>TAKORA · Data tersimpan sesuai periode</span></div>
     </section>
-    {active === 'aset' && <div className="mt-4 flex gap-2 rounded-md border bg-[#f0f2e9] p-3.5 text-[11px]"><Camera size={15} /><p>Isi tarif Semeton dan orang luar agar hitungan sewa sesuai jenis penyewa.</p></div>}
+    {active === 'aset' && <div className="no-print mt-4 flex gap-2 rounded-md border bg-[#f0f2e9] p-3.5 text-[11px]"><Camera size={15} /><p>Isi tarif Semeton dan orang luar agar hitungan sewa sesuai jenis penyewa.</p></div>}
+    <footer className="print-signatures"><div><b>Ketua</b><span></span></div><div><b>Sekretaris</b><span></span></div><div><b>Bendahara</b><span></span></div></footer>
   </div>
 }
 

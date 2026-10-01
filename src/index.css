@@ -20,6 +20,45 @@ button { cursor: pointer; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .animate-rise { animation: rise-in .45s ease-out both; }
+.print-heading { display: none; }
+.print-signatures { display: none; }
+
+@media print {
+  @page { size: A4 landscape; margin: 9mm; }
+  body { min-width: 0; background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .print-report,
+  .print-report * { visibility: visible !important; }
+  .print-report {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .print-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 2px solid #222; }
+  .print-heading img { width: 62px; height: 62px; flex: 0 0 62px; object-fit: contain; }
+  .print-heading h1 { margin: 0; font-size: 16pt; font-weight: 700; }
+  .print-heading h2 { margin: 6px 0 0; font-size: 12pt; font-weight: 700; }
+  .print-heading p { margin: 3px 0 0; color: #333; font-size: 8pt; }
+  .module-toolbar button,
+  .module-filters,
+  .no-print { display: none !important; }
+  .overflow-x-auto { overflow: visible !important; }
+  .print-report section { border-color: #aaa !important; box-shadow: none !important; break-inside: auto; }
+  .print-report table { width: 100%; min-width: 0 !important; border-collapse: collapse; }
+  .print-report th,
+  .print-report td { padding: 4px !important; color: #111 !important; border-bottom: 1px solid #ccc; font-size: 7pt !important; white-space: normal !important; overflow-wrap: anywhere; }
+  .print-report th { padding: 4px !important; color: #111 !important; border-bottom: 1px solid #aaa; font-size: 7pt !important; white-space: normal !important; }
+  .print-report thead { display: table-header-group; }
+  .print-report tr { break-inside: avoid; }
+  .print-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12mm; margin: 18mm 8mm 0; break-inside: avoid; text-align: center; }
+  .print-signatures div { display: flex; min-height: 27mm; flex-direction: column; align-items: center; justify-content: space-between; font-size: 9pt; }
+  .print-signatures span { width: 70%; border-bottom: 1px solid #222; }
+  .animate-rise { animation: none !important; }
+}
 
 .tridatu-theme {
   background: #fff;
