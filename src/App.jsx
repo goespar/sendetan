@@ -443,7 +443,7 @@ function App() {
         }
       }
       setRows((previous) => ({ ...previous, sukaduka: editing ? previous.sukaduka.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...(previous.sukaduka || [])] }))
-      if (savedMember) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(savedMember.ID) ? savedMember : member))
+      if (savedMember) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(savedMember.ID) ? { ...member, ...savedMember } : member))
       uploadedPhotoUrls.current.delete(`sukaduka:${updated.id}`)
       setNotice(editing ? 'Transaksi sukaduka diperbarui.' : 'Transaksi sukaduka disimpan.')
       setModal(false)
@@ -473,7 +473,7 @@ function App() {
         ...previous,
         iuran: editing ? previous.iuran.map((row) => row.id === editing.id ? savedRecord : row) : [savedRecord, ...(previous.iuran || [])],
       }))
-      if (savedMember) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(savedMember.ID) ? savedMember : member))
+      if (savedMember) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(savedMember.ID) ? { ...member, ...savedMember } : member))
       setNotice(editing ? 'Transaksi iuran diperbarui dan saldo anggota disinkronkan.' : 'Transaksi iuran disimpan dan saldo anggota diperbarui.')
       setModal(false)
       setEditing(null)
@@ -532,7 +532,7 @@ function App() {
         const previous = masterMembers.find((item) => String(item.ID) === String(record.memberId))
         member = { ...previous, Sisa_Hutang_Iuran: record.arrears, ...(role === 'Bendahara' ? {} : { Sisa_Hutang_Kembalian: record.refundDebt }) }
       }
-      setMasterMembers((previous) => previous.map((item) => String(item.ID) === String(member.ID) ? member : item))
+      setMasterMembers((previous) => previous.map((item) => String(item.ID) === String(member.ID) ? { ...item, ...member } : item))
       setNotice('Saldo master diperbarui dan alasan koreksi dicatat di audit.')
       setBalanceModal(false)
     } catch (error) { setNotice(error.message) }
@@ -553,7 +553,7 @@ function App() {
       } else {
         member = { ...current, Sisa_Hutang_Sukaduka: Number(record.sukadukaArrears || 0) }
       }
-      setMasterMembers((previous) => previous.map((item) => String(item.ID) === String(member.ID) ? member : item))
+      setMasterMembers((previous) => previous.map((item) => String(item.ID) === String(member.ID) ? { ...item, ...member } : item))
       setNotice('Saldo tunggakan Sukaduka berhasil diperbarui.')
       setBalanceModal(false)
     } catch (error) { setNotice(error.message) }
@@ -598,7 +598,7 @@ function App() {
       setRows((previous) => ({ ...previous, [active]: (previous[active] || []).filter((row) => row.id !== id) }))
       if (active === 'sewa') setRentalRows((previous) => previous.filter((row) => row.id !== id))
       if (active === 'kegiatan') setPublicActivities((previous) => previous.filter((row) => row.id !== id))
-      if (['iuran', 'sukaduka'].includes(active) && result?.member) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(result.member.ID) ? result.member : member))
+      if (['iuran', 'sukaduka'].includes(active) && result?.member) setMasterMembers((previous) => previous.map((member) => String(member.ID) === String(result.member.ID) ? { ...member, ...result.member } : member))
       setNotice('Catatan berhasil dihapus.')
     } catch (error) { setNotice(error.message) }
   }
@@ -797,7 +797,7 @@ function App() {
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
           {['iuran', 'sukaduka', 'sesari'].includes(active) && writable && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d9e1d5] bg-white px-4 py-3"><div><p className="text-[10px] font-semibold uppercase text-[#849084]">Saldo awal kas {moduleLabels[active]}</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{openingBalances[active]?.configured ? currency(openingBalances[active].amount) : 'Belum diatur'}</p>{openingBalances[active]?.date && <p className="mt-1 text-[10px] text-[#849084]">Per {readableDate(openingBalances[active].date)}</p>}</div><button onClick={() => setOpeningBalanceModal(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Atur saldo awal</button></div>}
           {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenOpeningBalance={() => setOpeningBalanceModal(true)} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} />}
-          <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TAKORA TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
+          <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
 
@@ -829,7 +829,10 @@ function App() {
             updatedMembers = [...balances.values()]
           }
           setRows((previous) => ({ ...previous, [active]: [...savedRecords, ...(previous[active] || [])] }))
-          if (updatedMembers.length) setMasterMembers((previous) => previous.map((member) => updatedMembers.find((updated) => String(updated.ID) === String(member.ID)) || member))
+          if (updatedMembers.length) setMasterMembers((previous) => previous.map((member) => {
+            const updated = updatedMembers.find((item) => String(item.ID) === String(member.ID))
+            return updated ? { ...member, ...updated } : member
+          }))
           setBatchModal(false)
           setNotice(`${savedRecords.length} pembayaran berhasil disimpan.`)
         } catch (error) { setNotice(error.message); throw error }
@@ -974,9 +977,11 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
   const exportableModules = ['iuran', 'sukaduka', 'pengeluaranIuran', 'sesari', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi']
   const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
   const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
+  const memberNumbers = new Map(masterMembers.map((member) => [String(member.ID), String(member.memberNo || member.ID)]))
   const paymentGroups = new Map(masterMembers.map((member) => [String(member.ID), {
     id: String(member.ID),
     name: member.Nama,
+    memberNo: memberNumbers.get(String(member.ID)) || String(member.ID),
     payments: [],
     total: 0,
     arrears: Number(active === 'iuran' ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka) || 0,
@@ -986,7 +991,12 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
     if (amount <= 0 || active === 'sukaduka' && row.direction !== 'Masuk') return
     const memberId = String(row.memberId || row.memberName || 'tanpa-anggota')
     if (!paymentGroups.has(memberId)) paymentGroups.set(memberId, {
-      id: memberId, name: row.memberName || row.Nama || 'Anggota tanpa nama', payments: [], total: 0, arrears: 0,
+      id: memberId,
+      name: row.memberName || row.Nama || 'Anggota tanpa nama',
+      memberNo: memberNumbers.get(memberId) || memberId,
+      payments: [],
+      total: 0,
+      arrears: 0,
     })
     const member = paymentGroups.get(memberId)
     member.payments.push({ date: row.date, amount })
@@ -995,7 +1005,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
   const paymentRecap = ['iuran', 'sukaduka'].includes(active)
     ? [...paymentGroups.values()]
       .filter((member) => !query || member.name.toLowerCase().includes(query.toLowerCase()) || member.id.toLowerCase().includes(query.toLowerCase()) || member.payments.length)
-      .sort((left, right) => left.name.localeCompare(right.name, 'id'))
+      .sort((left, right) => left.memberNo.localeCompare(right.memberNo, 'id', { numeric: true, sensitivity: 'base' }) || left.name.localeCompare(right.name, 'id'))
     : []
   const paymentCountTotal = paymentRecap.reduce((total, member) => total + member.payments.length, 0)
   const paymentTotal = paymentRecap.reduce((total, member) => total + member.total, 0)
@@ -1023,7 +1033,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
       signatureLines[columnCount - 1] = '(................................)'
       const reportPeriod = `${periodFilter ? `Periode: ${periodFilter}` : 'Periode: Semua'}${query ? ` | Pencarian: ${query}` : ''}${['iuran', 'sukaduka'].includes(active) ? ' | Tunggakan: saldo saat ini' : ''}`
       const sheet = XLSX.utils.aoa_to_sheet([
-        padRow(['SENDETAN TAKORA TELAGA BETENG']),
+        padRow(['SENDETAN TELAGA BETENG']),
         padRow([organizationAddress]),
         padRow([page.title]),
         padRow([reportPeriod]),
@@ -1043,13 +1053,13 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
     }
     if (['iuran', 'sukaduka'].includes(active)) {
       const recapRows = [
-        ...paymentRecap.map((member) => [member.name, member.payments.length, member.total, member.arrears]),
-        [paymentRecapTotalLabel, paymentCountTotal, paymentTotal, paymentArrearsTotal],
+        ...paymentRecap.map((member) => [member.memberNo, member.name, member.payments.length, member.total, member.arrears]),
+        ['', paymentRecapTotalLabel, paymentCountTotal, paymentTotal, paymentArrearsTotal],
       ]
-      const recapSheet = makeReportSheet(['Anggota', 'Kali pembayaran', 'Total terbayar', 'Tunggakan saat ini'], recapRows)
+      const recapSheet = makeReportSheet(['No. anggota', 'Nama anggota', 'Kali pembayaran', 'Total terbayar', 'Tunggakan saat ini'], recapRows)
       XLSX.utils.book_append_sheet(workbook, recapSheet, 'Rekap per Anggota')
-      const paymentDetails = paymentRecap.flatMap((member) => member.payments.map((payment) => [member.name, payment.date || '', payment.amount]))
-      const paymentDetailsSheet = makeReportSheet(['Anggota', 'Tanggal pembayaran', 'Jumlah pembayaran'], paymentDetails)
+      const paymentDetails = paymentRecap.flatMap((member) => member.payments.map((payment) => [member.memberNo, member.name, payment.date || '', payment.amount]))
+      const paymentDetailsSheet = makeReportSheet(['No. anggota', 'Nama anggota', 'Tanggal pembayaran', 'Jumlah pembayaran'], paymentDetails)
       XLSX.utils.book_append_sheet(workbook, paymentDetailsSheet, 'Rincian Pembayaran')
     }
     const detailHeaders = page.columns.map(([, label]) => label)
@@ -1060,7 +1070,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
     XLSX.writeFile(workbook, `laporan-${active}${periodSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
   return <div className={`print-report animate-rise ${busy ? 'pointer-events-none opacity-70' : ''}`} aria-busy={busy}>
-    <header className="print-heading"><img src={logo} alt="Logo SENDETAN TAKORA TELAGA BETENG" /><div><h1>SENDETAN TAKORA TELAGA BETENG</h1><p>{organizationAddress}</p><h2>{page.title}</h2><p>{periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}{query ? ` · Pencarian: ${query}` : ''}</p></div></header>
+    <header className="print-heading"><h1>SENDETAN TELAGA BETENG</h1><p>{organizationAddress}</p><h2>{page.title}</h2><p>{periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}{query ? ` · Pencarian: ${query}` : ''}</p></header>
     <div className="module-toolbar mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
       {exportableModules.includes(active) && <><button onClick={() => window.print()} className="no-print flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak</button><button onClick={() => exportReport().catch((error) => window.alert(`Ekspor gagal: ${error.message}`))} className="no-print flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><Download size={15} /> Ekspor Excel</button></>}
       {active === 'iuran' && writable && <button onClick={onCloseBook} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50">{busy ? 'Memproses...' : <><BookOpenCheck size={15} /> Tutup buku</>}</button>}
@@ -1072,7 +1082,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
     </div></div>
     {['iuran', 'sukaduka'].includes(active) && <section className="mb-4 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-3 sm:px-5"><div><h2 className="text-xs font-bold">Rekap pembayaran per anggota</h2><p className="mt-1 text-[10px] text-[#849084]">Jumlah transaksi dan total bayar mengikuti filter; tunggakan adalah saldo saat ini.</p><p className="mt-1 text-[10px] text-[#849084]">{periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}{query ? ' · sesuai pencarian' : ''}</p></div><div className="flex gap-5 text-right"><div><p className="text-[10px] text-[#849084]">Total pembayaran</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{currency(paymentTotal)}</p></div><div><p className="text-[10px] text-[#849084]">Total tunggakan kini</p><p className="mt-1 text-sm font-bold text-[#b5122a]">{currency(paymentArrearsTotal)}</p></div></div></div>
-      {paymentRecap.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-[#fafaf6] text-[10px] text-[#849084]"><tr><th className="px-4 py-2.5 sm:px-5">Anggota / riwayat pembayaran</th><th className="px-4 py-2.5 text-right">Kali bayar</th><th className="px-4 py-2.5 text-right">Total terbayar</th><th className="px-4 py-2.5 text-right">Tunggakan saat ini</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{paymentRecap.map((member) => <tr key={member.id}><td className="px-4 py-3 sm:px-5"><b className="text-[#355d3f]">{member.name}</b>{member.payments.length ? <div className="mt-1.5 space-y-1">{member.payments.map((payment, index) => <p key={`${member.id}-${payment.date}-${index}`} className="text-[10px] text-[#68776b]">{readableDate(payment.date)} · {currency(payment.amount)}</p>)}</div> : <p className="mt-1.5 text-[10px] text-[#929c91]">Belum ada pembayaran pada filter ini</p>}</td><td className="px-4 py-3 text-right">{member.payments.length} kali</td><td className="px-4 py-3 text-right font-semibold">{currency(member.total)}</td><td className="px-4 py-3 text-right font-semibold text-[#b5122a]">{currency(member.arrears)}</td></tr>)}</tbody><tfoot className="border-t-2 border-[#dfe4d9] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3 sm:px-5">{paymentRecapTotalLabel}</td><td className="px-4 py-3 text-right">{paymentCountTotal} kali</td><td className="px-4 py-3 text-right">{currency(paymentTotal)}</td><td className="px-4 py-3 text-right text-[#b5122a]">{currency(paymentArrearsTotal)}</td></tr></tfoot></table></div> : <p className="px-5 py-6 text-center text-xs text-[#89958a]">Belum ada anggota pada rekap ini.</p>}
+      {paymentRecap.length ? <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-xs"><thead className="bg-[#fafaf6] text-[10px] text-[#849084]"><tr><th className="px-4 py-2.5">No. anggota</th><th className="px-4 py-2.5 sm:px-5">Nama / riwayat pembayaran</th><th className="px-4 py-2.5 text-right">Kali bayar</th><th className="px-4 py-2.5 text-right">Total terbayar</th><th className="px-4 py-2.5 text-right">Tunggakan saat ini</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{paymentRecap.map((member) => <tr key={member.id}><td className="px-4 py-3 font-medium">{member.memberNo}</td><td className="px-4 py-3 sm:px-5"><b className="text-[#355d3f]">{member.name}</b>{member.payments.length ? <div className="mt-1.5 space-y-1">{member.payments.map((payment, index) => <p key={`${member.id}-${payment.date}-${index}`} className="text-[10px] text-[#68776b]">{readableDate(payment.date)} · {currency(payment.amount)}</p>)}</div> : <p className="mt-1.5 text-[10px] text-[#929c91]">Belum ada pembayaran pada filter ini</p>}</td><td className="px-4 py-3 text-right">{member.payments.length} kali</td><td className="px-4 py-3 text-right font-semibold">{currency(member.total)}</td><td className="px-4 py-3 text-right font-semibold text-[#b5122a]">{currency(member.arrears)}</td></tr>)}</tbody><tfoot className="border-t-2 border-[#dfe4d9] bg-[#fafaf6] font-bold"><tr><td colSpan="2" className="px-4 py-3 sm:px-5">{paymentRecapTotalLabel}</td><td className="px-4 py-3 text-right">{paymentCountTotal} kali</td><td className="px-4 py-3 text-right">{currency(paymentTotal)}</td><td className="px-4 py-3 text-right text-[#b5122a]">{currency(paymentArrearsTotal)}</td></tr></tfoot></table></div> : <p className="px-5 py-6 text-center text-xs text-[#89958a]">Belum ada anggota pada rekap ini.</p>}
     </section>}
     {hasCashSummary && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana masuk · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Dana keluar · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashOut)}</p></div><div className="rounded-md border bg-white px-4 py-3"><p className="text-[10px]">Selisih bersih · hasil filter</p><p className="mt-1 text-sm font-bold">{currency(cashIn - cashOut)}</p></div></div>}
     <section className="overflow-hidden rounded-md border bg-white"><div className="module-filters flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><b className="text-xs">Daftar {page.title.toLowerCase()}</b><div className="flex gap-2"><input aria-label="Cari catatan" placeholder="Cari catatan..." value={query} onChange={(event) => setQuery(event.target.value)} className="rounded-md border px-3 py-2 text-xs" />{hasCashSummary && <input aria-label="Filter periode" type="month" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} className="rounded-md border px-2 py-2 text-xs" />}</div></div>
@@ -1086,7 +1096,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
           else if (['photoUrl', 'proofPhotoUrl'].includes(key) && value) value = <a href={value} target="_blank" rel="noreferrer" className="text-[#b5122a] underline">Lihat foto</a>
           return <td key={key} className="max-w-[240px] truncate whitespace-nowrap px-4 py-3">{value || '-'}</td>
         })}{writable && <td className="no-print whitespace-nowrap px-4 py-3 text-right"><button onClick={() => onEdit(row)} aria-label="Ubah" className="p-1.5"><Pencil size={14} /></button><button onClick={() => onDelete(row.id)} aria-label="Hapus" className="p-1.5 text-[#b5122a]"><Trash2 size={14} /></button></td>}</tr>)}</tbody></table></div>
-      <div className="flex justify-between border-t px-5 py-3 text-[10px] text-[#98a096]"><span>Menampilkan {rows.length} catatan</span><span>TAKORA · Data tersimpan sesuai periode</span></div>
+      <div className="flex justify-between border-t px-5 py-3 text-[10px] text-[#98a096]"><span>Menampilkan {rows.length} catatan</span><span>Data tersimpan sesuai periode</span></div>
     </section>
     {active === 'aset' && <div className="no-print mt-4 flex gap-2 rounded-md border bg-[#f0f2e9] p-3.5 text-[11px]"><Camera size={15} /><p>Isi tarif Semeton dan orang luar agar hitungan sewa sesuai jenis penyewa.</p></div>}
     <footer className="print-signatures"><div><b>Ketua</b><span></span></div><div><b>Sekretaris</b><span></span></div><div><b>Bendahara</b><span></span></div></footer>

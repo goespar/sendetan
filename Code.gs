@@ -848,7 +848,11 @@ function getMasterAnggota_(snapshot) {
   }
   const currentMembers = snapshot ? snapshot.Anggota : readRecords_('Anggota');
   const currentMemberIds = {};
-  currentMembers.forEach(function (member) { currentMemberIds[String(member.id)] = true; });
+  const currentMembersById = {};
+  currentMembers.forEach(function (member) {
+    currentMemberIds[String(member.id)] = true;
+    currentMembersById[String(member.id)] = member;
+  });
   const master = (snapshot ? snapshot.MASTER_ANGGOTA : readRecords_('MASTER_ANGGOTA')).filter(function (member) {
     return member.ID !== '' && currentMemberIds[String(member.ID)];
   });
@@ -870,6 +874,7 @@ function getMasterAnggota_(snapshot) {
   const sukadukaArrears = sukadukaArrearsByMember_(snapshot ? snapshot.Sukaduka : readRecords_('Sukaduka'));
   return Object.keys(byId).map(function (id) {
     const member = byId[id];
+    member.memberNo = currentMembersById[id] && currentMembersById[id].memberNo || member.memberNo || id;
     const latest = latestBalances[id];
     member.Nama = member.Nama || '';
     member.Sisa_Hutang_Iuran = member.Sisa_Hutang_Iuran === '' || member.Sisa_Hutang_Iuran === null || member.Sisa_Hutang_Iuran === undefined
@@ -933,6 +938,8 @@ function findMasterAnggota_(memberId) {
   for (let index = 1; index < values.length; index++) {
     if (String(values[index][idColumn]) === String(memberId)) {
       const member = rowToObject_(headers, values[index]);
+      const directoryMember = readRecords_('Anggota').find(function (item) { return String(item.id) === String(memberId); });
+      member.memberNo = directoryMember && directoryMember.memberNo || String(memberId);
       const latest = latestIuranBalance_(memberId);
       member.Sisa_Hutang_Iuran = member.Sisa_Hutang_Iuran === '' || member.Sisa_Hutang_Iuran === null || member.Sisa_Hutang_Iuran === undefined
         ? Number(latest && latest.arrears) || 0 : Number(member.Sisa_Hutang_Iuran) || 0;
@@ -962,6 +969,7 @@ function updateMasterBalance_(memberId, arrears, refundDebt, sukadukaArrears) {
   return {
     ID: location.member.ID,
     Nama: location.member.Nama,
+    memberNo: location.member.memberNo,
     Sisa_Hutang_Iuran: arrears,
     Sisa_Hutang_Kembalian: refundDebt,
     Sisa_Hutang_Sukaduka: Number.isFinite(sukadukaArrears) ? sukadukaArrears : Number(location.member.Sisa_Hutang_Sukaduka) || 0,
@@ -975,6 +983,7 @@ function updateMasterRefundDebt_(memberId, refundDebt) {
   return {
     ID: location.member.ID,
     Nama: location.member.Nama,
+    memberNo: location.member.memberNo,
     Sisa_Hutang_Iuran: Number(location.member.Sisa_Hutang_Iuran) || 0,
     Sisa_Hutang_Kembalian: refundDebt,
     Sisa_Hutang_Sukaduka: Number(location.member.Sisa_Hutang_Sukaduka) || 0,
