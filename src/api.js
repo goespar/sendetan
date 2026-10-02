@@ -1,9 +1,12 @@
 const endpoint = import.meta.env.VITE_APPS_SCRIPT_URL
 
-export const isDemo = !endpoint?.trim()
+export const backendConfigured = Boolean(endpoint?.trim())
+export const isDemo = false
 
 export async function request(action, payload = {}, token = '') {
-  if (isDemo) return { demo: true }
+  if (!backendConfigured) {
+    throw new Error('Koneksi Google Sheets belum diatur. Isi VITE_APPS_SCRIPT_URL di .env.local dengan URL Apps Script berakhiran /exec.')
+  }
   const mutation = ['create', 'update', 'batchPayments', 'batchCreate'].includes(action)
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 300000)

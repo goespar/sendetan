@@ -9,7 +9,7 @@ const SHEETS = {
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
   Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl', 'chargeAmount', 'openingArrears'],
   Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName', 'unit'],
-  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor', 'memberId', 'unit'],
+  Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor', 'memberId', 'unit', 'chargeAmount'],
   Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice', 'rentalRateSemeton', 'rentalRateLuar'],
   KegiatanMedia: ['id', 'title', 'description', 'mediaType', 'photoUrl', 'youtubeUrl', 'eventDate', 'visibility', 'createdBy', 'createdAt'],
   InventarisLog: ['id', 'date', 'assetId', 'assetName', 'movement', 'quantity', 'condition', 'notes', 'createdBy', 'createdAt'],
@@ -610,15 +610,21 @@ function validatePiodalanRecord_(record, rowNumber) {
   }
   if (['Masuk', 'Keluar'].indexOf(record.direction) === -1) throw new Error('Arus kas tidak valid pada baris ' + rowNumber + '.');
   const amount = Number(record.amount) || 0;
+  const chargeAmount = record.chargeAmount === '' || record.chargeAmount === null || record.chargeAmount === undefined ? 0 : Number(record.chargeAmount);
   const quantity = Number(record.quantity) || 0;
-  if (!Number.isFinite(amount) || amount < 0) throw new Error('Nominal piodalan tidak valid pada baris ' + rowNumber + '.');
+  if (!Number.isFinite(amount) || amount < 0 || !Number.isFinite(chargeAmount) || chargeAmount < 0) throw new Error('Nominal piodalan tidak valid pada baris ' + rowNumber + '.');
   if (record.category === 'Punia barang') {
     if (record.direction !== 'Masuk' || !String(record.donor || '').trim() || !String(record.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) {
       throw new Error('Punia barang memerlukan nama pemberi, barang, dan jumlah pada baris ' + rowNumber + '.');
     }
     record.unit = String(record.unit || 'unit').trim() || 'unit';
-  } else if (['Punia uang', 'Wijilan / Setoran wajib'].indexOf(record.category) !== -1) {
+  } else if (record.category === 'Punia uang') {
     if (record.direction !== 'Masuk' || !String(record.donor || '').trim() || amount <= 0) throw new Error('Punia uang memerlukan nama pemberi dan nominal masuk pada baris ' + rowNumber + '.');
+    record.unit = '';
+  } else if (record.category === 'Wijilan / Setoran wajib') {
+    if (record.direction !== 'Masuk' || !record.memberId || !String(record.donor || '').trim() || amount <= 0 && chargeAmount <= 0) {
+      throw new Error('Wijilan memerlukan anggota, nama pemberi, dan tagihan atau pembayaran pada baris ' + rowNumber + '.');
+    }
     record.unit = '';
   } else if (amount <= 0) {
     throw new Error('Nominal transaksi harus lebih dari nol pada baris ' + rowNumber + '.');
@@ -627,6 +633,16 @@ function validatePiodalanRecord_(record, rowNumber) {
   record.donor = String(record.donor || '').trim();
   record.quantity = quantity;
   record.amount = amount;
+  record.chargeAmount = chargeAmount;
+}
+
+function attachActiveWijilanMember_(record) {
+  const member = readRecords_('Anggota').find(function (item) {
+    return String(item.id) === String(record.memberId) && item.status === 'Aktif';
+  });
+  if (!member) throw new Error('Anggota Wijilan harus dipilih dari daftar anggota aktif.');
+  record.memberId = member.id;
+  record.donor = member.memberName;
 }
 
 function approveReport_(input, user) {
@@ -759,7 +775,10 @@ function createRecord_(module, record, user) {
   if (module === 'SewaAset') validateRentalAvailability_(clean);
   if (module === 'PengeluaranIuran') validateIuranExpense_(clean);
   if (module === 'Punia') validatePuniaRecord_(clean, 1);
-  if (module === 'Piodalan') validatePiodalanRecord_(clean, 1);
+  if (module === 'Piodalan') {
+    if (clean.category === 'Wijilan / Setoran wajib') attachActiveWijilanMember_(clean);
+    validatePiodalanRecord_(clean, 1);
+  }
   if (module === 'KegiatanMedia') validateActivityMedia_(clean);
   appendRecord_(module, clean);
   if (module === 'Anggota') upsertMasterAnggota_(clean);
@@ -808,7 +827,10 @@ function updateRecord_(module, record, user, internal) {
   if (module === 'SewaAset') validateRentalAvailability_(clean, clean.id);
   if (module === 'PengeluaranIuran') validateIuranExpense_(clean);
   if (module === 'Punia') validatePuniaRecord_(clean, 1);
-  if (module === 'Piodalan') validatePiodalanRecord_(clean, 1);
+  if (module === 'Piodalan') {
+    if (clean.category === 'Wijilan / Setoran wajib') attachActiveWijilanMember_(clean);
+    validatePiodalanRecord_(clean, 1);
+  }
   if (module === 'KegiatanMedia') validateActivityMedia_(clean);
   if (headers.indexOf('updatedAt') !== -1) clean.updatedAt = new Date().toISOString();
   sheet.getRange(rowNumber, 1, 1, headers.length).setValues([headers.map(function (key) { return normalizeCell_(clean[key]); })]);
@@ -1170,7 +1192,7 @@ function saveSukadukaIncoming_(mode, input, user) {
   const amount = Number(record.amount);
   const cashPhysical = Number(record.cashPhysical);
   const changePaid = Number(record.changePaid) || 0;
-  const chargeAmount = Number(record.chargeAmount) || 0;
+  const chargeAmount = record.chargeAmount === '' || record.chargeAmount === null || record.chargeAmount === undefined ? 0 : Number(record.chargeAmount);
   const existingTracksArrears = existing && existing.chargeAmount !== '' && existing.chargeAmount !== null && existing.chargeAmount !== undefined;
   const openingArrears = Math.max(0, (Number(location.member.Sisa_Hutang_Sukaduka) || 0) - (existingTracksArrears ? Number(existing.chargeAmount) || 0 : 0) + (existingTracksArrears ? Number(existing.amount) || 0 : 0));
   const openingRefundDebt = Math.max(0, (Number(location.member.Sisa_Hutang_Kembalian) || 0) - (Number(existing && existing.refundDebtAdded) || 0));
