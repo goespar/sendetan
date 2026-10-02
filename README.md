@@ -11,13 +11,13 @@ npm install
 npm run dev
 ```
 
-Tanpa `VITE_APPS_SCRIPT_URL`, aplikasi berjalan dalam **mode demo** memakai data contoh. Perubahan demo disimpan di browser yang sama dan tidak disinkronkan ke perangkat lain. Untuk memakai data Google, salin `.env.example` ke `.env.local`, isi URL Web App berakhiran `/exec`, lalu restart server:
+Tanpa `VITE_APPS_SCRIPT_URL`, aplikasi menampilkan daftar kosong dan ringkasan Rp 0. Login dan penyimpanan tidak berjalan sampai backend Google Sheets dikonfigurasi. Isi URL Web App berakhiran `/exec` di `.env.local`, lalu restart server:
 
 ```env
 VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/DEPLOYMENT_ID/exec
 ```
 
-Sebelum backend disiapkan, layar dashboard dan modul tetap dapat dicoba; perubahan mode demo tersimpan di browser yang sama setelah refresh, tetapi tidak menulis ke Sheets atau perangkat lain.
+Saat backend belum disiapkan, aplikasi tidak memakai atau menyimpan data contoh.
 
 ## Arsitektur Google Sheets
 
@@ -35,7 +35,7 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `Sesari` | `id`, `date`, `direction`, `category`, `amount`, `description`, `createdBy`, `createdAt` |
 | `Sukaduka` | `id`, `date`, `direction`, `recipient`, `purpose`, `amount`, `notes`, `createdBy`, `createdAt`, `memberId`, `memberName`, `cashPhysical`, `changeDue`, `changePaid`, `refundDebtAdded`, `refundDebt`, `arrears`, `proofPhotoUrl`, `chargeAmount`, `openingArrears` |
 | `Punia` | `id`, `date`, `donor`, `donationType`, `itemName`, `quantity`, `amount`, `notes`, `createdBy`, `createdAt`, `eventName`, `unit` |
-| `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt`, `donor`, `memberId`, `unit` |
+| `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt`, `donor`, `memberId`, `unit`, `chargeAmount` |
 | `Aset` | `id`, `assetName`, `category`, `quantity`, `condition`, `rentalRate`, `photoUrl`, `notes`, `createdBy`, `createdAt`, `updatedAt`, `purchasePrice`, `rentalRateSemeton`, `rentalRateLuar` |
 | `KegiatanMedia` | `id`, `title`, `description`, `mediaType`, `photoUrl`, `youtubeUrl`, `eventDate`, `visibility`, `createdBy`, `createdAt` |
 | `InventarisLog` | `id`, `date`, `assetId`, `assetName`, `movement`, `quantity`, `condition`, `notes`, `createdBy`, `createdAt` |
@@ -44,7 +44,7 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `LaporanPersetujuan` | `id`, `period`, `status`, `approvedBy`, `approvedAt`, `notes` |
 | `AuditLog` | `id`, `timestamp`, `userId`, `username`, `action`, `module`, `recordId`, `details` |
 
-Nominal disimpan sebagai angka rupiah tanpa simbol pemisah. `direction` memakai `Masuk` atau `Keluar`. `Punia.donationType` memakai `Uang Tunai`, `Wijilan / Setoran wajib`, atau `Barang`; Wijilan/setoran wajib dicatat sebagai uang masuk dan dapat diberi nama piodalan pada `eventName`. Punia barang menyimpan nama, jumlah, dan `unit` (misalnya kg, lusin, atau bungkus); data lama tanpa satuan ditampilkan sebagai `unit`. Nilai barang tidak menambah kas. Buku piodalan menyimpan detail yang sama untuk punia barang. Pengeluaran perawatan aset dicatat di `SewaAset.maintenanceCost`.
+Nominal disimpan sebagai angka rupiah tanpa simbol pemisah. `direction` memakai `Masuk` atau `Keluar`. `Punia.donationType` memakai `Uang Tunai`, `Wijilan / Setoran wajib`, atau `Barang`. Wijilan Piodalan ditautkan ke anggota aktif melalui `memberId`; `chargeAmount` menyimpan kewajiban per acara dan `amount` menyimpan pembayaran kas, termasuk cicilan. Tagihan tanpa setoran boleh dicatat dengan `amount=0`. Sisa Wijilan dihitung per anggota dan `eventName`, bukan ditambahkan ke hutang master global. Menu **Rekap kewajiban** menggabungkan sisa iuran/Sukaduka dari `MASTER_ANGGOTA` dan Wijilan dari ledger Piodalan. Punia barang menyimpan nama, jumlah, dan `unit` (misalnya kg, lusin, atau bungkus); data lama tanpa satuan ditampilkan sebagai `unit`. Nilai barang tidak menambah kas. Buku piodalan menyimpan detail yang sama untuk punia barang. Pengeluaran perawatan aset dicatat di `SewaAset.maintenanceCost`.
 
 Baris `MASTER_ANGGOTA` menjadi saldo berjalan, sedangkan setiap setoran disimpan sebagai baris baru di `TRANSAKSI_IURAN`; anggota dapat membayar beberapa kali pada periode yang sama. Pengeluaran dari kas iuran dicatat terpisah pada `PengeluaranIuran` dan ikut mengurangi saldo iuran serta saldo kas gabungan. Setelah tutup buku membuka periode berikutnya, tagihan baru ditambahkan ke sisa hutang sehingga anggota yang sudah lunas tetap dapat membayar periode baru. Menu `Anggota` menyinkronkan profil ke master. Jalankan ulang `setupSheets()` setelah pembaruan untuk menambahkan kolom baru di akhir sheet lama dan memigrasikan ledger `IuranTransaksi` sekali saja. Sukaduka kini menghitung tunggakan per anggota: `chargeAmount` menambah tagihan, sementara `amount` membayar tunggakan sebelumnya dan tagihan baru. Baris Sukaduka lama tanpa `chargeAmount` tidak dimasukkan ulang ke saldo tunggakan. Booking `SewaAset` memeriksa ketersediaan dengan rentang tanggal inklusif; tarif per item per hari dipilih dari `Aset.rentalRateSemeton` atau `Aset.rentalRateLuar` menurut jenis penyewa. Kolom `rentalRate` lama menjadi fallback untuk aset yang belum memiliki tarif baru.
 
@@ -58,7 +58,7 @@ Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Bas
 - Sukaduka: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `chargeAmount`, `amount`, `cashPhysical`, `changePaid`, `purpose`, `notes`. `chargeAmount` menambah tagihan; `amount` adalah alokasi pembayaran yang boleh digunakan untuk tunggakan lama; `cashPhysical` adalah uang yang benar-benar diterima. Untuk mencatat tagihan tanpa pembayaran, isi tagihan dan set nominal serta uang fisik ke `0`.
 - Nominal berupa angka rupiah, bukan teks dengan awalan `Rp`. Baris dengan nominal kosong atau nol dilewati. ID anggota dari template adalah acuan pencocokan; nama dapat dipakai bila ID tidak ada.
 - Maksimal 500 pembayaran per pengiriman. Server memvalidasi saldo anggota dan menulis transaksi, saldo master, serta audit secara berkelompok.
-- Punia: `date`, `donor`, `donationType`, `eventName`, `itemName`, `quantity`, `unit`, `amount`, `notes`. Piodalan: `date`, `eventName`, `category`, `donor`, `memberId`, `itemName`, `quantity`, `unit`, `direction`, `amount`, `description`. Untuk `Punia barang`, isi nama, jumlah, dan satuan; untuk Wijilan per anggota, gunakan ID dari template dan isi nominal. Baris tanpa nominal tidak dicatat sebagai setoran.
+- Punia: `date`, `donor`, `donationType`, `eventName`, `itemName`, `quantity`, `unit`, `amount`, `notes`. Piodalan: `date`, `eventName`, `category`, `donor`, `memberId`, `chargeAmount`, `itemName`, `quantity`, `unit`, `direction`, `amount`, `description`. Untuk `Punia barang`, isi nama, jumlah, dan satuan; untuk Wijilan, pilih anggota dari master, isi nama piodalan dan tagihan, lalu isi nominal bila pembayaran diterima. Tagihan tanpa pembayaran disimpan dengan nominal bayar `0`.
 - Daftar terbaru hingga 100 entri punia uang/barang beserta nama pemberi ditampilkan pada dashboard publik.
 
 ### Akses per peran
@@ -105,18 +105,18 @@ Backend dan frontend dirilis terpisah: Google Apps Script menjadi API untuk Goog
 4. Uji URL dengan membuka `<URL_WEB_APP>/exec?action=health`. Respons yang diharapkan berisi `"ok":true`. Endpoint ini dan `publicSummary`/`publicGallery` memang publik; jangan membagikan spreadsheet atau project Apps Script sebagai editor.
 5. Untuk foto, backend membuat subfolder `Foto Aset`, `Foto Kegiatan`, dan `Foto Sukaduka` otomatis. Foto aset dan kegiatan dapat dilihat siapa pun yang memiliki tautan; foto bukti Sukaduka mengikuti ACL Drive organisasi.
 
-Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbit hanya dengan deploy Vercel. Buka **Deploy → Manage deployments**, edit deployment Web App, pilih **New version**, lalu deploy. URL `/exec` biasanya tetap sama.
+Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbit hanya dengan deploy Vercel. Jalankan `setupSheets()` untuk menambahkan kolom baru, lalu buka **Deploy → Manage deployments**, edit deployment Web App, pilih **New version**, lalu deploy. URL `/exec` biasanya tetap sama.
 
 ### 3. Uji frontend secara lokal
 
-1. Di root repo, salin `.env.example` menjadi `.env.local`, lalu isi URL API:
+1. Di root repo, isi `.env.local` dengan URL API:
 
 	```env
 	VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/DEPLOYMENT_ID/exec
 	```
 
 2. Jalankan `npm install`, lalu `npm run dev`. Restart Vite jika `.env.local` diubah.
-3. Masuk dengan akun admin awal. Pastikan dashboard membaca API, lalu uji tambah/baca data anggota dan galeri. Tanpa `VITE_APPS_SCRIPT_URL`, aplikasi berjalan dalam mode demo dan tidak menyimpan data ke Sheets.
+3. Masuk dengan akun admin awal. Pastikan dashboard membaca API, lalu uji tambah/baca data anggota dan galeri. Tanpa `VITE_APPS_SCRIPT_URL`, aplikasi menampilkan data kosong/nol dan menolak penyimpanan.
 
 `.env.local` sudah diabaikan Git. `VITE_APPS_SCRIPT_URL` masuk ke bundle frontend sehingga bukan tempat menyimpan rahasia; keamanan data tetap harus ditegakkan oleh Apps Script dan izin Google Drive.
 
@@ -138,7 +138,7 @@ Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbi
 
 ### Pemeriksaan jika belum tersambung
 
-- Jika aplikasi tampil dengan data simulasi, pastikan nama variable tepat `VITE_APPS_SCRIPT_URL`, nilainya berakhiran `/exec`, dan deployment Vercel dijalankan ulang.
+- Jika dashboard tetap menampilkan Rp 0, pastikan `VITE_APPS_SCRIPT_URL` benar, URL berakhiran `/exec`, deployment Apps Script aktif, dan server frontend sudah dimulai ulang.
 - Jika endpoint health tidak merespons `ok: true`, periksa URL Web App, izin akses deployment, dan otorisasi akun pengelola.
 - Jika login gagal, pastikan akun admin dibuat sekali oleh `createInitialAdmin()` dan statusnya aktif di tab `Users`.
 - Jika data anggota tidak muncul di modul saldo, jalankan `setupSheets()` lagi untuk sinkronisasi ke `MASTER_ANGGOTA`.
@@ -156,4 +156,4 @@ Foto kegiatan/aset dapat dilihat oleh siapa pun yang memiliki tautan. Foto bukti
 - Dashboard menyediakan filter tahun, bulan, dan tanggal untuk ringkasan; tabel inventaris publik menampilkan jumlah dimiliki/tersedia, tarif sewa, serta penyewa yang sedang aktif.
 - Pembuatan transaksi dan basket memakai ID idempoten untuk iuran, Sukaduka, Punia, Piodalan, aset, sewa, dan modul create lainnya. Mengirim ulang payload dengan ID yang sama tidak membuat baris, saldo, atau audit ganda. Form mempertahankan ID saat retry; jangan ubah isi transaksi selama status belum pasti.
 - Timeout atau koneksi terputus bukan bukti transaksi gagal. Jika form harus ditinggalkan, muat ulang daftar modul terkait dan pastikan transaksi belum tercatat sebelum memasukkannya kembali. Tombol kirim juga memakai pengunci klik ganda dan menampilkan status proses.
-- Grafik UI memiliki data contoh ketika backend belum dikonfigurasi; siapkan agregasi ringkasan produksi sebelum menjadikan grafik tersebut sebagai laporan resmi.
+- Grafik dan ringkasan membaca hasil API; ketika belum ada data, nilainya tetap kosong atau nol dan tidak diganti data contoh.
