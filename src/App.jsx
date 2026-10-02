@@ -1159,7 +1159,7 @@ function MemberDuesPage({ data, loading }) {
       const sukaduka = Number(master.Sisa_Hutang_Sukaduka) || 0
       const wijilan = wijilanByMember.get(String(member.id)) || 0
       return { ...member, iuran, sukaduka, wijilan, total: iuran + sukaduka + wijilan, wijilanEvents: eventsByMember.get(String(member.id)) || [] }
-    }).sort((left, right) => left.memberName.localeCompare(right.memberName, 'id'))
+    }).sort((left, right) => String(left.memberNo || left.id).localeCompare(String(right.memberNo || right.id), 'id', { numeric: true, sensitivity: 'base' }) || left.memberName.localeCompare(right.memberName, 'id'))
   }, [data])
 
   const visibleObligations = obligations.filter((member) => !query || `${member.memberName} ${member.memberNo || ''} ${member.phone || ''}`.toLowerCase().includes(query.toLowerCase()))
@@ -1172,6 +1172,7 @@ function MemberDuesPage({ data, loading }) {
 
   const dailyRows = useMemo(() => {
     const byMember = new Map()
+    const memberNumbers = new Map(obligations.map((member) => [String(member.id), String(member.memberNo || member.id)]))
     function add(row, module, amount) {
       const memberId = String(row.memberId || '')
       if (!memberId || amount <= 0) return
@@ -1186,7 +1187,7 @@ function MemberDuesPage({ data, loading }) {
     return [...byMember.values()].map((entry) => {
       const current = obligations.find((member) => String(member.id) === entry.memberId)
       return { ...entry, total: entry.iuran + entry.sukaduka + entry.wijilan, iuranDue: current?.iuran || 0, sukadukaDue: current?.sukaduka || 0, wijilanDue: current?.wijilan || 0 }
-    }).sort((left, right) => left.memberName.localeCompare(right.memberName, 'id'))
+    }).sort((left, right) => (memberNumbers.get(left.memberId) || left.memberId).localeCompare(memberNumbers.get(right.memberId) || right.memberId, 'id', { numeric: true, sensitivity: 'base' }) || left.memberName.localeCompare(right.memberName, 'id'))
   }, [data, dailyDate, obligations])
   const dailyTotals = dailyRows.reduce((sum, row) => ({ iuran: sum.iuran + row.iuran, sukaduka: sum.sukaduka + row.sukaduka, wijilan: sum.wijilan + row.wijilan }), { iuran: 0, sukaduka: 0, wijilan: 0 })
   dailyTotals.all = dailyTotals.iuran + dailyTotals.sukaduka + dailyTotals.wijilan
