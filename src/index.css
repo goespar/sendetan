@@ -38,8 +38,9 @@ button { cursor: pointer; }
     opacity: 1 !important;
     transform: none !important;
   }
-  .print-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 2px solid #222; }
-  .print-heading { text-align: center; }
+  .print-heading { display: flex; align-items: center; justify-content: center; gap: 5mm; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 2px solid #222; text-align: center; }
+  .print-logo { width: 22mm; height: 22mm; flex: 0 0 auto; object-fit: contain; }
+  .print-heading-copy { min-width: 0; }
   .print-heading h1 { margin: 0; font-size: 16pt; font-weight: 700; }
   .print-heading h2 { margin: 6px 0 0; font-size: 12pt; font-weight: 700; }
   .print-heading p { margin: 3px 0 0; color: #333; font-size: 8pt; }
@@ -55,8 +56,9 @@ button { cursor: pointer; }
   .print-report thead { display: table-header-group; }
   .print-report tr { break-inside: avoid; }
   .print-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12mm; margin: 18mm 8mm 0; break-inside: avoid; text-align: center; }
-  .print-signatures div { display: flex; min-height: 27mm; flex-direction: column; align-items: center; justify-content: space-between; font-size: 9pt; }
-  .print-signatures span { width: 70%; border-bottom: 1px solid #222; }
+  .print-signatures div { display: flex; min-height: 32mm; flex-direction: column; align-items: center; justify-content: space-between; font-size: 9pt; }
+  .print-signatures span { width: 70%; min-height: 18mm; border-bottom: 1px solid #222; }
+  .print-signatures strong { font-size: 8.5pt; }
   .animate-rise { animation: none !important; }
 }
 

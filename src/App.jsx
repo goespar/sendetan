@@ -7,12 +7,17 @@ import {
   X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import logo from '../logo takora.png'
-import { isDemo, request, uploadPhoto } from './api.js'
+import { backendConfigured, isDemo, request, uploadPhoto } from './api.js'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts.jsx'))
 
 const roleNames = { Admin: 'Administrator', Ketua: 'Ketua', Bendahara: 'Bendahara', Sekretaris: 'Sekretaris', Publik: 'Anggota / Publik' }
 const organizationAddress = 'Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali'
+const signatories = [
+  { title: 'Ketua', name: 'I GEDE SUARDIANA' },
+  { title: 'Sekretaris', name: 'I GEDE AGUS SUPARDIANA' },
+  { title: 'Bendahara', name: 'KOMANG YASMADIASA' },
+]
 const FINANCE_MODULES_UI = ['iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan']
 const ORGANIZATION_MODULES_UI = ['aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan']
 const navigation = [
@@ -21,6 +26,7 @@ const navigation = [
   { id: 'pengeluaranIuran', label: 'Pengeluaran iuran', icon: ArrowUpRight, group: 'KEUANGAN' },
   { id: 'sesari', label: 'Sesari', icon: HandCoins, group: 'KEUANGAN' },
   { id: 'sukaduka', label: 'Sukaduka', icon: HeartHandshake, group: 'KEUANGAN' },
+  { id: 'kewajiban', label: 'Rekap kewajiban', icon: ClipboardList, group: 'KEUANGAN' },
   { id: 'punia', label: 'Dana punia', icon: Wallet, group: 'KEUANGAN' },
   { id: 'piodalan', label: 'Piodalan', icon: Sparkles, group: 'KEUANGAN' },
   { id: 'aset', label: 'Aset & sewa', icon: Boxes, group: 'ORGANISASI' },
@@ -33,9 +39,9 @@ const navigation = [
   { id: 'users', label: 'Pengguna', icon: ShieldCheck, group: 'PENGATURAN' },
 ]
 const permission = {
-  Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users'],
-  Ketua: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
-  Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
+  Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users'],
+  Ketua: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
+  Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Sekretaris: ['dashboard', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Publik: ['dashboard', 'kegiatan'],
 }
@@ -45,7 +51,7 @@ const modules = {
   sesari: { title: 'Sesari', desc: 'Arus dana sesari persembahyangan.', api: 'Sesari', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Sumber / kategori', 'text'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   sukaduka: { title: 'Sukaduka', desc: 'Tagihan dan pembayaran per anggota dengan saldo tunggakan otomatis.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['chargeAmount', 'Tagihan baru'], ['amount', 'Dialokasikan'], ['arrears', 'Sisa tunggakan'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
   punia: { title: 'Dana punia', desc: 'Donasi uang, Wijilan atau setoran wajib piodalan, dan barang.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Wijilan / Setoran wajib|Barang'], ['eventName', 'Nama piodalan (opsional)', 'text'], ['itemName', 'Nama barang (jika barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['eventName', 'Piodalan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
-  piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal kas / nilai barang', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
+  piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['memberId', 'Anggota (khusus Wijilan)', 'member'], ['chargeAmount', 'Tagihan Wijilan', 'number'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal dibayar / kas', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang / anggota'], ['chargeAmount', 'Tagihan Wijilan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['currentRenter', 'Sedang disewa oleh'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
   sewa: { title: 'Transaksi sewa aset', desc: 'Pilih alat berdasarkan stok tersedia, jenis penyewa, dan rentang tanggal sewa.', api: 'SewaAset', fields: [], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['renter', 'Penyewa'], ['customerType', 'Jenis penyewa'], ['startDate', 'Mulai'], ['endDate', 'Selesai'], ['quantity', 'Jumlah'], ['rentalIncome', 'Pemasukan'], ['maintenanceCost', 'Perawatan'], ['status', 'Status']] },
   inventaris: { title: 'Log inventaris', desc: 'Riwayat barang masuk dan keluar dari inventaris.', api: 'InventarisLog', fields: [['date', 'Tanggal transaksi', 'date'], ['assetId', 'ID aset', 'text'], ['assetName', 'Nama barang', 'text'], ['movement', 'Pergerakan', 'select:Masuk|Keluar'], ['quantity', 'Jumlah', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['movement', 'Pergerakan'], ['quantity', 'Jumlah'], ['condition', 'Kondisi'], ['notes', 'Catatan']] },
@@ -56,66 +62,46 @@ const modules = {
   laporan: { title: 'Laporan keuangan', desc: 'Rangkuman kas, transaksi, dan transparansi organisasi.', api: 'all', fields: [], columns: [] },
 }
 const initialRows = {
-  iuran: [
-    { id: 'IU-104', date: '2026-09-28', periodId: '2026-09', memberId: 'AG-026', memberName: 'I Made Sudarma', target: 50000, allocatedContribution: 50000, cashPhysical: 50000, changeDue: 0, changePaid: 0, arrears: 0, refundDebtAdded: 0, refundDebt: 0 },
-    { id: 'IU-103', date: '2026-09-27', periodId: '2026-09', memberId: 'AG-025', memberName: 'Ni Luh Sari', target: 100000, allocatedContribution: 50000, cashPhysical: 100000, changeDue: 50000, changePaid: 30000, arrears: 50000, refundDebtAdded: 20000, refundDebt: 20000 },
-    { id: 'IU-102', date: '2026-09-25', periodId: '2026-09', memberId: 'AG-024', memberName: 'I Ketut Sutama', target: 50000, allocatedContribution: 30000, cashPhysical: 30000, changeDue: 0, changePaid: 0, arrears: 20000, refundDebtAdded: 0, refundDebt: 0 },
-    { id: 'IU-101', date: '2026-08-28', periodId: '2026-08', memberId: 'AG-025', memberName: 'Ni Luh Sari', target: 50000, allocatedContribution: 0, cashPhysical: 0, changeDue: 0, changePaid: 0, arrears: 50000, refundDebtAdded: 0, refundDebt: 0 },
-  ],
+  iuran: [],
   pengeluaranIuran: [],
-  sesari: [
-    { id: 'SE-038', date: '2026-09-28', direction: 'Masuk', category: 'Persembahyangan', description: 'Sesari purnama', amount: 350000 },
-    { id: 'SE-037', date: '2026-09-25', direction: 'Keluar', category: 'Canang & dupa', description: 'Kebutuhan persembahyangan', amount: 125000 },
-  ],
-  sukaduka: [{ id: 'SK-014', date: '2026-09-21', direction: 'Keluar', recipient: 'Keluarga I Made Raka', purpose: 'Dana belasungkawa', amount: 500000 }],
-  punia: [{ id: 'PU-022', date: '2026-09-19', donor: 'Krama Tiyingtali', donationType: 'Barang', itemName: 'Kursi plastik', amount: 1200000, notes: '10 unit' }],
-  piodalan: [{ id: 'PI-009', date: '2026-09-14', eventName: 'Piodalan Pura Desa', category: 'Punia uang', direction: 'Masuk', amount: 2500000, description: 'Punia krama' }],
-  aset: [{ id: 'AS-005', assetName: 'Sound system', category: 'Peralatan upacara', quantity: 1, condition: 'Baik', purchasePrice: 6500000, rentalRate: 150000, notes: 'Termasuk 2 speaker' }, { id: 'AS-004', assetName: 'Kursi plastik', category: 'Perlengkapan', quantity: 80, condition: 'Baik', purchasePrice: 85000, rentalRate: 1000 }],
-  sewa: [{ id: 'SW-001', date: '2026-09-28', assetId: 'AS-004', assetName: 'Kursi plastik', renter: 'Pura Desa', startDate: '2026-09-29', endDate: '2026-09-29', quantity: 20, rentalIncome: 20000, maintenanceCost: 0, status: 'Berjalan' }],
-  anggota: [{ id: 'AG-026', memberNo: 'ST-026', memberName: 'I Made Sudarma', phone: '0812-3456-7890', address: 'Tiyingtali Kelod', status: 'Aktif' }, { id: 'AG-025', memberNo: 'ST-025', memberName: 'Ni Luh Sari', phone: '0813-2468-1357', address: 'Tiyingtali Kelod', status: 'Aktif' }],
-  notulensi: [{ id: 'NT-003', date: '2026-09-12', title: 'Persiapan piodalan', attendees: 'Ketua, Bendahara, Sekretaris', minutes: 'Menetapkan jadwal dan pembagian tugas upacara.', followUp: 'Koordinasi perlengkapan' }],
+  sesari: [],
+  sukaduka: [],
+  punia: [],
+  piodalan: [],
+  aset: [],
+  sewa: [],
+  anggota: [],
+  notulensi: [],
   kegiatan: [],
-  users: [{ id: 'US-004', name: 'I Made Sudarma', username: 'bendahara', role: 'Bendahara', status: 'Aktif' }],
+  users: [],
 }
-const initialMasterMembers = [
-  { ID: 'AG-026', Nama: 'I Made Sudarma', Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0 },
-  { ID: 'AG-025', Nama: 'Ni Luh Sari', Sisa_Hutang_Iuran: 50000, Sisa_Hutang_Kembalian: 20000 },
-  { ID: 'AG-024', Nama: 'I Ketut Sutama', Sisa_Hutang_Iuran: 20000, Sisa_Hutang_Kembalian: 0 },
-]
-const cashBars = [
-  { month: 'Apr', masuk: 3.1, keluar: 1.2 }, { month: 'Mei', masuk: 2.6, keluar: 1.7 },
-  { month: 'Jun', masuk: 4.2, keluar: 2.1 }, { month: 'Jul', masuk: 3.4, keluar: 1.4 },
-  { month: 'Agu', masuk: 5.1, keluar: 2.8 }, { month: 'Sep', masuk: 4.6, keluar: 1.9 },
-]
-const fundSlices = [{ name: 'Iuran', value: 47, color: '#b5122a' }, { name: 'Sesari', value: 31, color: '#242424' }, { name: 'Punia', value: 22, color: '#8f8f8f' }]
 const demoModuleBalances = {
-  iuran: { incoming: 130000, outgoing: 30000, balance: 100000, unpaid: 70000 },
-  sukaduka: { incoming: 0, outgoing: 500000, balance: -500000, unpaid: 0 },
-  sesari: { incoming: 350000, outgoing: 125000, balance: 225000, unpaid: 0 },
+  iuran: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
+  sukaduka: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
+  sesari: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
   punia: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
-  sewa: { incoming: 20000, outgoing: 0, balance: 20000, unpaid: 0 },
-  piodalan: { incoming: 2500000, outgoing: 0, balance: 2500000, unpaid: 0 },
+  sewa: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
+  piodalan: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
 }
 const moduleLabels = { iuran: 'Iuran', sukaduka: 'Sukaduka', sesari: 'Sesari', punia: 'Punia tunai', sewa: 'Sewa alat', piodalan: 'Piodalan' }
 const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777', punia: '#2563eb', sewa: '#15803d', piodalan: '#eab308' }
-const openingBalanceDefaults = { iuran: 1215000, sukaduka: 920000, sesari: 0 }
+const openingBalanceDefaults = { iuran: 0, sukaduka: 0, sesari: 0 }
 const emptyOpeningBalances = Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, { amount: 0, date: '', notes: '', configured: false }]))
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
 const createTransactionId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+function PrintLetterhead({ title, detail }) {
+  return <header className="print-heading"><img src={logo} alt="Logo SENDETAN TAKORA" className="print-logo" /><div className="print-heading-copy"><h1>SENDETAN TELAGA BETENG</h1><p>{organizationAddress}</p><h2>{title}</h2>{detail && <p>{detail}</p>}</div></header>
+}
+function PrintSignatures() {
+  return <footer className="print-signatures">{signatories.map((person) => <div key={person.title}><b>{person.title}</b><span></span><strong>{person.name}</strong></div>)}</footer>
+}
 function matchesDateFilter(row, filters) {
   const date = String(row.date || row.eventDate || row.periodId || '').slice(0, 10)
   return (!filters.year || date.slice(0, 4) === filters.year)
     && (!filters.month || date.slice(5, 7) === filters.month)
     && (!filters.day || date.slice(8, 10) === filters.day)
 }
-function demoCache(key, fallback) {
-  try {
-    const cached = localStorage.getItem(`takora-demo-${key}`)
-    return cached ? { ...fallback, ...JSON.parse(cached) } : fallback
-  } catch { return fallback }
-}
-
 function App() {
   const savedSession = isDemo ? localStorage.getItem('takora-role') : localStorage.getItem('takora-token')
   const [authenticated, setAuthenticated] = useState(Boolean(savedSession))
@@ -123,12 +109,13 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('takora-token') || '')
   const [userName, setUserName] = useState(savedSession ? (localStorage.getItem('takora-name') || 'I Made Sudarma') : 'Anggota')
   const [active, setActive] = useState(() => sessionStorage.getItem('takora-active') || 'dashboard')
-  const [rows, setRows] = useState(() => isDemo ? demoCache('rows', initialRows) : Object.fromEntries(Object.keys(initialRows).map((key) => [key, []])))
-  const [masterMembers, setMasterMembers] = useState(() => isDemo ? demoCache('members', initialMasterMembers) : [])
-  const [contacts, setContacts] = useState(() => isDemo ? demoCache('contacts', initialRows.anggota) : [])
-  const [rentalAssets, setRentalAssets] = useState(() => isDemo ? demoCache('assets', initialRows.aset) : [])
-  const [rentalRows, setRentalRows] = useState(() => isDemo ? demoCache('rentals', initialRows.sewa) : [])
-  const [publicActivities, setPublicActivities] = useState(isDemo ? initialRows.kegiatan : [])
+  const [rows, setRows] = useState(() => Object.fromEntries(Object.keys(initialRows).map((key) => [key, []])))
+  const [masterMembers, setMasterMembers] = useState([])
+  const [contacts, setContacts] = useState([])
+  const [rentalAssets, setRentalAssets] = useState([])
+  const [rentalRows, setRentalRows] = useState([])
+  const [publicActivities, setPublicActivities] = useState([])
+  const [memberDuesData, setMemberDuesData] = useState({ members: [], masterMembers: [], iuran: [], sukaduka: [], piodalan: [] })
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState('')
@@ -136,7 +123,7 @@ function App() {
   const [modal, setModal] = useState(false)
   const [balanceModal, setBalanceModal] = useState(false)
   const [openingBalanceModal, setOpeningBalanceModal] = useState(false)
-  const [openingBalances, setOpeningBalances] = useState(() => isDemo ? demoCache('opening-balances', emptyOpeningBalances) : emptyOpeningBalances)
+  const [openingBalances, setOpeningBalances] = useState(emptyOpeningBalances)
   const [batchModal, setBatchModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -154,7 +141,9 @@ function App() {
   const showSidebar = authenticated && role !== 'Publik'
   const menu = navigation.filter((item) => allowed.includes(item.id))
   const writable = role === 'Admin' || (role === 'Bendahara' && [...FINANCE_MODULES_UI, ...ORGANIZATION_MODULES_UI].includes(active)) || (role === 'Sekretaris' && ORGANIZATION_MODULES_UI.includes(active))
-  const page = modules[active]
+  const page = active === 'kewajiban'
+    ? { title: 'Rekap kewajiban anggota', desc: 'Status iuran, Sukaduka, Wijilan, dan input harian per anggota.', api: 'memberDues', duesData: memberDuesData }
+    : modules[active]
   const currentRows = rows[active] || []
 
   useEffect(() => {
@@ -199,7 +188,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (active === 'dashboard' || active === 'laporan' || active === 'kegiatan' || active === 'users' && role !== 'Admin') return
+    if (active === 'dashboard' || active === 'laporan' || active === 'kegiatan' || active === 'kewajiban' || active === 'users' && role !== 'Admin') return
     if (!isDemo && token && page) {
       setLoading(true)
       request('list', { module: page.api }, token)
@@ -250,6 +239,30 @@ function App() {
         .then((result) => setContacts(result.data || []))
         .catch((error) => setNotice(error.message))
     }
+  }, [active, token, role])
+
+  useEffect(() => {
+    if (active !== 'kewajiban' || !token) return
+    let cancelled = false
+    setLoading(true)
+    Promise.all([
+      request('list', { module: 'Anggota' }, token),
+      request('masterAnggota', {}, token),
+      request('list', { module: 'TRANSAKSI_IURAN' }, token),
+      request('list', { module: 'Sukaduka' }, token),
+      request('list', { module: 'Piodalan' }, token),
+    ]).then(([members, master, iuran, sukaduka, piodalan]) => {
+      if (cancelled) return
+      setMemberDuesData({
+        members: members.data || [],
+        masterMembers: master.members || [],
+        iuran: iuran.data || [],
+        sukaduka: sukaduka.data || [],
+        piodalan: piodalan.data || [],
+      })
+    }).catch((error) => { if (!cancelled) setNotice(error.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [active, token, role])
 
   useEffect(() => {
@@ -355,8 +368,8 @@ function App() {
       } catch (error) { setNotice(error.message); return }
     }
     if (!pendingPayload) delete values.photoFile
-    if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].some((field) => field in values)) {
-      for (const key of Object.keys(values)) if (['amount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) values[key] = Number(values[key]) || 0
+    if (['amount', 'chargeAmount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].some((field) => field in values)) {
+      for (const key of Object.keys(values)) if (['amount', 'chargeAmount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].includes(key)) values[key] = Number(values[key]) || 0
     }
     const updated = pendingPayload ? values : editing ? { ...editing, ...values } : { id: form.dataset.requestId, ...values }
     try {
@@ -778,7 +791,7 @@ function App() {
             <div className={`min-w-0 flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}><p className="truncate text-xs font-bold">{userName}</p><p className="mt-0.5 truncate text-[10px] text-[#829085]">{roleNames[role]}</p></div>
             <button onClick={() => runExclusive('logout', signOut)} disabled={Boolean(busyAction)} className="rounded p-1.5 text-[#8b978c] hover:bg-[#f0f1e9] disabled:cursor-wait disabled:opacity-50" title="Keluar" aria-label="Keluar"><LogOut size={16} /></button>
           </div>
-          <p className={`mt-1 px-2 text-[9px] text-[#9aa399] ${sidebarCollapsed ? 'lg:hidden' : ''}`}>{isDemo ? 'MODE DEMO' : 'DATA TERSINKRON'}</p>
+          <p className={`mt-1 px-2 text-[9px] text-[#9aa399] ${sidebarCollapsed ? 'lg:hidden' : ''}`}>{backendConfigured ? 'DATA TERSINKRON' : 'KONEKSI BELUM DIATUR'}</p>
         </div>
       </aside>
       </>}
@@ -795,6 +808,7 @@ function App() {
         </header>
 
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
+          {!backendConfigured && <div role="status" className="mb-5 rounded-md border border-[#e9d7a7] bg-[#fff9e8] px-4 py-3 text-xs leading-5 text-[#68552b]">Koneksi Google Sheets belum diatur. Semua data ditampilkan kosong atau Rp 0; penyimpanan dinonaktifkan sampai URL Apps Script dikonfigurasi.</div>}
           {['iuran', 'sukaduka', 'sesari'].includes(active) && writable && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d9e1d5] bg-white px-4 py-3"><div><p className="text-[10px] font-semibold uppercase text-[#849084]">Saldo awal kas {moduleLabels[active]}</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{openingBalances[active]?.configured ? currency(openingBalances[active].amount) : 'Belum diatur'}</p>{openingBalances[active]?.date && <p className="mt-1 text-[10px] text-[#849084]">Per {readableDate(openingBalances[active].date)}</p>}</div><button onClick={() => setOpeningBalanceModal(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Atur saldo awal</button></div>}
           {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenOpeningBalance={() => setOpeningBalanceModal(true)} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
@@ -973,6 +987,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
 
 */
 function ModulePage({ active, page, rows, query, setQuery, loading, writable, busy, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
+  if (page.api === 'memberDues') return <MemberDuesPage data={page.duesData} loading={loading} />
   const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
   const exportableModules = ['iuran', 'sukaduka', 'pengeluaranIuran', 'sesari', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi']
   const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
@@ -1024,10 +1039,14 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
       const columnCount = Math.max(5, headers.length)
       const padRow = (row) => [...row, ...Array(Math.max(0, columnCount - row.length)).fill('')]
       const signatureLabels = Array(columnCount).fill('')
+      const signatureNames = Array(columnCount).fill('')
       const signatureLines = Array(columnCount).fill('')
       signatureLabels[0] = 'Ketua'
       signatureLabels[Math.floor((columnCount - 1) / 2)] = 'Sekretaris'
       signatureLabels[columnCount - 1] = 'Bendahara'
+      signatureNames[0] = signatories[0].name
+      signatureNames[Math.floor((columnCount - 1) / 2)] = signatories[1].name
+      signatureNames[columnCount - 1] = signatories[2].name
       signatureLines[0] = '(................................)'
       signatureLines[Math.floor((columnCount - 1) / 2)] = '(................................)'
       signatureLines[columnCount - 1] = '(................................)'
@@ -1043,7 +1062,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
         Array(columnCount).fill(''),
         Array(columnCount).fill(''),
         signatureLabels,
-        Array(columnCount).fill(''),
+        signatureNames,
         signatureLines,
       ])
       sheet['!merges'] = [0, 1, 2, 3].map((row) => ({ s: { r: row, c: 0 }, e: { r: row, c: columnCount - 1 } }))
@@ -1070,7 +1089,7 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
     XLSX.writeFile(workbook, `laporan-${active}${periodSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
   return <div className={`print-report animate-rise ${busy ? 'pointer-events-none opacity-70' : ''}`} aria-busy={busy}>
-    <header className="print-heading"><h1>SENDETAN TELAGA BETENG</h1><p>{organizationAddress}</p><h2>{page.title}</h2><p>{periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}{query ? ` · Pencarian: ${query}` : ''}</p></header>
+    <PrintLetterhead title={page.title} detail={`${periodFilter ? `Periode ${periodFilter}` : 'Semua periode'}${query ? ` · Pencarian: ${query}` : ''}`} />
     <div className="module-toolbar mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="max-w-2xl text-xs leading-5 text-[#849084]">{page.desc}</p><p className="mt-2 text-[11px] text-[#9aa399]">{rows.length} catatan terdaftar</p></div><div className="flex flex-wrap gap-2">
       {exportableModules.includes(active) && <><button onClick={() => window.print()} className="no-print flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak</button><button onClick={() => exportReport().catch((error) => window.alert(`Ekspor gagal: ${error.message}`))} className="no-print flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold"><Download size={15} /> Ekspor Excel</button></>}
       {active === 'iuran' && writable && <button onClick={onCloseBook} disabled={busy} className="flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs font-semibold disabled:opacity-50">{busy ? 'Memproses...' : <><BookOpenCheck size={15} /> Tutup buku</>}</button>}
@@ -1099,8 +1118,128 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
       <div className="flex justify-between border-t px-5 py-3 text-[10px] text-[#98a096]"><span>Menampilkan {rows.length} catatan</span><span>Data tersimpan sesuai periode</span></div>
     </section>
     {active === 'aset' && <div className="no-print mt-4 flex gap-2 rounded-md border bg-[#f0f2e9] p-3.5 text-[11px]"><Camera size={15} /><p>Isi tarif Semeton dan orang luar agar hitungan sewa sesuai jenis penyewa.</p></div>}
-    <footer className="print-signatures"><div><b>Ketua</b><span></span></div><div><b>Sekretaris</b><span></span></div><div><b>Bendahara</b><span></span></div></footer>
+    <PrintSignatures />
   </div>
+}
+
+function MemberDuesPage({ data, loading }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [dailyDate, setDailyDate] = useState(today)
+  const [deadline, setDeadline] = useState('')
+  const [query, setQuery] = useState('')
+  const [preview, setPreview] = useState(null)
+  const inputClass = 'rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs outline-none focus:border-[#b5122a]'
+
+  const obligations = useMemo(() => {
+    const membersById = new Map((data.members || []).map((member) => [String(member.id), member]))
+    const masterById = new Map((data.masterMembers || []).map((member) => [String(member.ID), member]))
+    const wijilanEvents = new Map()
+    ;(data.piodalan || []).filter((row) => row.category === 'Wijilan / Setoran wajib' && row.memberId).forEach((row) => {
+      const memberId = String(row.memberId)
+      const eventName = String(row.eventName || 'Piodalan tanpa nama')
+      const key = `${memberId}\u0000${eventName}`
+      const event = wijilanEvents.get(key) || { memberId, eventName, charge: 0, paid: 0 }
+      event.charge += Number(row.chargeAmount) || 0
+      event.paid += Number(row.amount) || 0
+      wijilanEvents.set(key, event)
+    })
+    const wijilanByMember = new Map()
+    const eventsByMember = new Map()
+    wijilanEvents.forEach((event) => {
+      const remaining = Math.max(0, event.charge - event.paid)
+      if (!remaining) return
+      wijilanByMember.set(event.memberId, (wijilanByMember.get(event.memberId) || 0) + remaining)
+      const events = eventsByMember.get(event.memberId) || []
+      events.push({ name: event.eventName, remaining })
+      eventsByMember.set(event.memberId, events)
+    })
+    return [...membersById.values()].map((member) => {
+      const master = masterById.get(String(member.id)) || {}
+      const iuran = Number(master.Sisa_Hutang_Iuran) || 0
+      const sukaduka = Number(master.Sisa_Hutang_Sukaduka) || 0
+      const wijilan = wijilanByMember.get(String(member.id)) || 0
+      return { ...member, iuran, sukaduka, wijilan, total: iuran + sukaduka + wijilan, wijilanEvents: eventsByMember.get(String(member.id)) || [] }
+    }).sort((left, right) => left.memberName.localeCompare(right.memberName, 'id'))
+  }, [data])
+
+  const visibleObligations = obligations.filter((member) => !query || `${member.memberName} ${member.memberNo || ''} ${member.phone || ''}`.toLowerCase().includes(query.toLowerCase()))
+  const totals = obligations.reduce((sum, member) => ({
+    iuran: sum.iuran + member.iuran,
+    sukaduka: sum.sukaduka + member.sukaduka,
+    wijilan: sum.wijilan + member.wijilan,
+  }), { iuran: 0, sukaduka: 0, wijilan: 0 })
+  totals.all = totals.iuran + totals.sukaduka + totals.wijilan
+
+  const dailyRows = useMemo(() => {
+    const byMember = new Map()
+    function add(row, module, amount) {
+      const memberId = String(row.memberId || '')
+      if (!memberId || amount <= 0) return
+      const member = obligations.find((item) => String(item.id) === memberId)
+      const entry = byMember.get(memberId) || { memberId, memberName: row.memberName || member?.memberName || 'Anggota', iuran: 0, sukaduka: 0, wijilan: 0 }
+      entry[module] += amount
+      byMember.set(memberId, entry)
+    }
+    ;(data.iuran || []).filter((row) => String(row.date || '').slice(0, 10) === dailyDate).forEach((row) => add(row, 'iuran', Number(row.cashPhysical || row.allocatedContribution) || 0))
+    ;(data.sukaduka || []).filter((row) => String(row.date || '').slice(0, 10) === dailyDate && row.direction === 'Masuk').forEach((row) => add(row, 'sukaduka', Number(row.cashPhysical || row.amount) || 0))
+    ;(data.piodalan || []).filter((row) => String(row.date || '').slice(0, 10) === dailyDate && row.category === 'Wijilan / Setoran wajib' && row.direction === 'Masuk').forEach((row) => add(row, 'wijilan', Number(row.amount) || 0))
+    return [...byMember.values()].map((entry) => {
+      const current = obligations.find((member) => String(member.id) === entry.memberId)
+      return { ...entry, total: entry.iuran + entry.sukaduka + entry.wijilan, iuranDue: current?.iuran || 0, sukadukaDue: current?.sukaduka || 0, wijilanDue: current?.wijilan || 0 }
+    }).sort((left, right) => left.memberName.localeCompare(right.memberName, 'id'))
+  }, [data, dailyDate, obligations])
+  const dailyTotals = dailyRows.reduce((sum, row) => ({ iuran: sum.iuran + row.iuran, sukaduka: sum.sukaduka + row.sukaduka, wijilan: sum.wijilan + row.wijilan }), { iuran: 0, sukaduka: 0, wijilan: 0 })
+  dailyTotals.all = dailyTotals.iuran + dailyTotals.sukaduka + dailyTotals.wijilan
+
+  function memberMessage(member, daily = null) {
+    const dueDate = deadline ? readableDate(deadline) : '[tanggal batas pembayaran]'
+    const dailyLines = daily ? `\n\nInput tanggal ${readableDate(dailyDate)}:\n- Iuran: ${currency(daily.iuran)}\n- Sukaduka: ${currency(daily.sukaduka)}\n- Wijilan: ${currency(daily.wijilan)}\n- Total input: ${currency(daily.total)}` : ''
+    const eventLines = member.wijilanEvents.length ? `\n${member.wijilanEvents.map((event) => `  ${event.name}: ${currency(event.remaining)}`).join('\n')}` : ''
+    return `Om Swastyastu, Semeton ${member.memberName}.\nUning-uningan jinah paturunan / swadharma ring Sendetan saking tanggal ${readableDate(today)}:\n\n- Tunggakan Iuran: ${currency(member.iuran)}\n- Tunggakan Wijilan Wajib: ${currency(member.wijilan)}${eventLines}\n- Tunggakan Sukaduka (dados pungkuran): ${currency(member.sukaduka)}\n- Total kewajiban: ${currency(member.total)}${dailyLines}\n\nNunas uratiang mangda puputang naur sadurung tanggal ${dueDate}.\n\nMatur suksma.\nPrajuru Piodalan\nhttps://sendetan.vercel.app/`
+  }
+
+  function openPreview(recipient, phone, message, group = false) {
+    setPreview({ recipient, phone, message, group })
+  }
+
+  function groupReminderMessage() {
+    const debtors = obligations.filter((member) => member.total > 0)
+    const lines = debtors.map((member) => `${member.memberName}: Iuran ${currency(member.iuran)} · Wijilan ${currency(member.wijilan)} · Sukaduka ${currency(member.sukaduka)}`)
+    return `Om Swastyastu, Semeton.\nRekap kewajiban anggota per ${readableDate(today)}:\n${lines.length ? lines.join('\n') : 'Tidak ada tunggakan tercatat.'}\n\nTotal tunggakan: ${currency(totals.all)}\nBatas pembayaran: ${deadline ? readableDate(deadline) : '[tanggal batas pembayaran]'}\n\nMatur suksma. Prajuru Piodalan\nhttps://sendetan.vercel.app/`
+  }
+
+  function groupDailyMessage() {
+    const lines = dailyRows.map((row) => `${row.memberName}: Iuran ${currency(row.iuran)} · Sukaduka ${currency(row.sukaduka)} · Wijilan ${currency(row.wijilan)} | Sisa kewajiban ${currency(row.iuranDue + row.sukadukaDue + row.wijilanDue)}`)
+    return `Om Swastyastu.\nRekap input harian ${readableDate(dailyDate)}:\n${lines.length ? lines.join('\n') : 'Belum ada input transaksi anggota pada tanggal ini.'}\n\nTotal input: ${currency(dailyTotals.all)}\nTotal tunggakan saat ini: ${currency(totals.all)}\nhttps://sendetan.vercel.app/`
+  }
+
+  return <div className="animate-rise print-report space-y-5">
+    <PrintLetterhead title="Rekap kewajiban anggota" detail={`Diperbarui ${new Date().toLocaleDateString('id-ID')}`} />
+    <div className="no-print flex flex-col justify-between gap-3 border-b border-[#e6e7dd] pb-4 lg:flex-row lg:items-end"><div><h2 className="font-display text-lg font-extrabold">Kewajiban & rekap anggota</h2><p className="mt-1 text-xs text-[#849084]">Iuran dan Sukaduka mengikuti saldo master; Wijilan dihitung per piodalan.</p></div><div className="flex flex-wrap items-end gap-2"><label className="grid gap-1 text-[10px] font-semibold text-[#788579]">Batas pembayaran<input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} className={inputClass} /></label><button onClick={() => window.print()} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak rekap</button><button onClick={() => openPreview('Grup WhatsApp', '', groupReminderMessage(), true)} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3 py-2.5 text-xs font-semibold text-white"><MessageCircle size={15} /> Pratinjau reminder grup</button></div></div>
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">{[['Tunggakan iuran', totals.iuran], ['Tunggakan Sukaduka', totals.sukaduka], ['Tunggakan Wijilan', totals.wijilan], ['Total kewajiban', totals.all]].map(([label, amount]) => <div key={label} className="border-l-2 border-[#b5122a] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">{label}</p><p className="mt-1 font-display text-lg font-extrabold">{currency(amount)}</p></div>)}</div>
+    <section className="overflow-hidden border-y border-[#e6e7dd] bg-white">
+      <div className="flex flex-col gap-3 border-b border-[#eceee6] px-4 py-3 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-sm font-bold">Status per anggota</h3><p className="mt-1 text-[10px] text-[#849084]">{obligations.filter((member) => member.total > 0).length} anggota masih memiliki kewajiban</p></div><input type="search" placeholder="Cari nama / nomor anggota" value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} no-print`} /></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="bg-[#fafaf6] text-[10px] text-[#849084]"><tr><th className="px-4 py-3">Anggota</th><th className="px-3 py-3 text-right">Iuran</th><th className="px-3 py-3 text-right">Sukaduka</th><th className="px-3 py-3 text-right">Wijilan wajib</th><th className="px-3 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Reminder</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{loading ? <tr><td colSpan="6" className="p-8 text-center text-[#849084]">Memuat saldo dan transaksi...</td></tr> : visibleObligations.map((member) => <tr key={member.id}><td className="px-4 py-3"><p className="font-semibold">{member.memberName}</p><p className="mt-0.5 text-[10px] text-[#929c91]">{member.memberNo || member.id} · {member.phone || 'Nomor WA belum diisi'}{member.wijilanEvents.length > 0 && <span className="block">{member.wijilanEvents.map((event) => `${event.name}: ${currency(event.remaining)}`).join(' · ')}</span>}</p></td><td className="px-3 py-3 text-right">{currency(member.iuran)}</td><td className="px-3 py-3 text-right">{currency(member.sukaduka)}</td><td className="px-3 py-3 text-right">{currency(member.wijilan)}</td><td className="px-3 py-3 text-right font-bold">{currency(member.total)}</td><td className="px-4 py-3 text-right"><button disabled={!member.phone} title={member.phone ? 'Pratinjau pesan pribadi' : 'Isi nomor telepon anggota dahulu'} onClick={() => openPreview(member.memberName, member.phone, memberMessage(member))} className="inline-flex items-center gap-1.5 rounded-md border border-[#d9e1d5] px-2.5 py-2 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"><MessageCircle size={13} /> WhatsApp</button></td></tr>)}</tbody><tfoot className="border-t-2 border-[#dfe4d9] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3">TOTAL</td><td className="px-3 py-3 text-right">{currency(totals.iuran)}</td><td className="px-3 py-3 text-right">{currency(totals.sukaduka)}</td><td className="px-3 py-3 text-right">{currency(totals.wijilan)}</td><td className="px-3 py-3 text-right">{currency(totals.all)}</td><td /></tr></tfoot></table></div>
+    </section>
+    <section className="overflow-hidden border-y border-[#e6e7dd] bg-white">
+      <div className="flex flex-col gap-3 border-b border-[#eceee6] px-4 py-3 lg:flex-row lg:items-end lg:justify-between"><div><h3 className="text-sm font-bold">Rekap input harian</h3><p className="mt-1 text-[10px] text-[#849084]">Setoran per anggota pada tanggal terpilih dan total kewajiban terkini.</p></div><div className="no-print flex flex-wrap items-end gap-2"><label className="grid gap-1 text-[10px] font-semibold text-[#788579]">Tanggal input<input type="date" value={dailyDate} onChange={(event) => setDailyDate(event.target.value)} className={inputClass} /></label><button onClick={() => window.print()} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak rekap</button><button onClick={() => openPreview('Grup WhatsApp', '', groupDailyMessage(), true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><MessageCircle size={15} /> Pratinjau rekap grup</button></div></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="bg-[#fafaf6] text-[10px] text-[#849084]"><tr><th className="px-4 py-3">Anggota</th><th className="px-3 py-3 text-right">Iuran masuk</th><th className="px-3 py-3 text-right">Sukaduka masuk</th><th className="px-3 py-3 text-right">Wijilan masuk</th><th className="px-3 py-3 text-right">Total input</th><th className="px-3 py-3 text-right">Total tunggakan</th><th className="px-4 py-3 text-right">Bagikan</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{dailyRows.length ? dailyRows.map((row) => <tr key={row.memberId}><td className="px-4 py-3 font-semibold">{row.memberName}</td><td className="px-3 py-3 text-right">{currency(row.iuran)}</td><td className="px-3 py-3 text-right">{currency(row.sukaduka)}</td><td className="px-3 py-3 text-right">{currency(row.wijilan)}</td><td className="px-3 py-3 text-right font-bold">{currency(row.total)}</td><td className="px-3 py-3 text-right">{currency(row.iuranDue + row.sukadukaDue + row.wijilanDue)}</td><td className="px-4 py-3 text-right"><button disabled={!obligations.find((member) => String(member.id) === row.memberId)?.phone} onClick={() => { const member = obligations.find((entry) => String(entry.id) === row.memberId); if (member) openPreview(member.memberName, member.phone, memberMessage(member, row)) }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d9e1d5] px-2.5 py-2 text-[10px] font-semibold disabled:opacity-40"><MessageCircle size={13} /> WhatsApp</button></td></tr>) : <tr><td colSpan="7" className="px-4 py-8 text-center text-xs text-[#849084]">Tidak ada input anggota pada tanggal ini.</td></tr>}</tbody>{dailyRows.length > 0 && <tfoot className="border-t-2 border-[#dfe4d9] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3">TOTAL HARIAN</td><td className="px-3 py-3 text-right">{currency(dailyTotals.iuran)}</td><td className="px-3 py-3 text-right">{currency(dailyTotals.sukaduka)}</td><td className="px-3 py-3 text-right">{currency(dailyTotals.wijilan)}</td><td className="px-3 py-3 text-right">{currency(dailyTotals.all)}</td><td className="px-3 py-3 text-right">{currency(totals.all)}</td><td /></tr></tfoot>}</table></div>
+    </section>
+    <PrintSignatures />
+    {preview && <div className="no-print"><WhatsAppPreviewModal draft={preview} onClose={() => setPreview(null)} /></div>}
+  </div>
+}
+
+function WhatsAppPreviewModal({ draft, onClose }) {
+  const [message, setMessage] = useState(draft.message)
+  function openWhatsApp() {
+    let phone = String(draft.phone || '').replace(/\D/g, '')
+    if (phone.startsWith('0')) phone = `62${phone.slice(1)}`
+    else if (phone.startsWith('8')) phone = `62${phone}`
+    const url = `https://wa.me/${draft.group ? '' : phone}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+  return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section role="dialog" aria-modal="true" aria-labelledby="whatsapp-preview-title" className="w-full max-w-2xl rounded-t-lg bg-white p-5 shadow-xl sm:rounded-md"><div className="flex items-start justify-between gap-3"><div><h2 id="whatsapp-preview-title" className="font-display text-lg font-extrabold">Pratinjau WhatsApp</h2><p className="mt-1 text-xs text-[#849084]">Tujuan: {draft.recipient}{draft.phone ? ` · ${draft.phone}` : ' · tautan grup'}</p></div><button onClick={onClose} aria-label="Tutup pratinjau" className="rounded p-1.5 text-[#7d8b7e]"><X size={18} /></button></div><label className="mt-4 block text-[11px] font-semibold text-[#637367]">Pesan<textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="14" className="mt-1 w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs leading-5 outline-none focus:border-[#789578]" /></label><div className="mt-4 flex justify-end gap-2 border-t border-[#eceee6] pt-4"><button onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={openWhatsApp} disabled={!draft.group && !String(draft.phone || '').replace(/\D/g, '')} className="inline-flex items-center gap-2 rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle size={15} /> Buka WhatsApp</button></div></section></div>
 }
 
 function BatchPaymentModal({ module, members, onClose, onSave }) {
@@ -1272,12 +1411,13 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   const pendingSubmission = useRef(null)
   const [wijilanMode, setWijilanMode] = useState(false)
   const [wijilanEvent, setWijilanEvent] = useState('')
+  const [wijilanCharge, setWijilanCharge] = useState('')
   const inputClass = 'w-full min-w-[110px] rounded border border-[#e1e5dc] bg-white px-2 py-2 text-xs outline-none focus:border-[#b5122a]'
 
   function blankRecord() {
     return isPunia
       ? { date: today, donor: '', donationType: 'Uang Tunai', eventName: '', itemName: '', quantity: '', unit: '', amount: '', notes: '' }
-      : { date: today, eventName: '', category: 'Punia uang', donor: '', memberId: '', itemName: '', quantity: '', unit: '', direction: 'Masuk', amount: '', description: '' }
+      : { date: today, eventName: '', category: 'Punia uang', donor: '', memberId: '', chargeAmount: '', itemName: '', quantity: '', unit: '', direction: 'Masuk', amount: '', description: '' }
   }
 
   function updateRow(index, field, value) {
@@ -1285,7 +1425,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   }
 
   function hasData(row) {
-    if (!isPunia && row.category === 'Wijilan / Setoran wajib' && row.memberId) return Number(row.amount) > 0
+    if (!isPunia && row.category === 'Wijilan / Setoran wajib' && row.memberId) return Number(row.amount) > 0 || Number(row.chargeAmount) > 0
     const fields = isPunia ? ['donor', 'eventName', 'itemName', 'amount', 'notes'] : ['eventName', 'donor', 'itemName', 'amount', 'description']
     return fields.some((field) => String(row[field] || '').trim())
   }
@@ -1293,13 +1433,13 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   const readyCount = records.filter(hasData).length
   const headers = isPunia
     ? ['date', 'donor', 'donationType', 'eventName', 'itemName', 'quantity', 'unit', 'amount', 'notes']
-    : ['date', 'eventName', 'category', 'donor', 'memberId', 'itemName', 'quantity', 'unit', 'direction', 'amount', 'description']
+    : ['date', 'eventName', 'category', 'donor', 'memberId', 'chargeAmount', 'itemName', 'quantity', 'unit', 'direction', 'amount', 'description']
 
   function startWijilanForAll() {
     if (!members.length) { setMessage('Daftar anggota belum dimuat. Buka kembali menu Piodalan lalu coba lagi.'); return }
     setWijilanMode(true)
-    setRecords(members.map((member) => ({ ...blankRecord(), eventName: wijilanEvent, category: 'Wijilan / Setoran wajib', donor: member.Nama, memberId: member.ID, direction: 'Masuk' })))
-    setMessage(`Daftar ${members.length} anggota disiapkan. Isi nominal setiap anggota yang menyetor.`)
+    setRecords(members.map((member) => ({ ...blankRecord(), eventName: wijilanEvent, category: 'Wijilan / Setoran wajib', donor: member.Nama, memberId: member.ID, chargeAmount: wijilanCharge, direction: 'Masuk' })))
+    setMessage(`Daftar ${members.length} anggota disiapkan. Isi tagihan dan pembayaran tiap anggota.`)
   }
 
   async function exportWijilanTemplate() {
@@ -1308,7 +1448,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
       const XLSX = await import('xlsx')
       const rows = members.map((member) => ({
         date: today, eventName: wijilanEvent, category: 'Wijilan / Setoran wajib', donor: member.Nama,
-        memberId: member.ID, itemName: '', quantity: 0, unit: '', direction: 'Masuk', amount: '', description: '',
+        memberId: member.ID, chargeAmount: wijilanCharge, itemName: '', quantity: 0, unit: '', direction: 'Masuk', amount: '', description: '',
       }))
       const sheet = XLSX.utils.json_to_sheet(rows, { header: headers })
       const workbook = XLSX.utils.book_new()
@@ -1353,6 +1493,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
       if (!isPunia && imported.some((row) => row.category === 'Wijilan / Setoran wajib' && row.memberId)) {
         setWijilanMode(true)
         setWijilanEvent(imported.find((row) => row.eventName)?.eventName || '')
+        setWijilanCharge(String(imported.find((row) => row.chargeAmount)?.chargeAmount || ''))
       }
       setRecords([...imported, ...Array.from({ length: 3 }, () => blankRecord())])
       setMessage(`${imported.length} baris terbaca dari Excel.`)
@@ -1360,7 +1501,7 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   }
 
   function prepareRecords() {
-    const filled = records.filter((row) => wijilanMode ? Number(row.amount) > 0 : hasData(row))
+    const filled = records.filter(hasData)
     if (!filled.length) throw new Error('Isi minimal satu baris transaksi.')
     return filled.map((row, index) => {
       const amount = Number(row.amount) || 0
@@ -1377,12 +1518,17 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
       const eventName = String(row.eventName || (wijilanMode ? wijilanEvent : '')).trim()
       if (!eventName || !row.category || !row.direction) throw new Error(`Nama piodalan, kategori, dan arus wajib pada baris ${index + 1}.`)
       if (['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(row.category) && !String(row.donor || '').trim()) throw new Error(`Nama penyumbang wajib pada baris ${index + 1}.`)
-      if (row.category === 'Wijilan / Setoran wajib' && row.memberId && !members.some((member) => String(member.ID) === String(row.memberId))) throw new Error(`Anggota tidak ditemukan pada baris ${index + 1}.`)
+      if (row.category === 'Wijilan / Setoran wajib' && (!row.memberId || !members.some((member) => String(member.ID) === String(row.memberId)))) throw new Error(`Pilih anggota dari master pada baris ${index + 1}.`)
       if (row.category === 'Punia barang') {
         if (row.direction !== 'Masuk' || !String(row.itemName || '').trim() || !Number.isInteger(quantity) || quantity < 1) throw new Error(`Punia barang perlu nama/jumlah barang dan arus Masuk pada baris ${index + 1}.`)
         return { ...row, eventName, donor: String(row.donor || '').trim(), quantity, unit: String(row.unit || 'unit').trim() || 'unit', amount }
+      } else if (row.category === 'Wijilan / Setoran wajib') {
+        const chargeAmount = Number(row.chargeAmount) || 0
+        if (amount <= 0 && chargeAmount <= 0) throw new Error(`Isi tagihan Wijilan atau nominal bayar pada baris ${index + 1}.`)
+        const member = members.find((item) => String(item.ID) === String(row.memberId))
+        return { ...row, eventName, donor: member.Nama, memberId: member.ID, chargeAmount, quantity, unit: '', amount }
       } else if (amount <= 0) throw new Error(`Nominal transaksi harus lebih dari nol pada baris ${index + 1}.`)
-      return { ...row, eventName, donor: String(row.donor || '').trim(), quantity, unit: '', amount }
+      return { ...row, eventName, donor: String(row.donor || '').trim(), chargeAmount: 0, quantity, unit: '', amount }
     })
   }
 
@@ -1421,9 +1567,9 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
     <section className="flex max-h-[94vh] w-full max-w-7xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isPunia ? 'Dana Punia' : 'Piodalan'}</h2><p className="mt-1 text-xs text-[#849084]">Masukkan beberapa penyumbang/transaksi atau unggah file Excel untuk disimpan sekaligus.</p></div><button onClick={onClose} disabled={busy} aria-label="Tutup" className="rounded p-1.5 disabled:opacity-50"><X size={18} /></button></header>
       <fieldset disabled={busy || submissionUncertain} className="contents">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>{!isPunia && <><button onClick={startWijilanForAll} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Wijilan semua anggota</button><button onClick={exportWijilanTemplate} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Template Wijilan anggota</button></>}<button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
-      {wijilanMode && <div className="border-b border-[#eceee6] px-4 py-3 sm:px-6"><label className="block max-w-xl text-[11px] font-semibold">Nama piodalan<input value={wijilanEvent} onChange={(event) => setWijilanEvent(event.target.value)} placeholder="Contoh: Piodalan Pura Desa" className={`${inputClass} mt-1`} /></label><p className="mt-1 text-[10px] text-[#849084]">Satu baris disediakan untuk setiap anggota aktif. Isi nominal yang disetor; baris kosong dilewati.</p></div>}
-      <div className="min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[1160px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[9px] font-bold uppercase text-[#89958a]"><tr>{(isPunia ? ['Tanggal', 'Nama pemberi', 'Jenis', 'Nama piodalan', 'Barang', 'Jumlah', 'Satuan', 'Nominal/nilai', 'Catatan'] : ['Tanggal', 'Nama piodalan', 'Kategori', 'Nama pemberi', 'Barang', 'Jumlah', 'Satuan', 'Arus', 'Nominal', 'Keterangan']).map((label) => <th key={label} className="px-2 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#eff0ea]">{records.map((row, index) => <tr key={index}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#eceee6] p-4 sm:px-6"><button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><FileText size={15} /> Unduh format Excel</button><label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>{!isPunia && <><button onClick={startWijilanForAll} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Tagihkan Wijilan semua anggota</button><button onClick={exportWijilanTemplate} disabled={!members.length} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Template Wijilan anggota</button></>}<button onClick={() => setRecords((previous) => [...previous, blankRecord()])} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold">Tambah baris</button><span className="ml-auto text-xs text-[#849084]">{readyCount} baris terisi</span></div>
+      {wijilanMode && <div className="grid grid-cols-1 gap-3 border-b border-[#eceee6] px-4 py-3 sm:grid-cols-2 sm:px-6"><label className="text-[11px] font-semibold">Nama piodalan<input value={wijilanEvent} onChange={(event) => setWijilanEvent(event.target.value)} placeholder="Nama piodalan" className={`${inputClass} mt-1`} /></label><label className="text-[11px] font-semibold">Tagihan standar per anggota<input type="number" min="0" step="1" value={wijilanCharge} onChange={(event) => { const value = event.target.value; setWijilanCharge(value); setRecords((previous) => previous.map((row) => row.category === 'Wijilan / Setoran wajib' ? { ...row, chargeAmount: value } : row)) }} className={`${inputClass} mt-1`} /></label><p className="text-[10px] leading-4 text-[#849084] sm:col-span-2">Tagihan dicatat per anggota dan acara. Isi pembayaran yang sudah diterima; anggota yang belum membayar tetap dapat disimpan dengan nominal bayar 0.</p></div>}
+      <div className="min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[1320px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[9px] font-bold uppercase text-[#89958a]"><tr>{(isPunia ? ['Tanggal', 'Nama pemberi', 'Jenis', 'Nama piodalan', 'Barang', 'Jumlah', 'Satuan', 'Nominal/nilai', 'Catatan'] : ['Tanggal', 'Nama piodalan', 'Kategori', 'Nama pemberi', 'Anggota', 'Tagihan wajib', 'Barang', 'Jumlah', 'Satuan', 'Arus', 'Nominal dibayar', 'Keterangan']).map((label) => <th key={label} className="px-2 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#eff0ea]">{records.map((row, index) => <tr key={index}>
         <td className="px-2 py-2">{textCell(index, 'date', '', 'date')}</td>
         {isPunia ? <>
           <td className="px-2 py-2">{textCell(index, 'donor', 'Nama pemberi')}</td>
@@ -1438,6 +1584,8 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
           <td className="px-2 py-2">{wijilanMode ? <input readOnly value={wijilanEvent} placeholder="Nama piodalan di atas" className={`${inputClass} bg-[#f5f6f1]`} /> : textCell(index, 'eventName', 'Nama piodalan')}</td>
           <td className="px-2 py-2">{selectCell(index, 'category', ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib', 'Saldo awal', 'Sesari piodalan', 'Belanja'])}</td>
           <td className="px-2 py-2">{wijilanMode && row.memberId ? <div className="min-w-[150px] px-2 py-1"><b>{row.donor}</b><span className="ml-2 text-[10px] text-[#929c91]">{row.memberId}</span></div> : textCell(index, 'donor', 'Nama pemberi')}</td>
+          <td className="px-2 py-2"><select value={row.memberId} onChange={(event) => { const member = members.find((item) => String(item.ID) === event.target.value); setRecords((previous) => previous.map((entry, rowIndex) => rowIndex === index ? { ...entry, memberId: event.target.value, donor: member?.Nama || entry.donor } : entry)) }} disabled={wijilanMode && Boolean(row.memberId)} className={inputClass}><option value="">Pilih anggota</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama}</option>)}</select></td>
+          <td className="px-2 py-2">{row.category === 'Wijilan / Setoran wajib' ? textCell(index, 'chargeAmount', '0', 'number') : '-'}</td>
           <td className="px-2 py-2">{textCell(index, 'itemName', 'Nama barang')}</td>
           <td className="px-2 py-2">{textCell(index, 'quantity', '', 'number')}</td>
           <td className="px-2 py-2">{textCell(index, 'unit', 'kg / bungkus / unit')}</td>
@@ -1480,7 +1628,7 @@ function RecordModal({ page, editing, members, contacts, assets, rentalRows, bus
       <form onSubmit={(event) => { event.preventDefault(); submit(event) }} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <fieldset disabled={busy || submissionUncertain} className="contents">
         {page.fields.map(([key, label, type]) => <label key={key} className={`block ${type === 'textarea' || key === 'photoFile' ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">{label}{key === 'purpose' && <span className="ml-1 text-[#c16e52]">*</span>}</span>
-          {type.startsWith('select:') ? <select name={key} defaultValue={editing?.[key] || ''} required className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]"><option value="" disabled>Pilih {label.toLowerCase()}</option>{type.slice(7).split('|').map((option) => <option key={option}>{option}</option>)}</select> : type === 'textarea' ? <textarea name={key} defaultValue={editing?.[key] || ''} rows={key === 'minutes' || key === 'followUp' ? '8' : '3'} className="w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" /> : type === 'file' ? <input name={key} type="file" accept="image/*" className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-[#e9efe5] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#496b4d]" /> : <input name={key} type={type} required={key === 'date' || key === 'memberName' || key === 'amount' || key === 'description' && page.api === 'PengeluaranIuran' || (key === 'password' && !editing)} minLength={key === 'password' ? 12 : undefined} min={type === 'number' ? '0' : undefined} step={type === 'number' ? 'any' : undefined} defaultValue={key === 'password' ? '' : editing?.[key] ?? (key === 'date' ? today : '')} placeholder={key === 'password' && editing ? 'Kosongkan jika tidak diubah' : undefined} readOnly={key === 'photoUrl'} className={`w-full rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs outline-none focus:border-[#789578] ${key === 'photoUrl' ? 'bg-[#f5f6f1] text-[#809080]' : 'bg-white'}`} />}
+          {type === 'member' ? <select name={key} defaultValue={editing?.[key] || ''} className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]"><option value="">Pilih anggota untuk Wijilan</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama}</option>)}</select> : type.startsWith('select:') ? <select name={key} defaultValue={editing?.[key] || ''} required className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]"><option value="" disabled>Pilih {label.toLowerCase()}</option>{type.slice(7).split('|').map((option) => <option key={option}>{option}</option>)}</select> : type === 'textarea' ? <textarea name={key} defaultValue={editing?.[key] || ''} rows={key === 'minutes' || key === 'followUp' ? '8' : '3'} className="w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#789578]" /> : type === 'file' ? <input name={key} type="file" accept="image/*" className="w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-[#e9efe5] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#496b4d]" /> : <input name={key} type={type} required={key === 'date' || key === 'memberName' || key === 'amount' || key === 'description' && page.api === 'PengeluaranIuran' || (key === 'password' && !editing)} minLength={key === 'password' ? 12 : undefined} min={type === 'number' ? '0' : undefined} step={type === 'number' ? 'any' : undefined} defaultValue={key === 'password' ? '' : editing?.[key] ?? (key === 'date' ? today : key === 'chargeAmount' ? 0 : '')} placeholder={key === 'password' && editing ? 'Kosongkan jika tidak diubah' : undefined} readOnly={key === 'photoUrl'} className={`w-full rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs outline-none focus:border-[#789578] ${key === 'photoUrl' ? 'bg-[#f5f6f1] text-[#809080]' : 'bg-white'}`} />}
         </label>)}
         </fieldset>
         <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
@@ -1952,7 +2100,7 @@ function Reports({ rows, summary, role, onApprove }) {
   const demoExpense = [rows.sesari, rows.sukaduka, rows.piodalan].flat().filter((row) => row.direction === 'Keluar' && row.category !== 'Punia barang').reduce((total, row) => total + Number(row.amount || 0), 0) + (rows.sewa || []).reduce((total, row) => total + Number(row.maintenanceCost || 0), 0)
   const totalIncome = summary?.totals?.income ?? demoIncome
   const totalExpense = summary?.totals?.expenses ?? demoExpense
-  return <div className="animate-rise"><div className="mb-5"><p className="text-xs text-[#849084]">Ringkasan gabungan berdasarkan transaksi modul keuangan.</p></div><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4"><p className="text-xs text-[#849084]">Total penerimaan tercatat</p><p className="font-display mt-3 text-xl font-extrabold text-[#426a49]">{currency(totalIncome)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4"><p className="text-xs text-[#849084]">Total pengeluaran tercatat</p><p className="font-display mt-3 text-xl font-extrabold text-[#a36e3f]">{currency(totalExpense)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4"><p className="text-xs text-[#849084]">Saldo bersih tercatat</p><p className="font-display mt-3 text-xl font-extrabold text-[#314b38]">{currency(totalIncome - totalExpense)}</p></div></div><div className="mt-5 rounded-md border border-[#e6e7dd] bg-[#fffefa] p-5"><h2 className="font-display text-sm font-extrabold">Persetujuan laporan akhir</h2><p className="mt-2 max-w-xl text-xs leading-5 text-[#849084]">Ketua dapat menyetujui laporan periode berjalan setelah meninjau ringkasan kas. Data sensitif anggota tidak ditampilkan di dashboard publik.</p><div className="mt-4 flex flex-wrap gap-2"><button onClick={() => window.print()} className="rounded-md border border-[#dfe4d9] px-3 py-2 text-xs font-semibold text-[#506854] hover:bg-[#f6f7f2]">Cetak / simpan PDF</button>{['Admin', 'Ketua'].includes(role) && <button onClick={onApprove} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#294d33]"><Check size={14} /> Setujui laporan bulan ini</button>}</div></div></div>
+  return <div className="animate-rise print-report"><PrintLetterhead title="Laporan keuangan" detail={`Periode berjalan · ${new Date().toLocaleDateString('id-ID')}`} /><div className="mb-5 no-print"><p className="text-xs text-[#849084]">Ringkasan gabungan berdasarkan transaksi modul keuangan.</p></div><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4"><p className="text-xs text-[#849084]">Total penerimaan tercatat</p><p className="font-display mt-3 text-xl font-extrabold text-[#426a49]">{currency(totalIncome)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4"><p className="text-xs text-[#849084]">Total pengeluaran tercatat</p><p className="font-display mt-3 text-xl font-extrabold text-[#a36e3f]">{currency(totalExpense)}</p></div><div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] p-4"><p className="text-xs text-[#849084]">Saldo bersih tercatat</p><p className="font-display mt-3 text-xl font-extrabold text-[#314b38]">{currency(totalIncome - totalExpense)}</p></div></div><div className="mt-5 rounded-md border border-[#e6e7dd] bg-[#fffefa] p-5"><h2 className="font-display text-sm font-extrabold">Persetujuan laporan akhir</h2><p className="mt-2 max-w-xl text-xs leading-5 text-[#849084]">Ketua dapat menyetujui laporan periode berjalan setelah meninjau ringkasan kas. Data sensitif anggota tidak ditampilkan di dashboard publik.</p><div className="mt-4 flex flex-wrap gap-2 no-print"><button onClick={() => window.print()} className="rounded-md border border-[#dfe4d9] px-3 py-2 text-xs font-semibold text-[#506854] hover:bg-[#f6f7f2]">Cetak / simpan PDF</button>{['Admin', 'Ketua'].includes(role) && <button onClick={onApprove} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#294d33]"><Check size={14} /> Setujui laporan bulan ini</button>}</div></div><PrintSignatures /></div>
 }
 
 export default App
