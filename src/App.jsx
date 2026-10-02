@@ -1195,8 +1195,7 @@ function MemberDuesPage({ data, loading }) {
   function memberMessage(member, daily = null) {
     const dueDate = deadline ? readableDate(deadline) : '[tanggal batas pembayaran]'
     const dailyLines = daily ? `\n\nInput tanggal ${readableDate(dailyDate)}:\n- Iuran: ${currency(daily.iuran)}\n- Sukaduka: ${currency(daily.sukaduka)}\n- Wijilan: ${currency(daily.wijilan)}\n- Total input: ${currency(daily.total)}` : ''
-    const eventLines = member.wijilanEvents.length ? `\n${member.wijilanEvents.map((event) => `  ${event.name}: ${currency(event.remaining)}`).join('\n')}` : ''
-    return `Om Swastyastu, Semeton ${member.memberName}.\nUning-uningan jinah paturunan / swadharma ring Sendetan saking tanggal ${readableDate(today)}:\n\n- Tunggakan Iuran: ${currency(member.iuran)}\n- Tunggakan Wijilan Wajib: ${currency(member.wijilan)}${eventLines}\n- Tunggakan Sukaduka (dados pungkuran): ${currency(member.sukaduka)}\n- Total kewajiban: ${currency(member.total)}${dailyLines}\n\nNunas uratiang mangda puputang naur sadurung tanggal ${dueDate}.\n\nMatur suksma.\nPrajuru Piodalan\nhttps://sendetan.vercel.app/`
+    return `Om Swastyastu, Semeton ${member.memberName}.\nUning-uningan jinah paturunan / swadharma ring Sendetan saking tanggal ${readableDate(today)}:\n\n- Tunggakan Iuran: ${currency(member.iuran)}\n- Tunggakan Wijilan Wajib: ${currency(member.wijilan)}\n- Tunggakan Sukaduka (dados pungkuran): ${currency(member.sukaduka)}\n- Total kewajiban: ${currency(member.total)}${dailyLines}\n\nNunas uratiang mangda puputang naur sadurung tanggal ${dueDate}.\n\nMatur suksma.\nPrajuru Piodalan\nhttps://sendetan.vercel.app/`
   }
 
   function openPreview(recipient, phone, message, group = false) {
