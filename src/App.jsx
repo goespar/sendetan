@@ -464,6 +464,67 @@ function App() {
     } catch (error) { setNotice(error.message); throw error }
   }
 
+  async function saveSangkep(payload) {
+    const { event, participants } = payload
+    try {
+      let iuranRecords = []
+      let sukadukaRecords = []
+      let updatedMembers = []
+      if (!isDemo) {
+        const result = await request('batchSangkep', { event, members: participants }, token)
+        iuranRecords = result.iuranRecords || []
+        sukadukaRecords = result.sukadukaRecords || []
+        updatedMembers = result.members || []
+      } else {
+        const balances = new Map(masterMembers.map((member) => [String(member.ID), { ...member }]))
+        participants.forEach((participant) => {
+          const member = balances.get(String(participant.memberId))
+          if (!member) return
+          const iuranOpening = Number(member.Sisa_Hutang_Iuran || 0)
+          const iuranPaid = participant.iuranPaid ? event.iuranAmount : 0
+          if (event.iuranAmount > 0) {
+            iuranRecords.push({
+              id: `${event.id}-IU-${member.ID}`, sangkepId: event.id, date: event.date, periodId: event.date.slice(0, 7),
+              memberId: member.ID, memberName: member.Nama, target: iuranOpening + event.iuranAmount,
+              chargeAmount: event.iuranAmount, allocatedContribution: iuranPaid, cashPhysical: iuranPaid,
+              changeDue: 0, changePaid: 0, openingArrears: iuranOpening, arrears: iuranOpening + event.iuranAmount - iuranPaid,
+              openingRefundDebt: Number(member.Sisa_Hutang_Kembalian || 0), refundDebtAdded: 0,
+              refundDebt: Number(member.Sisa_Hutang_Kembalian || 0), notes: `Sangkep: ${event.title}`,
+            })
+            member.Sisa_Hutang_Iuran = iuranOpening + event.iuranAmount - iuranPaid
+          }
+          const sukadukaOpening = Number(member.Sisa_Hutang_Sukaduka || 0)
+          const sukadukaPaid = participant.sukadukaPaid ? event.sukadukaAmount : 0
+          if (event.sukadukaAmount > 0) {
+            sukadukaRecords.push({
+              id: `${event.id}-SK-${member.ID}`, sangkepId: event.id, date: event.date, direction: 'Masuk',
+              recipient: member.Nama, memberId: member.ID, memberName: member.Nama,
+              purpose: `Iuran Sukaduka Sangkep: ${event.title}`, amount: sukadukaPaid,
+              chargeAmount: event.sukadukaAmount, openingArrears: sukadukaOpening,
+              arrears: sukadukaOpening + event.sukadukaAmount - sukadukaPaid,
+              cashPhysical: sukadukaPaid, changeDue: 0, changePaid: 0, refundDebtAdded: 0,
+              refundDebt: Number(member.Sisa_Hutang_Kembalian || 0), notes: `Sangkep: ${event.title}`,
+            })
+            member.Sisa_Hutang_Sukaduka = sukadukaOpening + event.sukadukaAmount - sukadukaPaid
+          }
+        })
+        updatedMembers = [...balances.values()]
+      }
+      setRows((previous) => ({
+        ...previous,
+        iuran: [...iuranRecords, ...(previous.iuran || [])],
+        sukaduka: [...sukadukaRecords, ...(previous.sukaduka || [])],
+      }))
+      if (updatedMembers.length) setMasterMembers((previous) => previous.map((member) => {
+        const updated = updatedMembers.find((item) => String(item.ID) === String(member.ID))
+        return updated ? { ...member, ...updated } : member
+      }))
+      if (!isDemo) setSummary(await request('summary', {}, token))
+      setBatchModal(false)
+      setNotice(`Sangkep ${event.title} berhasil dicatat untuk ${participants.length} warga.`)
+    } catch (error) { setNotice(error.message); throw error }
+  }
+
   async function saveIuran(record) {
     const updated = editing ? { ...editing, ...record, id: editing.id } : { ...record, id: record.id || createTransactionId('IU') }
     try {
@@ -817,6 +878,7 @@ function App() {
 
       {modal && <RecordModal page={page} editing={editing} members={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} busy={Boolean(busyAction)} onClose={closeRecordModal} onSave={(event) => runExclusive('save', () => saveRecord(event))} onSaveIuran={(record) => runExclusive('save', () => saveIuran(record))} onSaveSukaduka={(record) => runExclusive('save', () => saveSukaduka(record))} onSaveRental={(record) => runExclusive('save', () => saveRental(record))} onSaveActivity={(record) => runExclusive('save', () => saveActivity(record))} />}
       {batchModal && ['iuran', 'sukaduka'].includes(active) && <BatchPaymentModal module={active === 'iuran' ? 'TRANSAKSI_IURAN' : 'Sukaduka'} members={masterMembers} onClose={closeBatchModal} onSave={async (records) => {
+        if (!Array.isArray(records)) return saveSangkep(records)
         try {
           let savedRecords = records
           let updatedMembers = []
@@ -1242,7 +1304,86 @@ function WhatsAppPreviewModal({ draft, onClose }) {
   return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section role="dialog" aria-modal="true" aria-labelledby="whatsapp-preview-title" className="w-full max-w-2xl rounded-t-lg bg-white p-5 shadow-xl sm:rounded-md"><div className="flex items-start justify-between gap-3"><div><h2 id="whatsapp-preview-title" className="font-display text-lg font-extrabold">Pratinjau WhatsApp</h2><p className="mt-1 text-xs text-[#849084]">Tujuan: {draft.recipient}{draft.phone ? ` · ${draft.phone}` : ' · tautan grup'}</p></div><button onClick={onClose} aria-label="Tutup pratinjau" className="rounded p-1.5 text-[#7d8b7e]"><X size={18} /></button></div><label className="mt-4 block text-[11px] font-semibold text-[#637367]">Pesan<textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="14" className="mt-1 w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs leading-5 outline-none focus:border-[#789578]" /></label><div className="mt-4 flex justify-end gap-2 border-t border-[#eceee6] pt-4"><button onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={openWhatsApp} disabled={!draft.group && !String(draft.phone || '').replace(/\D/g, '')} className="inline-flex items-center gap-2 rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle size={15} /> Buka WhatsApp</button></div></section></div>
 }
 
+function SangkepModal({ members, onClose, onBack, onSave }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [date, setDate] = useState(today)
+  const [title, setTitle] = useState(`Sangkep ${readableDate(today)}`)
+  const [iuranAmount, setIuranAmount] = useState(10000)
+  const [sukadukaAmount, setSukadukaAmount] = useState(5000)
+  const [search, setSearch] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [submissionUncertain, setSubmissionUncertain] = useState(false)
+  const eventId = useRef(createTransactionId('SG'))
+  const [values, setValues] = useState(() => Object.fromEntries(members.map((member) => [String(member.ID), {
+    included: true, iuranPaid: false, sukadukaPaid: false,
+  }])))
+  const visibleMembers = members.filter((member) => `${member.Nama} ${member.ID}`.toLowerCase().includes(search.toLowerCase()))
+  const includedMembers = members.filter((member) => values[String(member.ID)]?.included)
+  const valid = Boolean(date && title.trim() && includedMembers.length && Number(iuranAmount) >= 0
+    && Number(sukadukaAmount) >= 0 && Number(iuranAmount) + Number(sukadukaAmount) > 0)
+  const inputClass = 'w-full rounded border border-[#e1e5dc] bg-white px-2.5 py-2 text-xs outline-none focus:border-[#789578]'
+
+  function setMemberValue(memberId, field, value) {
+    setValues((previous) => ({ ...previous, [memberId]: { ...previous[memberId], [field]: value } }))
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!valid || busy) return
+    setBusy(true)
+    try {
+      await onSave({
+        event: { id: eventId.current, date, title: title.trim(), iuranAmount: Number(iuranAmount), sukadukaAmount: Number(sukadukaAmount) },
+        participants: includedMembers.map((member) => ({
+          memberId: member.ID,
+          iuranPaid: Boolean(values[String(member.ID)]?.iuranPaid),
+          sukadukaPaid: Boolean(values[String(member.ID)]?.sukadukaPaid),
+        })),
+      })
+      setSubmissionUncertain(false)
+    } catch (error) {
+      setSubmissionUncertain(Boolean(error.uncertain))
+      setMessage(error.message || 'Sangkep belum dapat disimpan.')
+    } finally { setBusy(false) }
+  }
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+    <section className="flex max-h-[94vh] w-full max-w-5xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
+      <header className="flex items-start justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Catat sangkep</h2><p className="mt-1 text-xs text-[#849084]">Tandai pembayaran iuran dan sukaduka secara terpisah. Yang belum dibayar menjadi tunggakan.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e]" aria-label="Tutup"><X size={18} /></button></header>
+      {message && <p role="alert" className="mx-4 mt-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a] sm:mx-6">{message}</p>}
+      <fieldset disabled={busy || submissionUncertain} className="contents">
+        <div className="grid gap-3 border-b border-[#eceee6] p-4 sm:grid-cols-4 sm:px-6">
+          <label className="text-[11px] font-semibold">Tanggal<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>
+          <label className="text-[11px] font-semibold">Nama sangkep<input required value={title} onChange={(event) => setTitle(event.target.value)} className={`${inputClass} mt-1`} /></label>
+          <label className="text-[11px] font-semibold">Iuran per warga<input type="number" min="0" step="1" value={iuranAmount} onChange={(event) => setIuranAmount(event.target.value)} className={`${inputClass} mt-1`} /></label>
+          <label className="text-[11px] font-semibold">Sukaduka per warga<input type="number" min="0" step="1" value={sukadukaAmount} onChange={(event) => setSukadukaAmount(event.target.value)} className={`${inputClass} mt-1`} /></label>
+          <label className="text-[11px] font-semibold sm:col-span-2">Cari warga<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nama atau ID" className={`${inputClass} mt-1`} /></label>
+          <div className="flex items-end text-[11px] text-[#68776b] sm:col-span-2">{includedMembers.length} warga ditagih · maksimal {currency(Number(iuranAmount) + Number(sukadukaAmount) || 0)} per warga</div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[780px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[10px] uppercase text-[#89958a]"><tr><th className="px-4 py-3">Ikut ditagih</th><th className="px-4 py-3">Warga</th><th className="px-4 py-3">Iuran {currency(Number(iuranAmount) || 0)}</th><th className="px-4 py-3">Sukaduka {currency(Number(sukadukaAmount) || 0)}</th><th className="px-4 py-3">Tunggakan iuran</th><th className="px-4 py-3">Tunggakan sukaduka</th></tr></thead>
+            <tbody className="divide-y divide-[#eff0ea]">{visibleMembers.map((member) => {
+              const key = String(member.ID)
+              const value = values[key] || {}
+              return <tr key={key} className={value.included ? '' : 'opacity-50'}>
+                <td className="px-4 py-3"><input aria-label={`Tagih ${member.Nama}`} type="checkbox" checked={Boolean(value.included)} onChange={(event) => setMemberValue(key, 'included', event.target.checked)} /></td>
+                <td className="px-4 py-3"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td>
+                <td className="px-4 py-3"><label className="flex items-center gap-2"><input type="checkbox" disabled={!value.included} checked={Boolean(value.iuranPaid)} onChange={(event) => setMemberValue(key, 'iuranPaid', event.target.checked)} /><span>{value.iuranPaid ? 'Dibayar' : 'Belum dibayar'}</span></label></td>
+                <td className="px-4 py-3"><label className="flex items-center gap-2"><input type="checkbox" disabled={!value.included} checked={Boolean(value.sukadukaPaid)} onChange={(event) => setMemberValue(key, 'sukadukaPaid', event.target.checked)} /><span>{value.sukadukaPaid ? 'Dibayar' : 'Belum dibayar'}</span></label></td>
+                <td className="px-4 py-3">{currency(member.Sisa_Hutang_Iuran)}</td><td className="px-4 py-3">{currency(member.Sisa_Hutang_Sukaduka)}</td>
+              </tr>
+            })}</tbody>
+          </table>
+        </div>
+      </fieldset>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><p className="text-[11px] text-[#68776b]">Tunggakan sebelumnya tetap tercatat; setoran sangkep hanya membayar tagihan sangkep ini.</p><div className="flex gap-2"><button type="button" onClick={onBack} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Kembali</button><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={submit} disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba simpan ulang' : 'Simpan sangkep'}</button></div></footer>
+    </section>
+  </div>
+}
+
 function BatchPaymentModal({ module, members, onClose, onSave }) {
+  const [sangkepMode, setSangkepMode] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
   const periodNow = today.slice(0, 7)
   const isIuran = module === 'TRANSAKSI_IURAN'
@@ -1373,9 +1514,11 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   }
 
   const submissionUncertain = Boolean(pendingSubmission.current)
+  if (sangkepMode) return <SangkepModal members={members} onClose={onClose} onBack={() => setSangkepMode(false)} onSave={onSave} />
+
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-6xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></header>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><div className="flex items-center gap-2">{isIuran && <button onClick={() => setSangkepMode(true)} disabled={busy || submissionUncertain} className="rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] disabled:opacity-50">Catat sangkep</button>}<button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div></header>
       <fieldset disabled={busy || submissionUncertain} className="contents">
       <div className="flex flex-wrap items-end gap-3 border-b border-[#eceee6] p-4 sm:px-6">
         <label className="text-[11px] font-semibold">Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>

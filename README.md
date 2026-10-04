@@ -28,12 +28,13 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `Users` | `id`, `name`, `username`, `passwordHash`, `salt`, `role`, `status`, `createdAt`, `lastLoginAt` |
 | `Anggota` | `id`, `memberNo`, `memberName`, `phone`, `address`, `status`, `joinedAt`, `notes` |
 | `IuranPeriode` | `id`, `period`, `openedAt`, `closedAt`, `status`, `monthlyTarget`, `memberCount`, `totalBilled`, `carryArrears`, `carryRefundDebt`, `notes`, `createdBy` |
+| `Sangkep` | `id`, `date`, `title`, `iuranAmount`, `sukadukaAmount`, `memberCount`, `createdBy`, `createdAt` |
 | `MASTER_ANGGOTA` | `ID`, `Nama`, `Sisa_Hutang_Iuran`, `Sisa_Hutang_Kembalian`, `Sisa_Hutang_Sukaduka` |
 | `SaldoAwal` | `id`, `module`, `amount`, `date`, `notes`, `updatedBy`, `updatedAt` |
-| `TRANSAKSI_IURAN` | `id`, `date`, `periodId`, `memberId`, `memberName`, `target`, `allocatedContribution`, `cashPhysical`, `changeDue`, `changePaid`, `openingArrears`, `arrears`, `openingRefundDebt`, `refundDebtAdded`, `refundDebt`, `notes`, `createdBy`, `createdAt`, `updatedAt` |
+| `TRANSAKSI_IURAN` | `id`, `date`, `periodId`, `memberId`, `memberName`, `target`, `allocatedContribution`, `cashPhysical`, `changeDue`, `changePaid`, `openingArrears`, `arrears`, `openingRefundDebt`, `refundDebtAdded`, `refundDebt`, `notes`, `createdBy`, `createdAt`, `updatedAt`, `chargeAmount`, `sangkepId` |
 | `PengeluaranIuran` | `id`, `date`, `category`, `description`, `amount`, `payee`, `createdBy`, `createdAt`, `updatedAt` |
 | `Sesari` | `id`, `date`, `direction`, `category`, `amount`, `description`, `createdBy`, `createdAt` |
-| `Sukaduka` | `id`, `date`, `direction`, `recipient`, `purpose`, `amount`, `notes`, `createdBy`, `createdAt`, `memberId`, `memberName`, `cashPhysical`, `changeDue`, `changePaid`, `refundDebtAdded`, `refundDebt`, `arrears`, `proofPhotoUrl`, `chargeAmount`, `openingArrears` |
+| `Sukaduka` | `id`, `date`, `direction`, `recipient`, `purpose`, `amount`, `notes`, `createdBy`, `createdAt`, `memberId`, `memberName`, `cashPhysical`, `changeDue`, `changePaid`, `refundDebtAdded`, `refundDebt`, `arrears`, `proofPhotoUrl`, `chargeAmount`, `openingArrears`, `sangkepId` |
 | `Punia` | `id`, `date`, `donor`, `donationType`, `itemName`, `quantity`, `amount`, `notes`, `createdBy`, `createdAt`, `eventName`, `unit` |
 | `Piodalan` | `id`, `date`, `eventName`, `category`, `itemName`, `quantity`, `direction`, `amount`, `description`, `createdBy`, `createdAt`, `donor`, `memberId`, `unit`, `chargeAmount` |
 | `Aset` | `id`, `assetName`, `category`, `quantity`, `condition`, `rentalRate`, `photoUrl`, `notes`, `createdBy`, `createdAt`, `updatedAt`, `purchasePrice`, `rentalRateSemeton`, `rentalRateLuar` |
@@ -53,6 +54,8 @@ Saldo kas hasil pembayaran sebelum aplikasi digunakan diatur dari tombol **Atur 
 ### Input basket dan format Excel
 
 Di menu **Iuran anggota** atau **Sukaduka**, pilih **Input basket / Excel**. Basket menampilkan seluruh anggota dan menyimpan semua pembayaran terpilih dalam satu permintaan. Tombol **Unduh format Excel** membuat `.xlsx` dengan `memberId` dan nama anggota sudah terisi; isi nominal pada baris yang dibayar, lalu unggah berkas tersebut. Menu **Dana Punia** dan **Piodalan** juga menyediakan basket dan template Excel. Pada Piodalan, pilih **Wijilan semua anggota** untuk membuat satu baris per anggota aktif, atau unduh **Template Wijilan anggota** yang sudah berisi ID/nama anggota; isi nama piodalan dan nominal masing-masing penyetor, lalu unggah file.
+
+Pada basket **Iuran anggota**, tombol **Catat sangkep** mencatat tagihan iuran dan Sukaduka sekaligus. Nominal awalnya Rp10.000 dan Rp5.000 per warga, dapat diubah per sangkep. Warga yang ikut ditagih bisa ditandai sudah membayar untuk masing-masing jenis secara terpisah; yang belum dibayar otomatis masuk tunggakan tanpa menambah kas. Warga yang tidak ikut ditagih dapat dikecualikan. Setiap acara memiliki ID unik agar pengiriman ulang tidak menggandakan transaksi.
 
 - Iuran: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `periodId` (`YYYY-MM`), `allocatedContribution`, `cashPhysical`, `changePaid`, `notes`.
 - Sukaduka: `memberId`, `memberName`, `date` (`YYYY-MM-DD`), `chargeAmount`, `amount`, `cashPhysical`, `changePaid`, `purpose`, `notes`. `chargeAmount` menambah tagihan; `amount` adalah alokasi pembayaran yang boleh digunakan untuk tunggakan lama; `cashPhysical` adalah uang yang benar-benar diterima. Untuk mencatat tagihan tanpa pembayaran, isi tagihan dan set nominal serta uang fisik ke `0`.

@@ -2,12 +2,13 @@ const SHEETS = {
   Users: ['id', 'name', 'username', 'passwordHash', 'salt', 'role', 'status', 'createdAt', 'lastLoginAt'],
   Anggota: ['id', 'memberNo', 'memberName', 'phone', 'address', 'status', 'joinedAt', 'notes'],
   IuranPeriode: ['id', 'period', 'openedAt', 'closedAt', 'status', 'monthlyTarget', 'memberCount', 'totalBilled', 'carryArrears', 'carryRefundDebt', 'notes', 'createdBy'],
+  Sangkep: ['id', 'date', 'title', 'iuranAmount', 'sukadukaAmount', 'memberCount', 'createdBy', 'createdAt'],
   MASTER_ANGGOTA: ['ID', 'Nama', 'Sisa_Hutang_Iuran', 'Sisa_Hutang_Kembalian', 'Sisa_Hutang_Sukaduka'],
   SaldoAwal: ['id', 'module', 'amount', 'date', 'notes', 'updatedBy', 'updatedAt'],
-  TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt'],
+  TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'chargeAmount', 'sangkepId'],
   PengeluaranIuran: ['id', 'date', 'category', 'description', 'amount', 'payee', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
-  Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl', 'chargeAmount', 'openingArrears'],
+  Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl', 'chargeAmount', 'openingArrears', 'sangkepId'],
   Punia: ['id', 'date', 'donor', 'donationType', 'itemName', 'quantity', 'amount', 'notes', 'createdBy', 'createdAt', 'eventName', 'unit'],
   Piodalan: ['id', 'date', 'eventName', 'category', 'itemName', 'quantity', 'direction', 'amount', 'description', 'createdBy', 'createdAt', 'donor', 'memberId', 'unit', 'chargeAmount'],
   Aset: ['id', 'assetName', 'category', 'quantity', 'condition', 'rentalRate', 'photoUrl', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'purchasePrice', 'rentalRateSemeton', 'rentalRateLuar'],
@@ -19,7 +20,7 @@ const SHEETS = {
   AuditLog: ['id', 'timestamp', 'userId', 'username', 'action', 'module', 'recordId', 'details'],
 };
 
-const FINANCE_MODULES = ['IuranPeriode', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan'];
+const FINANCE_MODULES = ['IuranPeriode', 'Sangkep', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan'];
 const SECRETARY_MODULES = ['Anggota', 'Aset', 'InventarisLog', 'SewaAset', 'Notulensi', 'KegiatanMedia'];
 const PUBLIC_ROLES = ['Publik'];
 const SESSION_TTL_SECONDS = 21600;
@@ -95,6 +96,9 @@ function doPost(e) {
     if (action === 'batchPayments') {
       assertRole_(user, 'create', body.module);
       result = batchPayments_(body.module, body.records || [], user);
+    } else if (action === 'batchSangkep') {
+      assertRole_(user, 'create', 'Sangkep');
+      result = batchSangkep_(body.event || {}, body.members || [], user);
     } else if (action === 'batchCreate') {
       assertRole_(user, 'create', body.module);
       result = batchCreateRecords_(body.module, body.records || [], user);
@@ -394,6 +398,8 @@ function batchPayments_(module, records, user) {
           && String(existing.date) === String(record.date)
           && String(existing.periodId) === String(record.periodId)
           && Number(existing.allocatedContribution) === Number(record.allocatedContribution)
+          && Number(existing.chargeAmount || 0) === (Number(record.chargeAmount) || 0)
+          && String(existing.sangkepId || '') === String(record.sangkepId || '')
           && Number(existing.cashPhysical) === Number(record.cashPhysical)
           && Number(existing.changePaid || 0) === (Number(record.changePaid) || 0)
           && String(existing.notes || '') === String(record.notes || '')
@@ -402,6 +408,7 @@ function batchPayments_(module, records, user) {
           && String(existing.purpose || '').trim() === String(record.purpose || '').trim()
           && Number(existing.amount) === Number(record.amount)
           && Number(existing.chargeAmount || 0) === (Number(record.chargeAmount) || 0)
+          && String(existing.sangkepId || '') === String(record.sangkepId || '')
           && Number(existing.cashPhysical) === Number(record.cashPhysical)
           && Number(existing.changePaid || 0) === (Number(record.changePaid) || 0)
           && String(existing.notes || '') === String(record.notes || '');
@@ -442,17 +449,22 @@ function batchPayments_(module, records, user) {
       const allocated = Number(record.allocatedContribution);
       const cash = Number(record.cashPhysical);
       const changePaid = Number(record.changePaid) || 0;
+      const chargeAmount = Number(record.chargeAmount) || 0;
+      const sangkepId = String(record.sangkepId || '');
       if (!/^\d{4}-\d{2}$/.test(periodId)) throw new Error('Periode tidak valid untuk ' + member.Nama + '.');
-      if (![allocated, cash, changePaid].every(Number.isFinite) || allocated <= 0 || cash < allocated || changePaid < 0) throw new Error('Nominal iuran tidak valid untuk ' + member.Nama + '.');
+      if (![allocated, cash, changePaid, chargeAmount].every(Number.isFinite) || allocated < 0 || chargeAmount < 0
+        || (sangkepId ? chargeAmount <= 0 || allocated > chargeAmount : allocated <= 0)
+        || cash < allocated || changePaid < 0) throw new Error('Nominal iuran tidak valid untuk ' + member.Nama + '.');
       const changeDue = cash - allocated;
       if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
       const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
       entry = {
         id: requestId || Utilities.getUuid(), date: record.date, periodId: periodId, memberId: member.ID, memberName: member.Nama,
-        target: balance.arrears, allocatedContribution: allocated, cashPhysical: cash, changeDue: changeDue,
-        changePaid: changePaid, openingArrears: balance.arrears, arrears: Math.max(0, balance.arrears - allocated),
+        target: balance.arrears + chargeAmount, allocatedContribution: allocated, cashPhysical: cash, changeDue: changeDue,
+        changePaid: changePaid, openingArrears: balance.arrears, arrears: Math.max(0, balance.arrears + chargeAmount - allocated),
         openingRefundDebt: balance.refundDebt, refundDebtAdded: refundDebt - balance.refundDebt,
         refundDebt: refundDebt, notes: String(record.notes || ''), createdBy: user.username,
+        chargeAmount: chargeAmount, sangkepId: sangkepId,
         createdAt: now, updatedAt: now,
       };
       balance.arrears = entry.arrears;
@@ -475,6 +487,7 @@ function batchPayments_(module, records, user) {
         changePaid: changePaid, refundDebtAdded: refundDebt - balance.refundDebt,
         refundDebt: refundDebt, chargeAmount: chargeAmount, openingArrears: openingArrears,
         arrears: Math.max(0, openingArrears + chargeAmount - amount), proofPhotoUrl: '',
+        sangkepId: String(record.sangkepId || ''),
       };
       balance.refundDebt = refundDebt;
       balance.sukadukaArrears = entry.arrears;
@@ -523,6 +536,79 @@ function batchPayments_(module, records, user) {
       const update = updates[id];
       return { ID: source.ID, Nama: source.Nama, Sisa_Hutang_Iuran: update ? update.arrears : source.Sisa_Hutang_Iuran, Sisa_Hutang_Kembalian: update ? update.refundDebt : source.Sisa_Hutang_Kembalian, Sisa_Hutang_Sukaduka: update ? update.sukadukaArrears : source.Sisa_Hutang_Sukaduka };
     }),
+  };
+}
+
+function batchSangkep_(input, participants, user) {
+  const event = input || {};
+  const eventId = String(event.id || '').trim();
+  const date = String(event.date || '').trim();
+  const title = String(event.title || '').trim();
+  const iuranAmount = Number(event.iuranAmount);
+  const sukadukaAmount = Number(event.sukadukaAmount);
+  if (!eventId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) throw new Error('ID, tanggal, dan nama sangkep wajib diisi.');
+  if (![iuranAmount, sukadukaAmount].every(Number.isFinite) || iuranAmount < 0 || sukadukaAmount < 0 || iuranAmount + sukadukaAmount <= 0) {
+    throw new Error('Nominal iuran sangkep tidak valid.');
+  }
+  if (!Array.isArray(participants) || !participants.length || participants.length > 500) throw new Error('Pilih minimal satu warga yang ikut ditagih.');
+
+  const events = readRecords_('Sangkep');
+  const existingEvent = events.find(function (row) { return String(row.id) === eventId; });
+  if (existingEvent) {
+    if (String(existingEvent.date) !== date || String(existingEvent.title) !== title
+      || Number(existingEvent.iuranAmount) !== iuranAmount || Number(existingEvent.sukadukaAmount) !== sukadukaAmount) {
+      throw new Error('ID sangkep sudah digunakan untuk data yang berbeda. Muat ulang sebelum mencoba lagi.');
+    }
+    const iuranRecords = readRecords_('TRANSAKSI_IURAN').filter(function (row) { return String(row.sangkepId || '') === eventId; });
+    const sukadukaRecords = readRecords_('Sukaduka').filter(function (row) { return String(row.sangkepId || '') === eventId; });
+    const ids = {};
+    iuranRecords.concat(sukadukaRecords).forEach(function (row) { ids[String(row.memberId)] = true; });
+    return {
+      event: existingEvent, iuranRecords: iuranRecords, sukadukaRecords: sukadukaRecords,
+      members: getMasterAnggota_().filter(function (member) { return ids[String(member.ID)]; }),
+      duplicate: true,
+    };
+  }
+
+  const seen = {};
+  const iuranRecords = [];
+  const sukadukaRecords = [];
+  participants.forEach(function (participant) {
+    const memberId = String(participant.memberId || '').trim();
+    if (!memberId || seen[memberId]) throw new Error('Warga sangkep tidak valid atau tercantum lebih dari sekali.');
+    seen[memberId] = true;
+    if (iuranAmount > 0) iuranRecords.push({
+      id: eventId + '-IU-' + memberId, sangkepId: eventId, memberId: memberId, date: date,
+      periodId: date.slice(0, 7), chargeAmount: iuranAmount,
+      allocatedContribution: participant.iuranPaid ? iuranAmount : 0,
+      cashPhysical: participant.iuranPaid ? iuranAmount : 0,
+      changePaid: 0, notes: 'Sangkep: ' + title,
+    });
+    if (sukadukaAmount > 0) sukadukaRecords.push({
+      id: eventId + '-SK-' + memberId, sangkepId: eventId, memberId: memberId, date: date,
+      chargeAmount: sukadukaAmount, amount: participant.sukadukaPaid ? sukadukaAmount : 0,
+      cashPhysical: participant.sukadukaPaid ? sukadukaAmount : 0,
+      changePaid: 0, purpose: 'Iuran Sukaduka Sangkep: ' + title, notes: 'Sangkep: ' + title,
+    });
+  });
+
+  const savedIuran = iuranRecords.length ? batchPayments_('TRANSAKSI_IURAN', iuranRecords, user).records : [];
+  const savedSukaduka = sukadukaRecords.length ? batchPayments_('Sukaduka', sukadukaRecords, user).records : [];
+  const eventRecord = {
+    id: eventId, date: date, title: title, iuranAmount: iuranAmount, sukadukaAmount: sukadukaAmount,
+    memberCount: participants.length, createdBy: user.username, createdAt: new Date().toISOString(),
+  };
+  try {
+    appendRecord_('Sangkep', eventRecord);
+  } catch (error) {
+    error.uncertain = true;
+    throw error;
+  }
+  const memberIds = {};
+  participants.forEach(function (participant) { memberIds[String(participant.memberId)] = true; });
+  return {
+    event: eventRecord, iuranRecords: savedIuran, sukadukaRecords: savedSukaduka,
+    members: getMasterAnggota_().filter(function (member) { return memberIds[String(member.ID)]; }),
   };
 }
 
