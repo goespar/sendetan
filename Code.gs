@@ -25,6 +25,13 @@ const SECRETARY_MODULES = ['Anggota', 'Aset', 'InventarisLog', 'SewaAset', 'Notu
 const PUBLIC_ROLES = ['Publik'];
 const SESSION_TTL_SECONDS = 21600;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const DATA_CACHE_TTL_SECONDS = 300;
+const DATA_CACHE_VERSION_PROPERTY = 'takora_data_cache_version';
+const MUTATING_ACTIONS = [
+  'restore', 'batchPayments', 'batchSangkep', 'batchCreate', 'create', 'update',
+  'delete', 'adjustMemberBalance', 'adjustIuranBalance', 'adjustSukadukaBalance',
+  'setOpeningBalances', 'closeBook', 'approveReport',
+];
 
 function doGet(e) {
   try {
@@ -58,8 +65,9 @@ function doGet(e) {
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
+  let body;
   try {
-    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = body.action;
     if (action === 'login') return json_(login_(body.username, body.password));
     if (action === 'publicGallery') return json_({ ok: true, data: publicGallery_() });
@@ -96,6 +104,7 @@ function doPost(e) {
     }
 
     lock.waitLock(20000);
+    if (MUTATING_ACTIONS.indexOf(action) !== -1) invalidateDataCaches_();
     let result;
     if (action === 'restore') {
       if (user.role !== 'Admin') throw new Error('Hanya Admin yang dapat memulihkan backup data.');
@@ -143,8 +152,10 @@ function doPost(e) {
     } else {
       throw new Error('Aksi tidak dikenal.');
     }
+    if (MUTATING_ACTIONS.indexOf(action) !== -1) invalidateDataCaches_();
     return json_({ ok: true, ...result });
   } catch (error) {
+    if (body && MUTATING_ACTIONS.indexOf(body.action) !== -1 && error.uncertain) invalidateDataCaches_();
     return json_({ ok: false, error: error.message, uncertain: Boolean(error.uncertain) });
   } finally {
     if (lock.hasLock()) lock.releaseLock();
@@ -174,6 +185,7 @@ function setupSheets() {
   });
   readRecords_('Anggota').forEach(function (member) { upsertMasterAnggota_(member); });
   migrateLegacyIuran_();
+  invalidateDataCaches_();
   return 'Sheet siap: ' + Object.keys(SHEETS).join(', ');
 }
 
@@ -601,6 +613,7 @@ function batchSangkep_(input, participants, user) {
 
   const savedIuran = iuranRecords.length ? batchPayments_('TRANSAKSI_IURAN', iuranRecords, user).records : [];
   const savedSukaduka = sukadukaRecords.length ? batchPayments_('Sukaduka', sukadukaRecords, user).records : [];
+  invalidateDataCaches_();
   const eventRecord = {
     id: eventId, date: date, title: title, iuranAmount: iuranAmount, sukadukaAmount: sukadukaAmount,
     memberCount: participants.length, createdBy: user.username, createdAt: new Date().toISOString(),
@@ -954,6 +967,16 @@ function deleteRecord_(module, id, user) {
 }
 
 function getMasterAnggota_(snapshot) {
+  if (!snapshot) {
+    const version = dataCacheVersion_();
+    return cachedJson_('master:' + version, function () {
+      return computeMasterAnggota_();
+    });
+  }
+  return computeMasterAnggota_(snapshot);
+}
+
+function computeMasterAnggota_(snapshot) {
   const sheet = spreadsheet_().getSheetByName('MASTER_ANGGOTA');
   if (!sheet) throw new Error('Sheet MASTER_ANGGOTA tidak ditemukan. Jalankan setupSheets().');
   const expectedHeaders = SHEETS.MASTER_ANGGOTA;
@@ -977,16 +1000,29 @@ function getMasterAnggota_(snapshot) {
     const id = String(member.id);
     if (!byId[id]) byId[id] = { ID: member.id, Nama: member.memberName, Sisa_Hutang_Iuran: 0, Sisa_Hutang_Kembalian: 0, Sisa_Hutang_Sukaduka: 0 };
   });
-  const latestBalances = {};
-  (snapshot ? snapshot.TRANSAKSI_IURAN : readRecords_('TRANSAKSI_IURAN')).forEach(function (row) {
-    const id = String(row.memberId);
-    const current = latestBalances[id];
-    const timestamp = String(row.updatedAt || row.createdAt || row.date || '');
-    if (!current || String(row.periodId) > String(current.periodId) || String(row.periodId) === String(current.periodId) && timestamp >= current.timestamp) {
-      latestBalances[id] = { periodId: row.periodId, timestamp: timestamp, arrears: row.arrears, refundDebt: row.refundDebt };
-    }
+  const needsIuranFallback = Object.keys(byId).some(function (id) {
+    const member = byId[id];
+    return member.Sisa_Hutang_Iuran === '' || member.Sisa_Hutang_Iuran === null || member.Sisa_Hutang_Iuran === undefined
+      || member.Sisa_Hutang_Kembalian === '' || member.Sisa_Hutang_Kembalian === null || member.Sisa_Hutang_Kembalian === undefined;
   });
-  const sukadukaArrears = sukadukaArrearsByMember_(snapshot ? snapshot.Sukaduka : readRecords_('Sukaduka'));
+  const latestBalances = {};
+  if (needsIuranFallback) {
+    (snapshot ? snapshot.TRANSAKSI_IURAN : readRecords_('TRANSAKSI_IURAN')).forEach(function (row) {
+      const id = String(row.memberId);
+      const current = latestBalances[id];
+      const timestamp = String(row.updatedAt || row.createdAt || row.date || '');
+      if (!current || String(row.periodId) > String(current.periodId) || String(row.periodId) === String(current.periodId) && timestamp >= current.timestamp) {
+        latestBalances[id] = { periodId: row.periodId, timestamp: timestamp, arrears: row.arrears, refundDebt: row.refundDebt };
+      }
+    });
+  }
+  const needsSukadukaFallback = Object.keys(byId).some(function (id) {
+    const value = byId[id].Sisa_Hutang_Sukaduka;
+    return value === '' || value === null || value === undefined;
+  });
+  const sukadukaArrears = needsSukadukaFallback
+    ? sukadukaArrearsByMember_(snapshot ? snapshot.Sukaduka : readRecords_('Sukaduka'))
+    : {};
   return Object.keys(byId).map(function (id) {
     const member = byId[id];
     member.memberNo = currentMembersById[id] && currentMembersById[id].memberNo || member.memberNo || id;
@@ -1053,15 +1089,19 @@ function findMasterAnggota_(memberId) {
   for (let index = 1; index < values.length; index++) {
     if (String(values[index][idColumn]) === String(memberId)) {
       const member = rowToObject_(headers, values[index]);
-      const directoryMember = readRecords_('Anggota').find(function (item) { return String(item.id) === String(memberId); });
+      const directoryMember = getMasterAnggota_().find(function (item) { return String(item.ID) === String(memberId); });
       member.memberNo = directoryMember && directoryMember.memberNo || String(memberId);
-      const latest = latestIuranBalance_(memberId);
+      const needsIuranFallback = member.Sisa_Hutang_Iuran === '' || member.Sisa_Hutang_Iuran === null || member.Sisa_Hutang_Iuran === undefined
+        || member.Sisa_Hutang_Kembalian === '' || member.Sisa_Hutang_Kembalian === null || member.Sisa_Hutang_Kembalian === undefined;
+      const latest = needsIuranFallback ? latestIuranBalance_(memberId) : null;
+      const needsSukadukaFallback = member.Sisa_Hutang_Sukaduka === '' || member.Sisa_Hutang_Sukaduka === null || member.Sisa_Hutang_Sukaduka === undefined;
       member.Sisa_Hutang_Iuran = member.Sisa_Hutang_Iuran === '' || member.Sisa_Hutang_Iuran === null || member.Sisa_Hutang_Iuran === undefined
         ? Number(latest && latest.arrears) || 0 : Number(member.Sisa_Hutang_Iuran) || 0;
       member.Sisa_Hutang_Kembalian = member.Sisa_Hutang_Kembalian === '' || member.Sisa_Hutang_Kembalian === null || member.Sisa_Hutang_Kembalian === undefined
         ? Number(latest && latest.refundDebt) || 0 : Number(member.Sisa_Hutang_Kembalian) || 0;
       member.Sisa_Hutang_Sukaduka = member.Sisa_Hutang_Sukaduka === '' || member.Sisa_Hutang_Sukaduka === null || member.Sisa_Hutang_Sukaduka === undefined
-        ? sukadukaArrearsByMember_(readRecords_('Sukaduka'))[String(memberId)] || 0 : Number(member.Sisa_Hutang_Sukaduka) || 0;
+        ? needsSukadukaFallback ? sukadukaArrearsByMember_(readRecords_('Sukaduka'))[String(memberId)] || 0 : 0
+        : Number(member.Sisa_Hutang_Sukaduka) || 0;
       return { sheet: sheet, rowNumber: index + 1, member: member };
     }
   }
@@ -1596,6 +1636,40 @@ function validateModule_(module) {
   }
 }
 
+function dataCacheVersion_() {
+  return PropertiesService.getScriptProperties().getProperty(DATA_CACHE_VERSION_PROPERTY) || '0';
+}
+
+function cachedJson_(key, createValue) {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(key);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (error) {
+      Logger.log('Cache TAKORA tidak valid (' + key + '): ' + error.message);
+      cache.remove(key);
+    }
+  }
+
+  const value = createValue();
+  const serialized = JSON.stringify(value);
+  if (Utilities.newBlob(serialized).getBytes().length < 95000) {
+    try {
+      cache.put(key, serialized, DATA_CACHE_TTL_SECONDS);
+    } catch (error) {
+      Logger.log('Cache TAKORA tidak dapat disimpan (' + key + '): ' + error.message);
+    }
+  }
+  return value;
+}
+
+function invalidateDataCaches_() {
+  const properties = PropertiesService.getScriptProperties();
+  const version = Number(properties.getProperty(DATA_CACHE_VERSION_PROPERTY)) || 0;
+  properties.setProperty(DATA_CACHE_VERSION_PROPERTY, String(version + 1));
+}
+
 function summarySnapshot_() {
   const names = ['Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'Aset', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA', 'SaldoAwal'];
   const snapshot = {};
@@ -1699,6 +1773,20 @@ function getOpeningBalancesFromSnapshot_(snapshot) {
 }
 
 function summary_(filters) {
+  const selectedFilters = filters || {};
+  const version = dataCacheVersion_();
+  const key = [
+    'summary', version,
+    String(selectedFilters.year || ''),
+    String(selectedFilters.month || ''),
+    String(selectedFilters.day || ''),
+  ].join(':');
+  return cachedJson_(key, function () {
+    return computeSummary_(selectedFilters);
+  });
+}
+
+function computeSummary_(filters) {
   const rawSnapshot = summarySnapshot_();
   const assets = assetInventory_(rawSnapshot);
   const allTotals = summaryTotals_(rawSnapshot);

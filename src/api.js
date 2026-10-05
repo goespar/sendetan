@@ -7,7 +7,11 @@ export async function request(action, payload = {}, token = '') {
   if (!backendConfigured) {
     throw new Error('Koneksi Google Sheets belum diatur. Isi VITE_APPS_SCRIPT_URL di .env.local dengan URL Apps Script berakhiran /exec.')
   }
-  const mutation = ['create', 'update', 'batchPayments', 'batchCreate', 'restore'].includes(action)
+  const mutation = [
+    'create', 'update', 'delete', 'batchPayments', 'batchSangkep', 'batchCreate',
+    'adjustMemberBalance', 'adjustIuranBalance', 'adjustSukadukaBalance',
+    'setOpeningBalances', 'closeBook', 'approveReport', 'restore',
+  ].includes(action)
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 300000)
   let response
