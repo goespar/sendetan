@@ -110,6 +110,8 @@ Backend dan frontend dirilis terpisah: Google Apps Script menjadi API untuk Goog
 
 Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbit hanya dengan deploy Vercel. Jalankan `setupSheets()` untuk menambahkan kolom baru, lalu buka **Deploy → Manage deployments**, edit deployment Web App, pilih **New version**, lalu deploy. URL `/exec` biasanya tetap sama.
 
+Menu **Backup** hanya tersedia bagi Admin dan mengunduh semua sheet sebagai satu file JSON; hash dan salt kata sandi tidak disertakan. Restore menerima file backup TAKORA versi 1 dan mengganti seluruh sheet data dengan isi backup setelah konfirmasi; sheet `Users` beserta kredensial saat ini dipertahankan, dan entri audit restore ditambahkan setelah riwayat audit dari backup dipulihkan. Data file di Google Drive tidak disalin, hanya referensi URL yang ada di sheet. Backend memvalidasi format dan ID, lalu berusaha mengembalikan data sebelumnya bila restore gagal. Deploy versi terbaru `Code.gs` sebagai versi Web App baru agar backup dan restore tersedia. Menu **Rekap kewajiban → Edit template WA** mengubah template di browser yang sedang digunakan, sehingga pengaturan template tidak ikut tersimpan di Google Sheets atau browser/perangkat lain.
+
 ### 3. Uji frontend secara lokal
 
 1. Di root repo, isi `.env.local` dengan URL API:

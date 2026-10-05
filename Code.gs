@@ -86,6 +86,10 @@ function doPost(e) {
       assertRole_(user, 'list', 'TRANSAKSI_IURAN');
       return json_({ ok: true, balances: getOpeningBalances_() });
     }
+    if (action === 'backup') {
+      if (user.role !== 'Admin') throw new Error('Hanya Admin yang dapat mengunduh backup data.');
+      return json_({ ok: true, backup: createBackup_() });
+    }
     if (action === 'uploadFile') {
       assertRole_(user, 'upload', body.folder || 'assets');
       return json_({ ok: true, ...uploadFile_(body) });
@@ -93,7 +97,10 @@ function doPost(e) {
 
     lock.waitLock(20000);
     let result;
-    if (action === 'batchPayments') {
+    if (action === 'restore') {
+      if (user.role !== 'Admin') throw new Error('Hanya Admin yang dapat memulihkan backup data.');
+      result = restoreBackup_(body.backup, user);
+    } else if (action === 'batchPayments') {
       assertRole_(user, 'create', body.module);
       result = batchPayments_(body.module, body.records || [], user);
     } else if (action === 'batchSangkep') {
@@ -1418,6 +1425,112 @@ function readAuditLog_() {
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, SHEETS.AuditLog.length).getValues()
     .filter(function (row) { return row.some(function (value) { return value !== ''; }); })
     .map(function (row) { return rowToObject_(SHEETS.AuditLog, row); });
+}
+
+function createBackup_() {
+  const sheets = {};
+  Object.keys(SHEETS).forEach(function (module) {
+    const records = module === 'AuditLog' ? readAuditLog_() : readRecords_(module);
+    sheets[module] = module === 'Users'
+      ? records.map(function (record) {
+        const safeRecord = Object.assign({}, record);
+        delete safeRecord.passwordHash;
+        delete safeRecord.salt;
+        return safeRecord;
+      })
+      : records;
+  });
+  return {
+    format: 'takora-backup',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    sheets: sheets,
+  };
+}
+
+function restoreBackup_(backup, user) {
+  if (!backup || backup.format !== 'takora-backup' || backup.version !== 1 || !backup.sheets || typeof backup.sheets !== 'object' || Array.isArray(backup.sheets)) {
+    throw new Error('Format backup tidak dikenal atau tidak didukung.');
+  }
+
+  const modules = Object.keys(SHEETS).filter(function (module) { return module !== 'Users'; });
+  const unknownSheets = Object.keys(backup.sheets).filter(function (module) {
+    return !Object.prototype.hasOwnProperty.call(SHEETS, module);
+  });
+  if (unknownSheets.length) throw new Error('Backup berisi sheet yang tidak dikenal: ' + unknownSheets.join(', ') + '.');
+  const prepared = {};
+  modules.forEach(function (module) {
+    const records = backup.sheets[module];
+    if (!Array.isArray(records)) throw new Error('Backup tidak memiliki data sheet ' + module + ' yang valid.');
+    const headers = SHEETS[module];
+    const idColumn = module === 'MASTER_ANGGOTA' ? 'ID' : 'id';
+    const seenIds = Object.create(null);
+    prepared[module] = records.map(function (record, index) {
+      if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        throw new Error('Data sheet ' + module + ' baris ' + (index + 1) + ' tidak valid.');
+      }
+      const id = String(record[idColumn] == null ? '' : record[idColumn]).trim();
+      if (!id) throw new Error('ID wajib diisi pada sheet ' + module + ' baris ' + (index + 1) + '.');
+      if (seenIds[id]) throw new Error('ID duplikat "' + id + '" pada sheet ' + module + '.');
+      seenIds[id] = true;
+      return headers.map(function (header) { return normalizeCell_(record[header]); });
+    });
+  });
+  if (!Array.isArray(backup.sheets.Users)) throw new Error('Backup tidak memiliki data sheet Users yang valid.');
+
+  const ss = spreadsheet_();
+  const previous = {};
+  modules.forEach(function (module) {
+    const sheet = ss.getSheetByName(module);
+    if (!sheet) throw new Error('Sheet ' + module + ' tidak ditemukan. Jalankan setupSheets() terlebih dahulu.');
+    const headers = SHEETS[module];
+    const existingHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+    if (headers.some(function (header, index) { return existingHeaders[index] !== header; })) {
+      throw new Error('Header sheet ' + module + ' tidak sesuai. Jalankan setupSheets() terlebih dahulu.');
+    }
+    const lastRow = sheet.getLastRow();
+    previous[module] = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, SHEETS[module].length).getValues();
+  });
+
+  function writeModule(module, records) {
+    const sheet = ss.getSheetByName(module);
+    const headers = SHEETS[module];
+    const oldRowCount = sheet.getLastRow() - 1;
+    if (oldRowCount > 0) sheet.getRange(2, 1, oldRowCount, headers.length).clearContent();
+    if (!records.length) return;
+    const requiredLastRow = records.length + 1;
+    if (sheet.getMaxRows() < requiredLastRow) sheet.insertRowsAfter(sheet.getMaxRows(), requiredLastRow - sheet.getMaxRows());
+    sheet.getRange(2, 1, records.length, headers.length).setValues(records);
+  }
+
+  try {
+    modules.forEach(function (module) { writeModule(module, prepared[module]); });
+    audit_(user, 'restore', 'ALL', '', JSON.stringify({
+      backupCreatedAt: backup.createdAt || '',
+      restoredRecordCounts: Object.keys(prepared).reduce(function (counts, module) {
+        counts[module] = prepared[module].length;
+        return counts;
+      }, {}),
+      usersPreserved: true,
+    }));
+  } catch (error) {
+    try {
+      modules.forEach(function (module) { writeModule(module, previous[module]); });
+    } catch (rollbackError) {
+      const failure = new Error('Restore gagal dan pemulihan otomatis data sebelumnya juga gagal. Periksa spreadsheet segera. Kesalahan restore: ' + error.message + ' Kesalahan rollback: ' + rollbackError.message);
+      failure.uncertain = true;
+      throw failure;
+    }
+    throw new Error('Restore gagal. Data sebelumnya berhasil dikembalikan. ' + error.message);
+  }
+
+  return {
+    restoredRecordCounts: Object.keys(prepared).reduce(function (counts, module) {
+      counts[module] = prepared[module].length;
+      return counts;
+    }, {}),
+    usersPreserved: true,
+  };
 }
 
 function appendRecord_(module, record) {

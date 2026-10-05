@@ -4,7 +4,7 @@ import {
   Check, ChevronDown, CircleDollarSign, ClipboardList, FileText, HandCoins,
   HeartHandshake, Landmark, LayoutDashboard, LogOut, Menu, Package, Plus,
   Search, Settings2, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet, Download, Printer,
-  X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen,
+  X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen, RotateCcw,
 } from 'lucide-react'
 import logo from '../logo takora.png'
 import { backendConfigured, isDemo, request, uploadPhoto } from './api.js'
@@ -37,9 +37,10 @@ const navigation = [
   { id: 'kegiatan', label: 'Galeri kegiatan', icon: Camera, group: 'PUBLIK' },
   { id: 'laporan', label: 'Laporan', icon: FileText, group: 'PELAPORAN' },
   { id: 'users', label: 'Pengguna', icon: ShieldCheck, group: 'PENGATURAN' },
+  { id: 'backup', label: 'Backup', icon: Download, group: 'PENGATURAN' },
 ]
 const permission = {
-  Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users'],
+  Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users', 'backup'],
   Ketua: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Sekretaris: ['dashboard', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
@@ -87,6 +88,23 @@ const moduleLabels = { iuran: 'Iuran', sukaduka: 'Sukaduka', sesari: 'Sesari', p
 const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777', punia: '#2563eb', sewa: '#15803d', piodalan: '#eab308' }
 const openingBalanceDefaults = { iuran: 0, sukaduka: 0, sesari: 0 }
 const emptyOpeningBalances = Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, { amount: 0, date: '', notes: '', configured: false }]))
+const whatsappTemplateKey = 'takora-whatsapp-templates'
+const defaultWhatsappTemplates = {
+  member: 'Om Swastyastu, Semeton {nama}.\nUning-uningan jinah paturunan / swadharma ring Sendetan saking tanggal {tanggal}:\n\n- Tunggakan Iuran: {iuran}\n- Tunggakan Wijilan Wajib: {wijilan}\n- Tunggakan Sukaduka (dados pungkuran): {sukaduka}\n- Total kewajiban: {total}{rekap_harian}\n\nNunas uratiang mangda puputang naur sadurung tanggal {batas_pembayaran}.\n\nMatur suksma.\nPrajuru Piodalan\nhttps://sendetan.vercel.app/',
+  groupDues: 'Om Swastyastu, Semeton.\nRekap kewajiban anggota per {tanggal}:\n{daftar_anggota}\n\nTotal tunggakan: {total_tunggakan}\nBatas pembayaran: {batas_pembayaran}\n\nMatur suksma. Prajuru Piodalan\nhttps://sendetan.vercel.app/',
+  groupDaily: 'Om Swastyastu.\nRekap input harian {tanggal_input}:\n{daftar_input}\n\nTotal input: {total_input}\nTotal tunggakan saat ini: {total_tunggakan}\nhttps://sendetan.vercel.app/',
+}
+function loadWhatsappTemplates() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(whatsappTemplateKey) || '{}')
+    return Object.fromEntries(Object.entries(defaultWhatsappTemplates).map(([key, value]) => [key, typeof saved[key] === 'string' ? saved[key] : value]))
+  } catch {
+    return defaultWhatsappTemplates
+  }
+}
+function formatTemplate(template, values) {
+  return template.replace(/\{([a-z_]+)\}/g, (placeholder, key) => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : placeholder)
+}
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
 const createTransactionId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
@@ -141,7 +159,9 @@ function App() {
   const showSidebar = authenticated && role !== 'Publik'
   const menu = navigation.filter((item) => allowed.includes(item.id))
   const writable = role === 'Admin' || (role === 'Bendahara' && [...FINANCE_MODULES_UI, ...ORGANIZATION_MODULES_UI].includes(active)) || (role === 'Sekretaris' && ORGANIZATION_MODULES_UI.includes(active))
-  const page = active === 'kewajiban'
+  const page = active === 'backup'
+    ? { title: 'Backup data aplikasi', desc: 'Unduh salinan data aplikasi dalam format JSON.' }
+    : active === 'kewajiban'
     ? { title: 'Rekap kewajiban anggota', desc: 'Status iuran, Sukaduka, Wijilan, dan input harian per anggota.', api: 'memberDues', duesData: memberDuesData }
     : modules[active]
   const currentRows = rows[active] || []
@@ -188,7 +208,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (active === 'dashboard' || active === 'laporan' || active === 'kegiatan' || active === 'kewajiban' || active === 'users' && role !== 'Admin') return
+    if (active === 'dashboard' || active === 'laporan' || active === 'kegiatan' || active === 'kewajiban' || active === 'backup' || active === 'users' && role !== 'Admin') return
     if (!isDemo && token && page) {
       setLoading(true)
       request('list', { module: page.api }, token)
@@ -285,6 +305,38 @@ function App() {
     finally {
       operationRef.current = false
       setBusyAction('')
+    }
+  }
+
+  async function downloadBackup() {
+    try {
+      const result = await request('backup', {}, token)
+      if (!result.backup?.sheets) throw new Error('Server tidak mengirim data backup yang valid.')
+      const blob = new Blob([JSON.stringify(result.backup, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `takora-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setNotice('Backup berhasil diunduh.')
+    } catch (error) {
+      setNotice(error.message)
+    }
+  }
+
+  async function restoreBackup(backup) {
+    try {
+      const result = await request('restore', { backup }, token)
+      const restoredCount = Object.values(result.restoredRecordCounts || {}).reduce((total, count) => total + count, 0)
+      setNotice(`Restore berhasil. ${restoredCount} data dipulihkan; akun pengguna tetap dipertahankan.`)
+      window.setTimeout(() => window.location.reload(), 1200)
+      return true
+    } catch (error) {
+      setNotice(error.message)
+      return false
     }
   }
 
@@ -871,7 +923,7 @@ function App() {
         <div className="mx-auto min-w-0 max-w-[1440px] overflow-x-clip px-4 pb-10 pt-6 sm:px-7 lg:px-9">
           {!backendConfigured && <div role="status" className="mb-5 rounded-md border border-[#e9d7a7] bg-[#fff9e8] px-4 py-3 text-xs leading-5 text-[#68552b]">Koneksi Google Sheets belum diatur. Semua data ditampilkan kosong atau Rp 0; penyimpanan dinonaktifkan sampai URL Apps Script dikonfigurasi.</div>}
           {['iuran', 'sukaduka', 'sesari'].includes(active) && writable && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#d9e1d5] bg-white px-4 py-3"><div><p className="text-[10px] font-semibold uppercase text-[#849084]">Saldo awal kas {moduleLabels[active]}</p><p className="mt-1 text-sm font-bold text-[#355d3f]">{openingBalances[active]?.configured ? currency(openingBalances[active].amount) : 'Belum diatur'}</p>{openingBalances[active]?.date && <p className="mt-1 text-[10px] text-[#849084]">Per {readableDate(openingBalances[active].date)}</p>}</div><button onClick={() => setOpeningBalanceModal(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] hover:bg-[#f3f6ef]"><CircleDollarSign size={15} /> Atur saldo awal</button></div>}
-          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenOpeningBalance={() => setOpeningBalanceModal(true)} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} />}
+          {active === 'dashboard' ? dashboardHidden ? <div className="rounded-md border border-[#e6e7dd] bg-white p-6 text-sm text-[#68766b]">Dashboard disembunyikan. <button onClick={toggleDashboard} className="ml-1 font-semibold text-[#b5122a] underline">Tampilkan kembali</button></div> : <Dashboard role={role} cards={summaryCards} analytics={summary} galleryItems={publicActivities} donations={dashboardDonations} piodalanReport={dashboardPiodalanReport} assets={summary?.assets || (isDemo ? rentalAssets.map((asset) => ({ ...asset, available: Math.max(0, Number(asset.quantity || 0) - rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)).reduce((sum, rental) => sum + Number(rental.quantity || 0), 0)), currentRentals: rentalRows.filter((rental) => String(rental.assetId) === String(asset.id) && rental.status !== 'Dibatalkan' && rental.startDate <= new Date().toISOString().slice(0, 10) && rental.endDate >= new Date().toISOString().slice(0, 10)) })) : [])} dashboardFilter={dashboardFilter} onDashboardFilterChange={(key, value) => setDashboardFilter((previous) => ({ ...previous, [key]: value, ...(key === 'year' || key === 'month' ? { day: previous.day } : {}) }))} onOpenOpeningBalance={() => setOpeningBalanceModal(true)} onOpenGallery={() => setActive('kegiatan')} demo={isDemo} /> : active === 'kegiatan' ? <GalleryPage items={filteredRows} writable={writable} busy={Boolean(busyAction)} onAdd={() => { setEditing(null); setModal(true) }} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} /> : active === 'laporan' ? <Reports rows={rows} summary={summary} role={role} busy={Boolean(busyAction)} onApprove={() => runExclusive('send', async () => { try { if (!isDemo) await request('approveReport', { period: new Date().toISOString().slice(0, 7), notes: 'Disetujui melalui dashboard TAKORA' }, token); setNotice('Laporan periode ini berhasil disetujui.'); } catch (error) { setNotice(error.message) } })} /> : <ModulePage active={active} page={page} rows={filteredRows} query={query} setQuery={setQuery} loading={loading} writable={writable} busy={Boolean(busyAction)} canEditBalances={role === 'Admin'} periodFilter={periodFilter} setPeriodFilter={setPeriodFilter} masterMembers={masterMembers} contacts={contacts} assets={rentalAssets} rentalRows={rentalRows} onAdd={() => { setEditing(null); setModal(true) }} onBatch={() => setBatchModal(true)} onEdit={(row) => { setEditing(row); setModal(true) }} onDelete={(id) => runExclusive('delete', () => deleteRecord(id))} onCloseBook={() => runExclusive('send', closeBook)} onEditBalance={() => setBalanceModal(true)} onDownloadBackup={() => runExclusive('backup', downloadBackup)} onRestoreBackup={(backup) => runExclusive('restore', () => restoreBackup(backup))} backupAvailable={backendConfigured} />}
           <footer className="mt-10 flex flex-col gap-1 border-t border-[#e5e6dc] pt-5 text-[10px] text-[#8a968c] sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} SENDETAN TELAGA BETENG</span><span>Telagabeteng, Banjar Dinas Tiyingtali Kelod, Desa Tiyingtali, Kec. Abang, Kab. Karangasem, Bali</span></footer>
         </div>
       </main>
@@ -1048,7 +1100,8 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, ca
 }
 
 */
-function ModulePage({ active, page, rows, query, setQuery, loading, writable, busy, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance }) {
+function ModulePage({ active, page, rows, query, setQuery, loading, writable, busy, canEditBalances, periodFilter, setPeriodFilter, masterMembers, rentalRows, onAdd, onBatch, onEdit, onDelete, onCloseBook, onEditBalance, onDownloadBackup, onRestoreBackup, backupAvailable }) {
+  if (active === 'backup') return <BackupPage available={backupAvailable} busy={busy} onDownload={onDownloadBackup} onRestore={onRestoreBackup} />
   if (page.api === 'memberDues') return <MemberDuesPage data={page.duesData} loading={loading} />
   const hasCashSummary = ['iuran', 'sesari', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
   const exportableModules = ['iuran', 'sukaduka', 'pengeluaranIuran', 'sesari', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi']
@@ -1184,12 +1237,97 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
   </div>
 }
 
+function BackupPage({ available, busy, onDownload, onRestore }) {
+  const [backup, setBackup] = useState(null)
+  const [fileName, setFileName] = useState('')
+  const [restoreError, setRestoreError] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmPhrase, setConfirmPhrase] = useState('')
+  const inputClass = 'mt-1 w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#b5122a]'
+  const restoredCounts = backup ? Object.fromEntries(Object.entries(backup.sheets).filter(([name]) => name !== 'Users').map(([name, records]) => [name, records.length])) : {}
+  const restoredRecordCount = Object.values(restoredCounts).reduce((total, count) => total + count, 0)
+
+  async function selectBackup(event) {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+    setRestoreError('')
+    setBackup(null)
+    setFileName('')
+    try {
+      const parsed = JSON.parse(await file.text())
+      if (parsed?.format !== 'takora-backup' || parsed.version !== 1 || !parsed.sheets || typeof parsed.sheets !== 'object' || Array.isArray(parsed.sheets)) {
+        throw new Error('File bukan backup TAKORA versi yang didukung.')
+      }
+      if (!Array.isArray(parsed.sheets.Users)) throw new Error('File backup tidak memiliki daftar sheet Users yang valid.')
+      if (Object.entries(parsed.sheets).some(([name, records]) => name !== 'Users' && !Array.isArray(records))) {
+        throw new Error('Isi salah satu sheet backup tidak valid.')
+      }
+      setBackup(parsed)
+      setFileName(file.name)
+    } catch (error) {
+      setRestoreError(error instanceof SyntaxError ? 'File bukan JSON yang valid.' : error.message)
+    }
+  }
+
+  async function confirmRestore() {
+    const succeeded = await onRestore(backup)
+    if (succeeded) {
+      setBackup(null)
+      setFileName('')
+      setConfirmOpen(false)
+      setConfirmPhrase('')
+      setRestoreError('')
+    } else {
+      setRestoreError('Restore tidak berhasil. Periksa pemberitahuan di atas sebelum mencoba kembali.')
+    }
+  }
+
+  return <>
+    <div className="grid max-w-4xl gap-5 lg:grid-cols-2">
+      <section className="border-y border-[#e6e7dd] bg-white px-5 py-6 sm:px-7">
+        <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[#fff1f2] text-[#b5122a]"><Download size={20} /></div>
+        <h2 className="font-display mt-4 text-lg font-extrabold">Backup data aplikasi</h2>
+        <p className="mt-2 text-xs leading-5 text-[#788579]">Unduh salinan seluruh data aplikasi dari Google Sheets dalam satu file JSON, termasuk data anggota, transaksi, saldo awal, dan log audit.</p>
+        <p className="mt-3 rounded-md border border-[#e9d7a7] bg-[#fff9e8] px-3 py-2.5 text-[11px] leading-5 text-[#68552b]">File backup berisi data organisasi yang sensitif. Simpan di lokasi yang aman. Hash dan salt kata sandi akun tidak disertakan.</p>
+        <button onClick={onDownload} disabled={!available || busy} className="mt-5 inline-flex items-center gap-2 rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Download size={15} /> {busy ? 'Menyiapkan backup...' : 'Unduh backup JSON'}</button>
+      </section>
+      <section className="border-y border-[#e6e7dd] bg-white px-5 py-6 sm:px-7">
+        <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[#fff1f2] text-[#b5122a]"><RotateCcw size={20} /></div>
+        <h2 className="font-display mt-4 text-lg font-extrabold">Restore dari backup</h2>
+        <p className="mt-2 text-xs leading-5 text-[#788579]">Pilih file JSON hasil backup TAKORA. Restore akan mengganti data semua sheet aplikasi dengan isi file tersebut.</p>
+        <label className="mt-4 block text-[11px] font-semibold text-[#637367]">File backup<input type="file" accept=".json,application/json" disabled={!available || busy} onChange={selectBackup} className={`${inputClass} file:mr-3 file:rounded file:border-0 file:bg-[#f0f1e9] file:px-2 file:py-1 file:text-xs`} /></label>
+        {!available && <p role="alert" className="mt-3 text-xs font-semibold text-[#b5122a]">Backend belum dikonfigurasi. Hubungkan Google Apps Script untuk membuat backup atau restore.</p>}
+        {restoreError && <p role="alert" className="mt-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{restoreError}</p>}
+        {backup && <div className="mt-4 rounded-md border border-[#e6e7dd] bg-[#fafaf6] p-3">
+          <p className="break-all text-xs font-semibold">{fileName}</p>
+          <p className="mt-1 text-[10px] text-[#788579]">Dibuat: {backup.createdAt || 'Informasi waktu tidak tersedia'} · {restoredRecordCount} baris data siap dipulihkan</p>
+          <p className="mt-1 text-[10px] leading-4 text-[#788579]">Sheet akun Users tidak diubah agar akun dan kata sandi yang berlaku tetap aktif. File Drive/foto di luar spreadsheet tidak disalin oleh restore.</p>
+          <button onClick={() => { setConfirmPhrase(''); setConfirmOpen(true) }} disabled={busy} className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#b5122a] px-3 py-2 text-xs font-semibold text-[#b5122a] disabled:opacity-50"><RotateCcw size={14} /> Lanjutkan restore</button>
+        </div>}
+      </section>
+    </div>
+    {confirmOpen && backup && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmOpen(false) }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="restore-confirm-title" className="w-full max-w-lg rounded-t-lg bg-white p-5 shadow-xl sm:rounded-md sm:p-6">
+        <h2 id="restore-confirm-title" className="font-display text-lg font-extrabold text-[#b5122a]">Konfirmasi penggantian data</h2>
+        <p className="mt-2 text-xs leading-5 text-[#68766b]">Semua data pada {Object.keys(restoredCounts).length} sheet (total {restoredRecordCount} baris) akan diganti menggunakan file <strong className="break-all">{fileName}</strong>. Aksi ini tidak dapat dibatalkan dari aplikasi. Sheet Users dan kredensial akun dipertahankan; jika proses gagal, server akan mencoba mengembalikan data sebelumnya.</p>
+        <div className="mt-3 max-h-28 overflow-y-auto rounded border border-[#e6e7dd] bg-[#fafaf6] p-2 text-[10px] text-[#788579]">{Object.entries(restoredCounts).map(([name, count]) => <p key={name}>{name}: {count} baris</p>)}</div>
+        <label className="mt-4 block text-[11px] font-semibold text-[#637367]">Ketik PULIHKAN untuk menyetujui<input value={confirmPhrase} onChange={(event) => setConfirmPhrase(event.target.value)} autoComplete="off" className={inputClass} /></label>
+        {restoreError && <p role="alert" className="mt-3 text-xs font-semibold text-[#b5122a]">{restoreError}</p>}
+        <div className="mt-5 flex justify-end gap-2 border-t border-[#eceee6] pt-4"><button type="button" onClick={() => setConfirmOpen(false)} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Batal</button><button type="button" onClick={confirmRestore} disabled={busy || confirmPhrase !== 'PULIHKAN'} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Memulihkan...' : 'Ganti data sekarang'}</button></div>
+      </section>
+    </div>}
+  </>
+}
+
 function MemberDuesPage({ data, loading }) {
   const today = new Date().toISOString().slice(0, 10)
   const [dailyDate, setDailyDate] = useState(today)
   const [deadline, setDeadline] = useState('')
   const [query, setQuery] = useState('')
   const [preview, setPreview] = useState(null)
+  const [templates, setTemplates] = useState(loadWhatsappTemplates)
+  const [templateEditor, setTemplateEditor] = useState(false)
   const inputClass = 'rounded-md border border-[#e1e5dc] bg-white px-3 py-2 text-xs outline-none focus:border-[#b5122a]'
 
   const obligations = useMemo(() => {
@@ -1255,9 +1393,17 @@ function MemberDuesPage({ data, loading }) {
   dailyTotals.all = dailyTotals.iuran + dailyTotals.sukaduka + dailyTotals.wijilan
 
   function memberMessage(member, daily = null) {
-    const dueDate = deadline ? readableDate(deadline) : '[tanggal batas pembayaran]'
     const dailyLines = daily ? `\n\nInput tanggal ${readableDate(dailyDate)}:\n- Iuran: ${currency(daily.iuran)}\n- Sukaduka: ${currency(daily.sukaduka)}\n- Wijilan: ${currency(daily.wijilan)}\n- Total input: ${currency(daily.total)}` : ''
-    return `Om Swastyastu, Semeton ${member.memberName}.\nUning-uningan jinah paturunan / swadharma ring Sendetan saking tanggal ${readableDate(today)}:\n\n- Tunggakan Iuran: ${currency(member.iuran)}\n- Tunggakan Wijilan Wajib: ${currency(member.wijilan)}\n- Tunggakan Sukaduka (dados pungkuran): ${currency(member.sukaduka)}\n- Total kewajiban: ${currency(member.total)}${dailyLines}\n\nNunas uratiang mangda puputang naur sadurung tanggal ${dueDate}.\n\nMatur suksma.\nPrajuru Piodalan\nhttps://sendetan.vercel.app/`
+    return formatTemplate(templates.member, {
+      nama: member.memberName,
+      tanggal: readableDate(today),
+      iuran: currency(member.iuran),
+      wijilan: currency(member.wijilan),
+      sukaduka: currency(member.sukaduka),
+      total: currency(member.total),
+      batas_pembayaran: deadline ? readableDate(deadline) : '[tanggal batas pembayaran]',
+      rekap_harian: dailyLines,
+    })
   }
 
   function openPreview(recipient, phone, message, group = false) {
@@ -1267,17 +1413,33 @@ function MemberDuesPage({ data, loading }) {
   function groupReminderMessage() {
     const debtors = obligations.filter((member) => member.total > 0)
     const lines = debtors.map((member) => `${member.memberName}: Iuran ${currency(member.iuran)} · Wijilan ${currency(member.wijilan)} · Sukaduka ${currency(member.sukaduka)}`)
-    return `Om Swastyastu, Semeton.\nRekap kewajiban anggota per ${readableDate(today)}:\n${lines.length ? lines.join('\n') : 'Tidak ada tunggakan tercatat.'}\n\nTotal tunggakan: ${currency(totals.all)}\nBatas pembayaran: ${deadline ? readableDate(deadline) : '[tanggal batas pembayaran]'}\n\nMatur suksma. Prajuru Piodalan\nhttps://sendetan.vercel.app/`
+    return formatTemplate(templates.groupDues, {
+      tanggal: readableDate(today),
+      daftar_anggota: lines.length ? lines.join('\n') : 'Tidak ada tunggakan tercatat.',
+      total_tunggakan: currency(totals.all),
+      batas_pembayaran: deadline ? readableDate(deadline) : '[tanggal batas pembayaran]',
+    })
   }
 
   function groupDailyMessage() {
     const lines = dailyRows.map((row) => `${row.memberName}: Iuran ${currency(row.iuran)} · Sukaduka ${currency(row.sukaduka)} · Wijilan ${currency(row.wijilan)} | Sisa kewajiban ${currency(row.iuranDue + row.sukadukaDue + row.wijilanDue)}`)
-    return `Om Swastyastu.\nRekap input harian ${readableDate(dailyDate)}:\n${lines.length ? lines.join('\n') : 'Belum ada input transaksi anggota pada tanggal ini.'}\n\nTotal input: ${currency(dailyTotals.all)}\nTotal tunggakan saat ini: ${currency(totals.all)}\nhttps://sendetan.vercel.app/`
+    return formatTemplate(templates.groupDaily, {
+      tanggal_input: readableDate(dailyDate),
+      daftar_input: lines.length ? lines.join('\n') : 'Belum ada input transaksi anggota pada tanggal ini.',
+      total_input: currency(dailyTotals.all),
+      total_tunggakan: currency(totals.all),
+    })
+  }
+
+  function saveTemplates(updated) {
+    localStorage.setItem(whatsappTemplateKey, JSON.stringify(updated))
+    setTemplates(updated)
+    setTemplateEditor(false)
   }
 
   return <div className="animate-rise print-report space-y-5">
     <PrintLetterhead title="Rekap kewajiban anggota" detail={`Diperbarui ${new Date().toLocaleDateString('id-ID')}`} />
-    <div className="no-print flex flex-col justify-between gap-3 border-b border-[#e6e7dd] pb-4 lg:flex-row lg:items-end"><div><h2 className="font-display text-lg font-extrabold">Kewajiban & rekap anggota</h2><p className="mt-1 text-xs text-[#849084]">Iuran dan Sukaduka mengikuti saldo master; Wijilan dihitung per piodalan.</p></div><div className="flex flex-wrap items-end gap-2"><label className="grid gap-1 text-[10px] font-semibold text-[#788579]">Batas pembayaran<input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} className={inputClass} /></label><button onClick={() => window.print()} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak rekap</button><button onClick={() => openPreview('Grup WhatsApp', '', groupReminderMessage(), true)} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3 py-2.5 text-xs font-semibold text-white"><MessageCircle size={15} /> Pratinjau reminder grup</button></div></div>
+    <div className="no-print flex flex-col justify-between gap-3 border-b border-[#e6e7dd] pb-4 lg:flex-row lg:items-end"><div><h2 className="font-display text-lg font-extrabold">Kewajiban & rekap anggota</h2><p className="mt-1 text-xs text-[#849084]">Iuran dan Sukaduka mengikuti saldo master; Wijilan dihitung per piodalan.</p></div><div className="flex flex-wrap items-end gap-2"><label className="grid gap-1 text-[10px] font-semibold text-[#788579]">Batas pembayaran<input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} className={inputClass} /></label><button onClick={() => setTemplateEditor(true)} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Pencil size={14} /> Edit template WA</button><button onClick={() => window.print()} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold"><Printer size={15} /> Cetak rekap</button><button onClick={() => openPreview('Grup WhatsApp', '', groupReminderMessage(), true)} className="flex items-center gap-2 rounded-md bg-[#355d3f] px-3 py-2.5 text-xs font-semibold text-white"><MessageCircle size={15} /> Pratinjau reminder grup</button></div></div>
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">{[['Tunggakan iuran', totals.iuran], ['Tunggakan Sukaduka', totals.sukaduka], ['Tunggakan Wijilan', totals.wijilan], ['Total kewajiban', totals.all]].map(([label, amount]) => <div key={label} className="border-l-2 border-[#b5122a] bg-white px-4 py-3"><p className="text-[10px] text-[#849084]">{label}</p><p className="mt-1 font-display text-lg font-extrabold">{currency(amount)}</p></div>)}</div>
     <section className="overflow-hidden border-y border-[#e6e7dd] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#eceee6] px-4 py-3 sm:flex-row sm:items-end sm:justify-between"><div><h3 className="text-sm font-bold">Status per anggota</h3><p className="mt-1 text-[10px] text-[#849084]">{obligations.filter((member) => member.total > 0).length} anggota masih memiliki kewajiban</p></div><input type="search" placeholder="Cari nama / nomor anggota" value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} no-print`} /></div>
@@ -1289,6 +1451,38 @@ function MemberDuesPage({ data, loading }) {
     </section>
     <PrintSignatures />
     {preview && <div className="no-print"><WhatsAppPreviewModal draft={preview} onClose={() => setPreview(null)} /></div>}
+    {templateEditor && <WhatsAppTemplateModal templates={templates} onClose={() => setTemplateEditor(false)} onSave={saveTemplates} />}
+  </div>
+}
+
+function WhatsAppTemplateModal({ templates, onClose, onSave }) {
+  const [draft, setDraft] = useState(templates)
+  const [error, setError] = useState('')
+  const fields = [
+    { key: 'member', label: 'Pesan pribadi anggota', tokens: '{nama}, {tanggal}, {iuran}, {wijilan}, {sukaduka}, {total}, {batas_pembayaran}, {rekap_harian}' },
+    { key: 'groupDues', label: 'Rekap tunggakan grup', tokens: '{tanggal}, {daftar_anggota}, {total_tunggakan}, {batas_pembayaran}' },
+    { key: 'groupDaily', label: 'Rekap input harian grup', tokens: '{tanggal_input}, {daftar_input}, {total_input}, {total_tunggakan}' },
+  ]
+  const inputClass = 'mt-1 w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs leading-5 outline-none focus:border-[#b5122a]'
+
+  function submit(event) {
+    event.preventDefault()
+    try {
+      onSave(draft)
+    } catch (saveError) {
+      setError(saveError.message)
+    }
+  }
+
+  return <div className="fixed inset-0 z-[65] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <section role="dialog" aria-modal="true" aria-labelledby="whatsapp-template-title" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-lg bg-white p-5 shadow-xl sm:rounded-md sm:p-6">
+      <div className="flex items-start justify-between gap-3"><div><h2 id="whatsapp-template-title" className="font-display text-lg font-extrabold">Edit template WhatsApp</h2><p className="mt-1 text-xs text-[#849084]">Template disimpan di browser ini dan digunakan untuk pesan WA berikutnya.</p></div><button type="button" onClick={onClose} aria-label="Tutup" className="rounded p-1.5 text-[#7d8b7e]"><X size={18} /></button></div>
+      {error && <p role="alert" className="mt-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{error}</p>}
+      <form onSubmit={submit} className="mt-4 space-y-4">
+        {fields.map((field) => <label key={field.key} className="block text-[11px] font-semibold text-[#637367]">{field.label}<textarea required rows={field.key === 'member' ? 10 : 7} value={draft[field.key]} onChange={(event) => setDraft((previous) => ({ ...previous, [field.key]: event.target.value }))} className={inputClass} /><span className="mt-1 block text-[10px] font-normal leading-4 text-[#849084]">Variabel: {field.tokens}</span></label>)}
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[#eceee6] pt-4"><button type="button" onClick={() => setDraft(defaultWhatsappTemplates)} className="mr-auto rounded-md border border-[#e1e5dc] px-3 py-2.5 text-xs font-semibold">Pulihkan bawaan</button><button type="button" onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white">Simpan template</button></div>
+      </form>
+    </section>
   </div>
 }
 

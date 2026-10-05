@@ -7,7 +7,7 @@ export async function request(action, payload = {}, token = '') {
   if (!backendConfigured) {
     throw new Error('Koneksi Google Sheets belum diatur. Isi VITE_APPS_SCRIPT_URL di .env.local dengan URL Apps Script berakhiran /exec.')
   }
-  const mutation = ['create', 'update', 'batchPayments', 'batchCreate'].includes(action)
+  const mutation = ['create', 'update', 'batchPayments', 'batchCreate', 'restore'].includes(action)
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 300000)
   let response
@@ -23,7 +23,9 @@ export async function request(action, payload = {}, token = '') {
       ? 'Permintaan melewati batas 5 menit.'
       : 'Koneksi ke server terputus.'
     const failure = new Error(mutation
-      ? `${message} Status transaksi belum dapat dipastikan. Jangan ubah isi transaksi; coba kirim ulang data yang sama agar server tidak mencatatnya dua kali.`
+      ? action === 'restore'
+        ? `${message} Status pemulihan belum dapat dipastikan. Periksa data di Google Sheets sebelum mencoba restore lagi.`
+        : `${message} Status transaksi belum dapat dipastikan. Jangan ubah isi transaksi; coba kirim ulang data yang sama agar server tidak mencatatnya dua kali.`
       : `${message} Periksa koneksi dan URL Apps Script.`)
     failure.uncertain = mutation
     throw failure
@@ -33,7 +35,9 @@ export async function request(action, payload = {}, token = '') {
   let result
   try { result = await response.json() }
   catch {
-    const failure = new Error('Server mengirim respons yang tidak valid. Status transaksi belum dapat dipastikan. Jangan ubah isi transaksi; muat ulang data sebelum mencoba lagi.')
+    const failure = new Error(action === 'restore'
+      ? 'Server mengirim respons yang tidak valid. Status pemulihan belum dapat dipastikan. Periksa data di Google Sheets sebelum mencoba restore lagi.'
+      : 'Server mengirim respons yang tidak valid. Status transaksi belum dapat dipastikan. Jangan ubah isi transaksi; muat ulang data sebelum mencoba lagi.')
     failure.uncertain = mutation
     throw failure
   }
