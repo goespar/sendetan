@@ -766,20 +766,53 @@ function App() {
     ? [...(rows.punia || []).map((row) => ({ ...row, module: 'Dana Punia' })), ...(rows.piodalan || []).filter((row) => ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(row.category)).map((row) => ({ ...row, donor: row.donor || row.description, donationType: row.category === 'Punia barang' ? 'Barang' : 'Uang Tunai', module: 'Piodalan' }))]
       .filter((row) => row.donor && matchesDateFilter(row, dashboardFilter)).sort((left, right) => String(right.date || '').localeCompare(String(left.date || ''))).slice(0, 100)
     : summary?.donations || summary?.public?.donations || []
-  const dashboardPiodalanReport = isDemo
-    ? Object.values((rows.piodalan || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((events, row) => {
-      const eventName = String(row.eventName || '').trim()
-      if (!eventName) return events
-      const event = events[eventName] || { eventName, income: 0, expenses: 0, goodsValue: 0 }
-      const amount = Number(row.amount || 0)
-      if (row.category === 'Punia barang' && row.direction === 'Masuk') event.goodsValue += amount
-      else if (row.direction === 'Masuk') event.income += amount
-      else if (row.direction === 'Keluar') event.expenses += amount
-      event.balance = event.income - event.expenses
-      events[eventName] = event
-      return events
-    }, {})).sort((left, right) => left.eventName.localeCompare(right.eventName, 'id'))
-    : summary?.piodalanReport || summary?.public?.piodalanReport || []
+  const dashboardPiodalanReport = useMemo(() => {
+    const normalizeEvent = (event) => {
+      const eventName = String(event?.eventName || '').trim()
+      const income = Number(event?.income || 0)
+      const expenses = Number(event?.expenses || 0)
+      const goodsValue = Number(event?.goodsValue || 0)
+      return {
+        eventName,
+        income,
+        expenses,
+        goodsValue,
+        balance: Number(event?.balance ?? income - expenses),
+      }
+    }
+
+    const baseEvents = isDemo
+      ? Object.values((rows.piodalan || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((events, row) => {
+        const eventName = String(row.eventName || '').trim()
+        if (!eventName) return events
+        const event = events[eventName] || { eventName, income: 0, expenses: 0, goodsValue: 0 }
+        const amount = Number(row.amount || 0)
+        if (row.category === 'Punia barang' && row.direction === 'Masuk') event.goodsValue += amount
+        else if (row.direction === 'Masuk') event.income += amount
+        else if (row.direction === 'Keluar') event.expenses += amount
+        event.balance = event.income - event.expenses
+        events[eventName] = event
+        return events
+      }, {}))
+      : (summary?.piodalanReport || summary?.public?.piodalanReport || [])
+
+    const iuranIncome = Number(summary?.modules?.iuran?.incoming || 0)
+      || (rows.iuran || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((total, row) => total + Number(row.cashPhysical || 0), 0)
+    const sesariIncome = Number(summary?.modules?.sesari?.incoming || 0)
+      || (rows.sesari || []).filter((row) => matchesDateFilter(row, dashboardFilter) && row.direction === 'Masuk').reduce((total, row) => total + Number(row.amount || 0), 0)
+    const filteredEvents = baseEvents
+      .map(normalizeEvent)
+      .filter((event) => {
+        const total = event.income + event.expenses + event.goodsValue
+        const isPlaceholder = /buda wage|budawage|klau/i.test(event.eventName) && total === 0
+        return Boolean(event.eventName) && !isPlaceholder && total > 0
+      })
+
+    if (iuranIncome > 0) filteredEvents.push({ eventName: 'Iuran anggota', income: iuranIncome, expenses: 0, goodsValue: 0, balance: iuranIncome })
+    if (sesariIncome > 0) filteredEvents.push({ eventName: 'Sesari', income: sesariIncome, expenses: 0, goodsValue: 0, balance: sesariIncome })
+
+    return filteredEvents.sort((left, right) => left.eventName.localeCompare(right.eventName, 'id'))
+  }, [rows.iuran, rows.piodalan, rows.sesari, summary, dashboardFilter, isDemo])
   const demoDashboard = useMemo(() => {
     const entries = []
     function add(row, category, activity, direction, amount, source = '') {
