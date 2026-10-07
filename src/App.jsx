@@ -876,7 +876,7 @@ function App() {
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-hidden border-r border-[#e5e6dc] bg-[#fbfaf6] transition-all lg:translate-x-0 ${sidebarCollapsed ? 'lg:w-0 lg:border-r-0' : 'lg:w-[260px]'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-[82px] items-center gap-3 border-b border-[#e8e8df] px-5">
           <img src={logo} alt="Logo TAKORA" className={`rounded-full object-contain ${sidebarCollapsed ? 'h-10 w-10 lg:mx-auto' : 'h-12 w-12'}`} />
-          <div className={sidebarCollapsed ? 'lg:hidden' : ''}><p className="font-display text-[12px] font-extrabold text-[#244332]">SENDETAN TELAGA BETENG</p><p className="mt-0.5 text-[10px] font-semibold tracking-[.08em] text-[#829085]">TELAGA BETENG</p></div>
+          <div className={sidebarCollapsed ? 'lg:hidden' : ''}><p className="font-display text-[12px] font-extrabold text-[#244332]">SENDETAN</p><p className="mt-0.5 text-[10px] font-semibold tracking-[.08em] text-[#829085]">TELAGA BETENG</p></div>
           <button onClick={() => setMobileOpen(false)} className="ml-auto rounded p-1 text-[#718076] lg:hidden" aria-label="Tutup"><X size={18} /></button>
         </div>
         <div className={`mx-4 mt-4 rounded-md border border-[#e5e8df] bg-white px-3 py-3 ${sidebarCollapsed ? 'lg:mx-2 lg:px-0 lg:text-center' : ''}`}>
