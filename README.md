@@ -33,6 +33,7 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 | `SaldoAwal` | `id`, `module`, `amount`, `date`, `notes`, `updatedBy`, `updatedAt` |
 | `TRANSAKSI_IURAN` | `id`, `date`, `periodId`, `memberId`, `memberName`, `target`, `allocatedContribution`, `cashPhysical`, `changeDue`, `changePaid`, `openingArrears`, `arrears`, `openingRefundDebt`, `refundDebtAdded`, `refundDebt`, `notes`, `createdBy`, `createdAt`, `updatedAt`, `chargeAmount`, `sangkepId` |
 | `PengeluaranIuran` | `id`, `date`, `category`, `description`, `amount`, `payee`, `createdBy`, `createdAt`, `updatedAt` |
+| `KasUmum` | `id`, `date`, `direction`, `category`, `description`, `amount`, `createdBy`, `createdAt`, `updatedAt` |
 | `Sesari` | `id`, `date`, `direction`, `category`, `amount`, `description`, `createdBy`, `createdAt` |
 | `Sukaduka` | `id`, `date`, `direction`, `recipient`, `purpose`, `amount`, `notes`, `createdBy`, `createdAt`, `memberId`, `memberName`, `cashPhysical`, `changeDue`, `changePaid`, `refundDebtAdded`, `refundDebt`, `arrears`, `proofPhotoUrl`, `chargeAmount`, `openingArrears`, `sangkepId` |
 | `Punia` | `id`, `date`, `donor`, `donationType`, `itemName`, `quantity`, `amount`, `notes`, `createdBy`, `createdAt`, `eventName`, `unit` |
@@ -47,13 +48,15 @@ Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis
 
 Nominal disimpan sebagai angka rupiah tanpa simbol pemisah. `direction` memakai `Masuk` atau `Keluar`. `Punia.donationType` memakai `Uang Tunai`, `Wijilan / Setoran wajib`, atau `Barang`. Wijilan Piodalan ditautkan ke anggota aktif melalui `memberId`; `chargeAmount` menyimpan kewajiban per acara dan `amount` menyimpan pembayaran kas, termasuk cicilan. Tagihan tanpa setoran boleh dicatat dengan `amount=0`. Sisa Wijilan dihitung per anggota dan `eventName`, bukan ditambahkan ke hutang master global. Menu **Rekap kewajiban** menggabungkan sisa iuran/Sukaduka dari `MASTER_ANGGOTA` dan Wijilan dari ledger Piodalan. Punia barang menyimpan nama, jumlah, dan `unit` (misalnya kg, lusin, atau bungkus); data lama tanpa satuan ditampilkan sebagai `unit`. Nilai barang tidak menambah kas. Buku piodalan menyimpan detail yang sama untuk punia barang. Pengeluaran perawatan aset dicatat di `SewaAset.maintenanceCost`.
 
+Menu **Kas Umum** hanya untuk pemasukan/pengeluaran di luar modul lain; transaksi sewa aset tetap dicatat di `SewaAset` dan pengeluaran khusus iuran tetap di `PengeluaranIuran`. Setiap transaksi Kas Umum memerlukan tanggal, arah (`Masuk`/`Keluar`), kategori (`Bunga bank`, `Hibah / bantuan`, `Donasi umum`, `Operasional`, `ATK`, `Konsumsi`, `Transportasi`, `Hosting / aplikasi`, atau `Lainnya`), uraian, dan nominal rupiah bulat lebih dari nol. Saldo awal Kas Umum dapat diatur melalui tombol **Atur saldo awal**; transaksi dan saldo awal masuk ke saldo gabungan tanpa dihitung dua kali.
+
 Baris `MASTER_ANGGOTA` menjadi saldo berjalan, sedangkan setiap setoran disimpan sebagai baris baru di `TRANSAKSI_IURAN`; anggota dapat membayar beberapa kali pada periode yang sama. Pengeluaran dari kas iuran dicatat terpisah pada `PengeluaranIuran` dan ikut mengurangi saldo iuran serta saldo kas gabungan. Setelah tutup buku membuka periode berikutnya, tagihan baru ditambahkan ke sisa hutang sehingga anggota yang sudah lunas tetap dapat membayar periode baru. Menu `Anggota` menyinkronkan profil ke master. Jalankan ulang `setupSheets()` setelah pembaruan untuk menambahkan kolom baru di akhir sheet lama dan memigrasikan ledger `IuranTransaksi` sekali saja. Sukaduka kini menghitung tunggakan per anggota: `chargeAmount` menambah tagihan, sementara `amount` membayar tunggakan sebelumnya dan tagihan baru. Baris Sukaduka lama tanpa `chargeAmount` tidak dimasukkan ulang ke saldo tunggakan. Booking `SewaAset` memeriksa ketersediaan dengan rentang tanggal inklusif; tarif per item per hari dipilih dari `Aset.rentalRateSemeton` atau `Aset.rentalRateLuar` menurut jenis penyewa. Kolom `rentalRate` lama menjadi fallback untuk aset yang belum memiliki tarif baru.
 
 ### Performa dan kesegaran data
 
 Backend menyimpan hasil ringkasan dashboard dan master anggota di `CacheService` selama maksimal 5 menit. Semua mutasi aplikasi (termasuk batch, koreksi saldo, tutup buku, persetujuan, dan restore) menaikkan versi cache; permintaan sesudah perubahan menggunakan data baru. Bila ukuran hasil melewati batas aman satu item CacheService, hasil tersebut tetap dihitung dari Sheets dan tidak disimpan. Saldo berjalan di `MASTER_ANGGOTA` tetap menjadi sumber utama; histori transaksi hanya dibaca sebagai fallback untuk saldo master yang memang kosong. Perubahan yang dilakukan langsung di Google Sheets, di luar aplikasi, dapat terlihat setelah TTL cache berakhir.
 
-Saldo kas hasil pembayaran sebelum aplikasi digunakan diatur dari tombol **Atur saldo awal** pada modul Iuran, Sukaduka, atau Sesari. Nilainya disimpan terpisah di `SaldoAwal`, masuk ke ringkasan kas, dan tidak mengubah tunggakan anggota atau membuat transaksi pembayaran baru. Satu baris saldo disimpan per modul; mengubahnya memperbarui nilai yang sama.
+Saldo kas hasil pembayaran sebelum aplikasi digunakan diatur dari tombol **Atur saldo awal** pada modul Iuran, Sukaduka, Sesari, atau Kas Umum. Nilainya disimpan terpisah di `SaldoAwal`, masuk ke ringkasan kas, dan tidak mengubah tunggakan anggota atau membuat transaksi pembayaran baru. Satu baris saldo disimpan per modul; mengubahnya memperbarui nilai yang sama.
 
 ### Input basket dan format Excel
 
@@ -74,7 +77,7 @@ Pada basket **Iuran anggota**, tombol **Catat sangkep** mencatat tagihan iuran d
 | --- | --- |
 | Admin | Semua modul dan pengelolaan akun |
 | Ketua | Membaca seluruh modul, laporan, dan persetujuan akhir |
-| Bendahara | CRUD iuran, sesari, sukaduka, punia, piodalan, anggota, aset, sewa, inventaris, notulensi, dan galeri |
+| Bendahara | CRUD iuran, Kas Umum, sesari, sukaduka, punia, piodalan, anggota, aset, sewa, inventaris, notulensi, dan galeri |
 | Sekretaris | CRUD anggota, aset, log inventaris, sewa aset, notulensi, dan galeri; upload foto aset/kegiatan |
 | Anggota / Publik | Ringkasan transparansi agregat, tanpa rincian anggota |
 
@@ -112,7 +115,7 @@ Backend dan frontend dirilis terpisah: Google Apps Script menjadi API untuk Goog
 4. Uji URL dengan membuka `<URL_WEB_APP>/exec?action=health`. Respons yang diharapkan berisi `"ok":true`. Endpoint ini dan `publicSummary`/`publicGallery` memang publik; jangan membagikan spreadsheet atau project Apps Script sebagai editor.
 5. Untuk foto, backend membuat subfolder `Foto Aset`, `Foto Kegiatan`, dan `Foto Sukaduka` otomatis. Foto aset dan kegiatan dapat dilihat siapa pun yang memiliki tautan; foto bukti Sukaduka mengikuti ACL Drive organisasi.
 
-Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbit hanya dengan deploy Vercel. Jalankan `setupSheets()` untuk menambahkan kolom baru, lalu buka **Deploy → Manage deployments**, edit deployment Web App, pilih **New version**, lalu deploy. URL `/exec` biasanya tetap sama.
+Jika kode `Code.gs` berubah di kemudian hari, perubahan itu tidak otomatis terbit hanya dengan deploy Vercel. Jalankan `setupSheets()` untuk membuat sheet baru/menambahkan kolom, lalu buka **Deploy → Manage deployments**, edit deployment Web App, pilih **New version**, lalu deploy. Untuk Kas Umum, jalankan `setupSheets()` sekali agar sheet `KasUmum` dibuat sebelum menggunakan menu. URL `/exec` biasanya tetap sama.
 
 Menu **Backup** hanya tersedia bagi Admin dan mengunduh semua sheet sebagai satu file JSON; hash dan salt kata sandi tidak disertakan. Restore menerima file backup TAKORA versi 1 dan mengganti seluruh sheet data dengan isi backup setelah konfirmasi; sheet `Users` beserta kredensial saat ini dipertahankan, dan entri audit restore ditambahkan setelah riwayat audit dari backup dipulihkan. Data file di Google Drive tidak disalin, hanya referensi URL yang ada di sheet. Backend memvalidasi format dan ID, lalu berusaha mengembalikan data sebelumnya bila restore gagal. Deploy versi terbaru `Code.gs` sebagai versi Web App baru agar backup dan restore tersedia. Menu **Rekap kewajiban → Edit template WA** mengubah template di browser yang sedang digunakan, sehingga pengaturan template tidak ikut tersimpan di Google Sheets atau browser/perangkat lain.
 
