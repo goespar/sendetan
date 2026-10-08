@@ -23,6 +23,8 @@ Saat backend belum disiapkan, aplikasi tidak memakai atau menyimpan data contoh.
 
 Jalankan `setupSheets()` dari editor Apps Script. Header berikut dibuat otomatis dan harus dipertahankan persis. ID di kolom `id` menjadi primary key; kolom `memberId`, `assetId`, dan `periodId` menjadi relasi.
 
+`setupSheets()` juga membuat sheet turunan `Dashboard_Summary` dengan kolom `version`, `generatedAt`, `part`, `parts`, dan `payload`. Sheet ini dikelola backend, bukan sumber data transaksi, tidak diedit manual, dan tidak disertakan dalam backup.
+
 | Sheet | Header kolom berurutan |
 | --- | --- |
 | `Users` | `id`, `name`, `username`, `passwordHash`, `salt`, `role`, `status`, `createdAt`, `lastLoginAt` |
@@ -54,7 +56,7 @@ Baris `MASTER_ANGGOTA` menjadi saldo berjalan, sedangkan setiap setoran disimpan
 
 ### Performa dan kesegaran data
 
-Backend menyimpan hasil ringkasan dashboard dan master anggota di `CacheService` selama maksimal 5 menit. Semua mutasi aplikasi (termasuk batch, koreksi saldo, tutup buku, persetujuan, dan restore) menaikkan versi cache; permintaan sesudah perubahan menggunakan data baru. Bila ukuran hasil melewati batas aman satu item CacheService, hasil tersebut tetap dihitung dari Sheets dan tidak disimpan. Saldo berjalan di `MASTER_ANGGOTA` tetap menjadi sumber utama; histori transaksi hanya dibaca sebagai fallback untuk saldo master yang memang kosong. Perubahan yang dilakukan langsung di Google Sheets, di luar aplikasi, dapat terlihat setelah TTL cache berakhir.
+Dashboard tanpa filter membaca snapshot JSON dari satu sheet `Dashboard_Summary`, bukan menyusun ringkasan dengan membaca semua sheet transaksi pada setiap pembukaan. Backend membangun ulang snapshot setelah mutasi aplikasi berhasil dan saat `setupSheets()` dijalankan; pekerjaan tambahan ini dapat menambah waktu respons saat menyimpan transaksi. CacheService tetap menyimpan ringkasan dan master anggota maksimal 5 menit. Permintaan dashboard dengan filter tanggal masih memakai perhitungan sumber lama dan cache per filter. Jika data diedit langsung di Google Sheets, jalankan `rebuildDashboardSummary()` dari editor Apps Script agar snapshot dan cache segera disegarkan. Jika snapshot tidak tersedia atau versinya tidak cocok, backend menghitung ulang dari sumber sebagai fallback. Saldo berjalan di `MASTER_ANGGOTA` tetap menjadi sumber utama; histori transaksi hanya dibaca sebagai fallback untuk saldo master yang memang kosong.
 
 Saldo kas hasil pembayaran sebelum aplikasi digunakan diatur dari tombol **Atur saldo awal** pada modul Iuran, Sukaduka, Sesari, atau Kas Umum. Nilainya disimpan terpisah di `SaldoAwal`, masuk ke ringkasan kas, dan tidak mengubah tunggakan anggota atau membuat transaksi pembayaran baru. Satu baris saldo disimpan per modul; mengubahnya memperbarui nilai yang sama.
 

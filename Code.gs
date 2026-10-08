@@ -28,6 +28,9 @@ const SESSION_TTL_SECONDS = 21600;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const DATA_CACHE_TTL_SECONDS = 300;
 const DATA_CACHE_VERSION_PROPERTY = 'takora_data_cache_version';
+const DASHBOARD_SUMMARY_SHEET = 'Dashboard_Summary';
+const DASHBOARD_SUMMARY_HEADERS = ['version', 'generatedAt', 'part', 'parts', 'payload'];
+const DASHBOARD_SUMMARY_CHUNK_SIZE = 40000;
 const MUTATING_ACTIONS = [
   'restore', 'batchPayments', 'batchSangkep', 'batchCreate', 'create', 'update',
   'delete', 'adjustMemberBalance', 'adjustIuranBalance', 'adjustSukadukaBalance',
@@ -153,7 +156,14 @@ function doPost(e) {
     } else {
       throw new Error('Aksi tidak dikenal.');
     }
-    if (MUTATING_ACTIONS.indexOf(action) !== -1) invalidateDataCaches_();
+    if (MUTATING_ACTIONS.indexOf(action) !== -1) {
+      invalidateDataCaches_();
+      try {
+        refreshDashboardSummary_();
+      } catch (error) {
+        Logger.log('Ringkasan dashboard belum dapat diperbarui setelah mutasi: ' + error.message);
+      }
+    }
     return json_({ ok: true, ...result });
   } catch (error) {
     if (body && MUTATING_ACTIONS.indexOf(body.action) !== -1 && error.uncertain) invalidateDataCaches_();
@@ -184,10 +194,44 @@ function setupSheets() {
       throw new Error('Header sheet ' + name + ' tidak sesuai. Tidak ada perubahan dilakukan.');
     }
   });
+  dashboardSummarySheet_();
   readRecords_('Anggota').forEach(function (member) { upsertMasterAnggota_(member); });
   migrateLegacyIuran_();
   invalidateDataCaches_();
-  return 'Sheet siap: ' + Object.keys(SHEETS).join(', ');
+  try {
+    refreshDashboardSummary_();
+  } catch (error) {
+    Logger.log('Ringkasan dashboard awal belum dapat dibuat: ' + error.message);
+  }
+  return 'Sheet siap: ' + Object.keys(SHEETS).join(', ') + ', ' + DASHBOARD_SUMMARY_SHEET;
+}
+
+function rebuildDashboardSummary() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    invalidateDataCaches_();
+    refreshDashboardSummary_();
+    return 'Dashboard_Summary berhasil diperbarui.';
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function dashboardSummarySheet_() {
+  const ss = spreadsheet_();
+  let sheet = ss.getSheetByName(DASHBOARD_SUMMARY_SHEET);
+  if (!sheet) sheet = ss.insertSheet(DASHBOARD_SUMMARY_SHEET);
+  const lastColumn = sheet.getLastColumn();
+  const existing = lastColumn ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0] : [];
+  if (!existing.length || existing.every(function (value) { return value === ''; })) {
+    sheet.getRange(1, 1, 1, DASHBOARD_SUMMARY_HEADERS.length).setValues([DASHBOARD_SUMMARY_HEADERS]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, DASHBOARD_SUMMARY_HEADERS.length).setFontWeight('bold').setBackground('#e9efe5');
+  } else if (DASHBOARD_SUMMARY_HEADERS.some(function (header, index) { return existing[index] !== header; })) {
+    throw new Error('Header sheet ' + DASHBOARD_SUMMARY_SHEET + ' tidak sesuai. Header yang diharapkan: ' + DASHBOARD_SUMMARY_HEADERS.join(', '));
+  }
+  return sheet;
 }
 
 function migrateLegacyIuran_() {
@@ -1695,6 +1739,68 @@ function summarySnapshot_() {
   return snapshot;
 }
 
+function readDashboardSummary_(version) {
+  const sheet = spreadsheet_().getSheetByName(DASHBOARD_SUMMARY_SHEET);
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  const values = sheet.getRange(1, 1, lastRow, DASHBOARD_SUMMARY_HEADERS.length).getValues();
+  if (DASHBOARD_SUMMARY_HEADERS.some(function (header, index) { return values[0][index] !== header; })) return null;
+  const rows = values.slice(1)
+    .filter(function (row) { return String(row[0]) === String(version); });
+  if (!rows.length) return null;
+  const partCount = Number(rows[0][3]);
+  if (!partCount || rows.length !== partCount) return null;
+  rows.sort(function (left, right) { return Number(left[2]) - Number(right[2]); });
+  for (let index = 0; index < partCount; index++) {
+    if (Number(rows[index][2]) !== index + 1 || Number(rows[index][3]) !== partCount) return null;
+  }
+  try {
+    return JSON.parse(rows.map(function (row) { return String(row[4] || ''); }).join(''));
+  } catch (error) {
+    Logger.log('Ringkasan Dashboard_Summary tidak valid: ' + error.message);
+    return null;
+  }
+}
+
+function writeDashboardSummary_(summary, version) {
+  const serialized = JSON.stringify(summary);
+  const chunks = [];
+  for (let offset = 0; offset < serialized.length; offset += DASHBOARD_SUMMARY_CHUNK_SIZE) {
+    chunks.push(serialized.slice(offset, offset + DASHBOARD_SUMMARY_CHUNK_SIZE));
+  }
+  const generatedAt = new Date().toISOString();
+  const values = chunks.map(function (payload, index) {
+    return [version, generatedAt, index + 1, chunks.length, payload];
+  });
+  const sheet = dashboardSummarySheet_();
+  const existingRows = sheet.getLastRow() - 1;
+  if (existingRows > 0) sheet.getRange(2, 1, existingRows, DASHBOARD_SUMMARY_HEADERS.length).clearContent();
+  if (sheet.getMaxRows() < values.length + 1) sheet.insertRowsAfter(sheet.getMaxRows(), values.length + 1 - sheet.getMaxRows());
+  sheet.getRange(2, 5, values.length, 1).setNumberFormat('@');
+  sheet.getRange(2, 1, values.length, DASHBOARD_SUMMARY_HEADERS.length).setValues(values);
+}
+
+function refreshDashboardSummary_() {
+  const version = dataCacheVersion_();
+  const summary = computeSummary_({});
+  writeDashboardSummary_(summary, version);
+  return summary;
+}
+
+function getDashboardSummary_() {
+  const version = dataCacheVersion_();
+  const stored = readDashboardSummary_(version);
+  if (stored) return stored;
+  const summary = computeSummary_({});
+  try {
+    writeDashboardSummary_(summary, version);
+  } catch (error) {
+    Logger.log('Ringkasan Dashboard_Summary gagal diperbarui: ' + error.message);
+  }
+  return summary;
+}
+
 function getOpeningBalances_() {
   const balances = {
     iuran: { amount: 0, date: '', notes: '', configured: false },
@@ -1801,7 +1907,8 @@ function summary_(filters) {
     String(selectedFilters.day || ''),
   ].join(':');
   return cachedJson_(key, function () {
-    return computeSummary_(selectedFilters);
+    const hasFilter = Boolean(selectedFilters.year || selectedFilters.month || selectedFilters.day);
+    return hasFilter ? computeSummary_(selectedFilters) : getDashboardSummary_();
   });
 }
 
@@ -1854,11 +1961,13 @@ function computeSummary_(filters) {
 }
 
 function publicSummary_(filters) {
+  const selectedFilters = filters || {};
+  if (!selectedFilters.year && !selectedFilters.month && !selectedFilters.day) return getDashboardSummary_().public;
   const rawSnapshot = summarySnapshot_();
   const assets = assetInventory_(rawSnapshot);
-  const snapshot = filteredSummarySnapshot_(rawSnapshot, filters || {});
+  const snapshot = filteredSummarySnapshot_(rawSnapshot, selectedFilters);
   const totals = summaryTotals_(snapshot);
-  const analytics = analytics_(snapshot, filters || {});
+  const analytics = analytics_(snapshot, selectedFilters);
   const members = summaryRows_(snapshot, 'Anggota').filter(function (row) { return row.status === 'Aktif'; }).length;
   const masterMembers = getMasterAnggota_(snapshot);
   const balances = moduleBalances_(snapshot, masterMembers);
