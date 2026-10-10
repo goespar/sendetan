@@ -891,21 +891,22 @@ function validateActivityMedia_(record) {
   if (['photo', 'youtube'].indexOf(record.mediaType) === -1) throw new Error('Jenis media tidak valid.');
   if (record.mediaType === 'photo' && !record.photoUrl) throw new Error('Foto kegiatan harus diunggah terlebih dahulu.');
   if (record.mediaType === 'youtube') {
-    let host = '';
     let videoId = '';
     let source = String(record.youtubeUrl || '').trim();
     const pastedUrl = source.match(/(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com|youtu\.be)\/[^\s<>"']+/i);
     if (pastedUrl) source = pastedUrl[0].replace(/[),.;!?]+$/, '');
-    if (!/^[a-z][a-z\d+.-]*:\/\//i.test(source)) source = 'https://' + source.replace(/^\/\//, '');
-    try {
-      const url = new URL(source);
-      host = url.hostname.toLowerCase().replace(/^www\./, '');
-      if (host === 'youtu.be') videoId = url.pathname.split('/').filter(Boolean)[0] || '';
-      else if (['youtube.com', 'm.youtube.com', 'music.youtube.com'].indexOf(host) !== -1) {
-        const pathMatch = url.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/);
-        videoId = url.searchParams.get('v') || (pathMatch ? pathMatch[1] : '');
+    const urlMatch = source.match(/(?:https?:\/\/)?(?:www\.|m\.|music\.)?(youtube\.com|youtu\.be)\/([^\s?#]+)(?:\?([^\s#]*))?/i);
+    if (urlMatch) {
+      const host = urlMatch[1].toLowerCase();
+      const path = urlMatch[2];
+      const query = urlMatch[3] || '';
+      if (host === 'youtu.be') videoId = path.split('/')[0] || '';
+      else {
+        const queryMatch = query.match(/(?:^|&)v=([^&]+)/);
+        const pathMatch = path.match(/^(?:shorts|embed|live|v)\/([^/]+)/);
+        videoId = queryMatch ? queryMatch[1] : pathMatch ? pathMatch[1] : '';
       }
-    } catch (error) {}
+    }
     if (!/^[\w-]{11}$/.test(videoId)) throw new Error('Link YouTube tidak terbaca. Pastikan URL lengkap dan ID video berisi 11 karakter.');
     record.youtubeUrl = 'https://www.youtube.com/watch?v=' + videoId;
   }
