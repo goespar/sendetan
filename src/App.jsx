@@ -1096,9 +1096,11 @@ function GalleryPreview({ items, onOpen }) {
   </section>
 }
 
-function youtubeEmbedUrl(value) {
+function youtubeVideoId(value) {
   try {
     let source = String(value || '').trim()
+    const pastedUrl = source.match(/(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com|youtu\.be)\/[^\s<>"']+/i)
+    if (pastedUrl) source = pastedUrl[0].replace(/[),.;!?]+$/, '')
     if (!/^[a-z][a-z\d+.-]*:\/\//i.test(source)) source = `https://${source.replace(/^\/\//, '')}`
     const url = new URL(source)
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
@@ -1107,9 +1109,13 @@ function youtubeEmbedUrl(value) {
     else if (['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) {
       videoId = url.searchParams.get('v') || url.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/)?.[1] || ''
     }
-    if (!/^[\w-]{11}$/.test(videoId)) return ''
-    return `https://www.youtube-nocookie.com/embed/${videoId}`
+    return /^[\w-]{11}$/.test(videoId) ? videoId : ''
   } catch { return '' }
+}
+
+function youtubeEmbedUrl(value) {
+  const videoId = youtubeVideoId(value)
+  return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : ''
 }
 
 function GalleryPage({ items, writable, busy, onAdd, onEdit, onDelete }) {
@@ -2001,6 +2007,7 @@ function RecordModal({ page, editing, members: availableMembers, contacts, asset
       setMessage(error.message || 'Status penyimpanan belum dapat dipastikan.')
     }
   }
+  if (page.api === 'InventarisLog') return <InventoryLogModal assets={assets} editing={editing} busy={busy} message={message} submissionUncertain={submissionUncertain} onClose={onClose} onSubmit={submit} />
   if (page.api === 'TRANSAKSI_IURAN') return <IuranModal members={members} editing={editing} busy={busy} onClose={onClose} onSave={onSaveIuran} />
   if (page.api === 'Sukaduka') return <SukadukaModal members={members} editing={editing} busy={busy} onClose={onClose} onSave={onSaveSukaduka} />
   if (page.api === 'SewaAset') return <RentalModal assets={assets} rentalRows={rentalRows} editing={editing} busy={busy} onClose={onClose} onSave={onSaveRental} />
@@ -2018,6 +2025,30 @@ function RecordModal({ page, editing, members: availableMembers, contacts, asset
         </label>)}
         </fieldset>
         <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-wait disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba kirim ulang' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
+      </form>
+    </div>
+  </div>
+}
+
+function InventoryLogModal({ assets, editing, busy, message, submissionUncertain, onClose, onSubmit }) {
+  const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
+  const today = new Date().toISOString().slice(0, 10)
+  const selectedAsset = assets.find((asset) => String(asset.id) === String(editing?.assetId))
+    || assets.find((asset) => asset.assetName === editing?.assetName)
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#16392c]/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+    <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-lg border border-[#e6e7dd] bg-[#fffefa] p-5 shadow-xl sm:rounded-md sm:p-6">
+      <div className="mb-5 flex items-start justify-between"><div><h2 className="font-display text-lg font-extrabold">{editing ? 'Ubah log inventaris' : 'Tambah log inventaris'}</h2><p className="mt-1 text-xs text-[#8c978d]">Pilih barang yang sudah terdaftar pada Aset &amp; sewa alat.</p></div><button type="button" onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div>
+      {message && <p role="alert" className="mb-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a]">{message}</p>}
+      <form onSubmit={(event) => { event.preventDefault(); onSubmit(event) }} className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <fieldset disabled={busy || submissionUncertain} className="contents">
+          <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal transaksi</span><input name="date" type="date" required defaultValue={editing?.date || today} className={inputClass} /></label>
+          <label><span className="mb-1.5 block text-[11px] font-semibold">Nama barang</span><select name="assetId" required defaultValue={selectedAsset?.id || ''} className={inputClass}><option value="">Pilih barang dari aset</option>{assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.assetName}</option>)}</select></label>
+          <label><span className="mb-1.5 block text-[11px] font-semibold">Pergerakan</span><select name="movement" required defaultValue={editing?.movement || ''} className={inputClass}><option value="" disabled>Pilih pergerakan</option><option>Masuk</option><option>Keluar</option></select></label>
+          <label><span className="mb-1.5 block text-[11px] font-semibold">Jumlah</span><input name="quantity" type="number" min="1" step="1" required defaultValue={editing?.quantity || ''} className={inputClass} /></label>
+          <label><span className="mb-1.5 block text-[11px] font-semibold">Kondisi</span><select name="condition" required defaultValue={editing?.condition || ''} className={inputClass}><option value="" disabled>Pilih kondisi</option><option>Baik</option><option>Perlu perawatan</option><option>Rusak</option></select></label>
+          <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan</span><input name="notes" type="text" defaultValue={editing?.notes || ''} className={inputClass} /></label>
+        </fieldset>
+        <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : editing ? 'Simpan perubahan' : 'Simpan catatan'}</button></div>
       </form>
     </div>
   </div>
@@ -2188,14 +2219,15 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
   const [message, setMessage] = useState('')
   const transactionId = useRef(editing?.id || createTransactionId('KM'))
   const hasPhoto = Boolean(photoFile || editing?.photoUrl)
-  const validYoutube = Boolean(youtubeEmbedUrl(form.youtubeUrl))
+  const videoId = youtubeVideoId(form.youtubeUrl)
+  const validYoutube = Boolean(videoId)
   const valid = Boolean(form.title.trim() && form.eventDate) && (form.mediaType === 'photo' ? hasPhoto : validYoutube)
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   function setValue(key, value) { setForm((previous) => ({ ...previous, [key]: value })) }
   async function submit(event) {
     event.preventDefault()
     if (!valid) return
-    try { await onSave({ ...form, youtubeUrl: form.mediaType === 'youtube' ? `https://www.youtube.com/watch?v=${youtubeEmbedUrl(form.youtubeUrl).split('/').pop()}` : '', id: transactionId.current, title: form.title.trim(), photoFile, photoUrl: editing?.photoUrl || '' }) }
+    try { await onSave({ ...form, youtubeUrl: form.mediaType === 'youtube' ? `https://www.youtube.com/watch?v=${videoId}` : '', id: transactionId.current, title: form.title.trim(), photoFile, photoUrl: editing?.photoUrl || '' }) }
     catch (error) {
       if (error.uncertain) setSubmissionUncertain(true)
       setMessage(error.message || 'Status dokumentasi belum dapat dipastikan.')
@@ -2213,7 +2245,8 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
       {form.mediaType === 'photo' ? <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Foto kegiatan {editing?.photoUrl && <span className="font-normal text-[#777]">(unggah baru untuk mengganti)</span>}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setPhotoFile(event.target.files?.[0] || null)} className={`${inputClass} file:mr-3 file:rounded file:border-0 file:bg-[#fff1f2] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#b5122a]`} /><span className="mt-1 block text-[10px] text-[#888]">JPG, PNG, WEBP, GIF · maks. 5 MB · Folder Drive: Foto Kegiatan</span></label> : <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Link video YouTube</span><input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} required placeholder="Tempel link YouTube dari aplikasi atau browser" value={form.youtubeUrl} onChange={(event) => setValue('youtubeUrl', event.target.value)} className={inputClass} /></label>}
       <label><span className="mb-1.5 block text-[11px] font-semibold">Publikasi</span><select value={form.visibility} onChange={(event) => setValue('visibility', event.target.value)} className={inputClass}><option>Publik</option><option>Draft</option></select></label>
       <p className="self-center text-[10px] text-[#777]">{form.visibility === 'Publik' ? 'Tampil di galeri publik.' : 'Hanya dapat dilihat pengelola.'}</p>
-      {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Lengkapi judul/tanggal dan pilih foto atau URL YouTube yang valid.</p>}
+      {(!form.title.trim() || !form.eventDate) && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Judul dan tanggal kegiatan wajib diisi.</p>}
+      {form.mediaType === 'youtube' && !validYoutube && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Tempel link video YouTube yang lengkap. ID video harus 11 karakter; link youtu.be dan Shorts juga didukung.</p>}
       </fieldset>
       <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#b5122a] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Mengirim...' : submissionUncertain ? 'Coba konfirmasi dokumentasi' : 'Simpan dokumentasi'}</button></div>
     </form>

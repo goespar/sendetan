@@ -894,6 +894,8 @@ function validateActivityMedia_(record) {
     let host = '';
     let videoId = '';
     let source = String(record.youtubeUrl || '').trim();
+    const pastedUrl = source.match(/(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com|youtu\.be)\/[^\s<>"']+/i);
+    if (pastedUrl) source = pastedUrl[0].replace(/[),.;!?]+$/, '');
     if (!/^[a-z][a-z\d+.-]*:\/\//i.test(source)) source = 'https://' + source.replace(/^\/\//, '');
     try {
       const url = new URL(source);
@@ -904,7 +906,7 @@ function validateActivityMedia_(record) {
         videoId = url.searchParams.get('v') || (pathMatch ? pathMatch[1] : '');
       }
     } catch (error) {}
-    if (!/^[\w-]{11}$/.test(videoId)) throw new Error('Masukkan URL video YouTube yang valid.');
+    if (!/^[\w-]{11}$/.test(videoId)) throw new Error('Link YouTube tidak terbaca. Pastikan URL lengkap dan ID video berisi 11 karakter.');
     record.youtubeUrl = 'https://www.youtube.com/watch?v=' + videoId;
   }
   if (['Publik', 'Draft'].indexOf(record.visibility || 'Publik') === -1) throw new Error('Visibilitas media tidak valid.');
