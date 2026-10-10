@@ -6,7 +6,7 @@ import {
   Search, Settings2, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet, Download, Printer,
   X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen, RotateCcw,
 } from 'lucide-react'
-import logo from '../logo takora.png'
+import logo from '../logo takora-optimized.png'
 import { backendConfigured, isDemo, request, uploadPhoto } from './api.js'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts.jsx'))
@@ -57,7 +57,7 @@ const modules = {
   piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['memberId', 'Anggota (khusus Wijilan)', 'member'], ['chargeAmount', 'Tagihan Wijilan', 'number'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal dibayar / kas', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang / anggota'], ['chargeAmount', 'Tagihan Wijilan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['currentRenter', 'Sedang disewa oleh'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
   sewa: { title: 'Transaksi sewa aset', desc: 'Pilih alat berdasarkan stok tersedia, jenis penyewa, dan rentang tanggal sewa.', api: 'SewaAset', fields: [], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['renter', 'Penyewa'], ['customerType', 'Jenis penyewa'], ['startDate', 'Mulai'], ['endDate', 'Selesai'], ['quantity', 'Jumlah'], ['rentalIncome', 'Pemasukan'], ['maintenanceCost', 'Perawatan'], ['status', 'Status']] },
-  inventaris: { title: 'Log inventaris', desc: 'Riwayat barang masuk dan keluar dari inventaris.', api: 'InventarisLog', fields: [['date', 'Tanggal transaksi', 'date'], ['assetId', 'ID aset', 'text'], ['assetName', 'Nama barang', 'text'], ['movement', 'Pergerakan', 'select:Masuk|Keluar'], ['quantity', 'Jumlah', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['movement', 'Pergerakan'], ['quantity', 'Jumlah'], ['condition', 'Kondisi'], ['notes', 'Catatan']] },
+  inventaris: { title: 'Log inventaris', desc: 'Riwayat barang masuk dan keluar dari inventaris.', api: 'InventarisLog', fields: [['date', 'Tanggal transaksi', 'date'], ['assetId', 'Nama barang', 'member'], ['movement', 'Pergerakan', 'select:Masuk|Keluar'], ['quantity', 'Jumlah', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['assetName', 'Barang'], ['movement', 'Pergerakan'], ['quantity', 'Jumlah'], ['condition', 'Kondisi'], ['notes', 'Catatan']] },
   anggota: { title: 'Manajemen anggota', desc: 'Data keanggotaan organisasi.', api: 'Anggota', fields: [['memberName', 'Nama lengkap', 'text'], ['memberNo', 'Nomor anggota', 'text'], ['phone', 'Nomor telepon', 'text'], ['address', 'Alamat', 'text'], ['status', 'Status', 'select:Aktif|Nonaktif']], columns: [['memberNo', 'Nomor'], ['memberName', 'Nama anggota'], ['phone', 'Telepon'], ['address', 'Alamat'], ['status', 'Status']] },
   notulensi: { title: 'Notulensi', desc: 'Arsip keputusan rapat dengan pesan yang dapat dibagikan ke WhatsApp.', api: 'Notulensi', fields: [['date', 'Tanggal rapat', 'date'], ['title', 'Agenda / judul', 'text'], ['attendees', 'Peserta', 'text'], ['minutes', 'Catatan dan keputusan', 'textarea'], ['followUp', 'Tindak lanjut', 'textarea']], columns: [['date', 'Tanggal'], ['title', 'Agenda'], ['attendees', 'Peserta'], ['minutes', 'Catatan'], ['followUp', 'Tindak lanjut']] },
   kegiatan: { title: 'Galeri kegiatan', desc: 'Dokumentasi foto dan video kegiatan organisasi.', api: 'KegiatanMedia', fields: [], columns: [] },
@@ -89,7 +89,7 @@ const demoModuleBalances = {
   piodalan: { incoming: 0, outgoing: 0, balance: 0, unpaid: 0 },
 }
 const moduleLabels = { iuran: 'Iuran', sukaduka: 'Sukaduka', sesari: 'Sesari', kasUmum: 'Kas Umum', punia: 'Punia tunai', sewa: 'Sewa alat', piodalan: 'Piodalan' }
-const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777', kasUmum: '#15803d', punia: '#2563eb', sewa: '#15803d', piodalan: '#eab308' }
+const moduleColors = { iuran: '#b5122a', sukaduka: '#242424', sesari: '#777777', kasUmum: '#8b5e3c', punia: '#2563eb', sewa: '#15803d', piodalan: '#eab308' }
 const openingBalanceDefaults = { iuran: 0, sukaduka: 0, sesari: 0, kasUmum: 0 }
 const emptyOpeningBalances = Object.fromEntries(Object.keys(openingBalanceDefaults).map((module) => [module, { amount: 0, date: '', notes: '', configured: false }]))
 const whatsappTemplateKey = 'takora-whatsapp-templates'
@@ -249,7 +249,7 @@ function App() {
 
   useEffect(() => {
     if (isDemo || !token) return
-    if (active === 'sewa' || active === 'aset') {
+    if (active === 'sewa' || active === 'aset' || active === 'inventaris') {
       Promise.all([
         request('list', { module: 'Aset' }, token),
         request('list', { module: 'SewaAset' }, token),
@@ -422,6 +422,14 @@ function App() {
         if (!form.dataset.photoUrl) form.dataset.photoUrl = (await uploadPhoto(formData.get('photoFile'), token)).url
         values.photoUrl = form.dataset.photoUrl
       } catch (error) { setNotice(error.message); return }
+    }
+    if (active === 'inventaris') {
+      const selectedAsset = rentalAssets.find((asset) => String(asset.id) === String(values.assetId))
+      if (!selectedAsset) {
+        setNotice('Pilih nama barang dari Aset & sewa alat.')
+        return
+      }
+      values.assetName = selectedAsset.assetName
     }
     if (!pendingPayload) delete values.photoFile
     if (['amount', 'chargeAmount', 'target', 'cashPhysical', 'changeDue', 'changePaid', 'arrears', 'refundDebt', 'quantity', 'rentalRate', 'rentalRateSemeton', 'rentalRateLuar', 'purchasePrice', 'rentalIncome', 'maintenanceCost'].some((field) => field in values)) {
@@ -1090,10 +1098,15 @@ function GalleryPreview({ items, onOpen }) {
 
 function youtubeEmbedUrl(value) {
   try {
-    const url = new URL(value)
+    let source = String(value || '').trim()
+    if (!/^[a-z][a-z\d+.-]*:\/\//i.test(source)) source = `https://${source.replace(/^\/\//, '')}`
+    const url = new URL(source)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
     let videoId = ''
-    if (url.hostname === 'youtu.be') videoId = url.pathname.split('/').filter(Boolean)[0] || ''
-    else if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(url.hostname)) videoId = url.searchParams.get('v') || url.pathname.split('/').filter(Boolean).pop() || ''
+    if (host === 'youtu.be') videoId = url.pathname.split('/').filter(Boolean)[0] || ''
+    else if (['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) {
+      videoId = url.searchParams.get('v') || url.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/)?.[1] || ''
+    }
     if (!/^[\w-]{11}$/.test(videoId)) return ''
     return `https://www.youtube-nocookie.com/embed/${videoId}`
   } catch { return '' }
@@ -1534,7 +1547,8 @@ function WhatsAppPreviewModal({ draft, onClose }) {
   return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section role="dialog" aria-modal="true" aria-labelledby="whatsapp-preview-title" className="w-full max-w-2xl rounded-t-lg bg-white p-5 shadow-xl sm:rounded-md"><div className="flex items-start justify-between gap-3"><div><h2 id="whatsapp-preview-title" className="font-display text-lg font-extrabold">Pratinjau WhatsApp</h2><p className="mt-1 text-xs text-[#849084]">Tujuan: {draft.recipient}{draft.phone ? ` · ${draft.phone}` : ' · tautan grup'}</p></div><button onClick={onClose} aria-label="Tutup pratinjau" className="rounded p-1.5 text-[#7d8b7e]"><X size={18} /></button></div><label className="mt-4 block text-[11px] font-semibold text-[#637367]">Pesan<textarea value={message} onChange={(event) => setMessage(event.target.value)} rows="14" className="mt-1 w-full resize-y rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs leading-5 outline-none focus:border-[#789578]" /></label><div className="mt-4 flex justify-end gap-2 border-t border-[#eceee6] pt-4"><button onClick={onClose} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={openWhatsApp} disabled={!draft.group && !String(draft.phone || '').replace(/\D/g, '')} className="inline-flex items-center gap-2 rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle size={15} /> Buka WhatsApp</button></div></section></div>
 }
 
-function SangkepModal({ members, onClose, onBack, onSave }) {
+function SangkepModal({ members, module, onClose, onBack, onSave }) {
+  const isIuran = module === 'TRANSAKSI_IURAN'
   const today = new Date().toISOString().slice(0, 10)
   const [date, setDate] = useState(today)
   const [title, setTitle] = useState(`Sangkep ${readableDate(today)}`)
@@ -1550,8 +1564,8 @@ function SangkepModal({ members, onClose, onBack, onSave }) {
   }])))
   const visibleMembers = members.filter((member) => `${member.Nama} ${member.ID}`.toLowerCase().includes(search.toLowerCase()))
   const includedMembers = members.filter((member) => values[String(member.ID)]?.included)
-  const valid = Boolean(date && title.trim() && includedMembers.length && Number(iuranAmount) >= 0
-    && Number(sukadukaAmount) >= 0 && Number(iuranAmount) + Number(sukadukaAmount) > 0)
+  const selectedAmount = Number(isIuran ? iuranAmount : sukadukaAmount)
+  const valid = Boolean(date && title.trim() && includedMembers.length && selectedAmount > 0)
   const inputClass = 'w-full rounded border border-[#e1e5dc] bg-white px-2.5 py-2 text-xs outline-none focus:border-[#789578]'
 
   function setMemberValue(memberId, field, value) {
@@ -1564,11 +1578,11 @@ function SangkepModal({ members, onClose, onBack, onSave }) {
     setBusy(true)
     try {
       await onSave({
-        event: { id: eventId.current, date, title: title.trim(), iuranAmount: Number(iuranAmount), sukadukaAmount: Number(sukadukaAmount) },
+        event: { id: eventId.current, date, title: title.trim(), iuranAmount: isIuran ? Number(iuranAmount) : 0, sukadukaAmount: isIuran ? 0 : Number(sukadukaAmount) },
         participants: includedMembers.map((member) => ({
           memberId: member.ID,
-          iuranPaid: Boolean(values[String(member.ID)]?.iuranPaid),
-          sukadukaPaid: Boolean(values[String(member.ID)]?.sukadukaPaid),
+          iuranPaid: isIuran && Boolean(values[String(member.ID)]?.iuranPaid),
+          sukadukaPaid: !isIuran && Boolean(values[String(member.ID)]?.sukadukaPaid),
         })),
       })
       setSubmissionUncertain(false)
@@ -1580,34 +1594,32 @@ function SangkepModal({ members, onClose, onBack, onSave }) {
 
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-5xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex items-start justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Catat sangkep</h2><p className="mt-1 text-xs text-[#849084]">Tandai pembayaran iuran dan sukaduka secara terpisah. Yang belum dibayar menjadi tunggakan.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e]" aria-label="Tutup"><X size={18} /></button></header>
+      <header className="flex items-start justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Catat sangkep {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">Catatan hanya masuk ke menu {isIuran ? 'Iuran' : 'Sukaduka'}; yang belum dibayar menjadi tunggakan.</p></div><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e]" aria-label="Tutup"><X size={18} /></button></header>
       {message && <p role="alert" className="mx-4 mt-3 rounded border border-[#f1d9dc] bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#b5122a] sm:mx-6">{message}</p>}
       <fieldset disabled={busy || submissionUncertain} className="contents">
         <div className="grid gap-3 border-b border-[#eceee6] p-4 sm:grid-cols-4 sm:px-6">
           <label className="text-[11px] font-semibold">Tanggal<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>
           <label className="text-[11px] font-semibold">Nama sangkep<input required value={title} onChange={(event) => setTitle(event.target.value)} className={`${inputClass} mt-1`} /></label>
-          <label className="text-[11px] font-semibold">Iuran per warga<input type="number" min="0" step="1" value={iuranAmount} onChange={(event) => setIuranAmount(event.target.value)} className={`${inputClass} mt-1`} /></label>
-          <label className="text-[11px] font-semibold">Sukaduka per warga<input type="number" min="0" step="1" value={sukadukaAmount} onChange={(event) => setSukadukaAmount(event.target.value)} className={`${inputClass} mt-1`} /></label>
+          {isIuran ? <label className="text-[11px] font-semibold">Iuran per warga<input type="number" min="0" step="1" value={iuranAmount} onChange={(event) => setIuranAmount(event.target.value)} className={`${inputClass} mt-1`} /></label> : <label className="text-[11px] font-semibold">Sukaduka per warga<input type="number" min="0" step="1" value={sukadukaAmount} onChange={(event) => setSukadukaAmount(event.target.value)} className={`${inputClass} mt-1`} /></label>}
           <label className="text-[11px] font-semibold sm:col-span-2">Cari warga<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nama atau ID" className={`${inputClass} mt-1`} /></label>
-          <div className="flex items-end text-[11px] text-[#68776b] sm:col-span-2">{includedMembers.length} warga ditagih · maksimal {currency(Number(iuranAmount) + Number(sukadukaAmount) || 0)} per warga</div>
+          <div className="flex items-end text-[11px] text-[#68776b] sm:col-span-2">{includedMembers.length} warga ditagih · {currency(selectedAmount || 0)} per warga</div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[780px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[10px] uppercase text-[#89958a]"><tr><th className="px-4 py-3">Ikut ditagih</th><th className="px-4 py-3">Warga</th><th className="px-4 py-3">Iuran {currency(Number(iuranAmount) || 0)}</th><th className="px-4 py-3">Sukaduka {currency(Number(sukadukaAmount) || 0)}</th><th className="px-4 py-3">Tunggakan iuran</th><th className="px-4 py-3">Tunggakan sukaduka</th></tr></thead>
+          <table className="w-full min-w-[560px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[10px] uppercase text-[#89958a]"><tr><th className="px-4 py-3">Ikut ditagih</th><th className="px-4 py-3">Warga</th>{isIuran ? <><th className="px-4 py-3">Iuran {currency(Number(iuranAmount) || 0)}</th><th className="px-4 py-3">Tunggakan iuran</th></> : <><th className="px-4 py-3">Sukaduka {currency(Number(sukadukaAmount) || 0)}</th><th className="px-4 py-3">Tunggakan sukaduka</th></>}</tr></thead>
             <tbody className="divide-y divide-[#eff0ea]">{visibleMembers.map((member) => {
               const key = String(member.ID)
               const value = values[key] || {}
               return <tr key={key} className={value.included ? '' : 'opacity-50'}>
                 <td className="px-4 py-3"><input aria-label={`Tagih ${member.Nama}`} type="checkbox" checked={Boolean(value.included)} onChange={(event) => setMemberValue(key, 'included', event.target.checked)} /></td>
                 <td className="px-4 py-3"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td>
-                <td className="px-4 py-3"><label className="flex items-center gap-2"><input type="checkbox" disabled={!value.included} checked={Boolean(value.iuranPaid)} onChange={(event) => setMemberValue(key, 'iuranPaid', event.target.checked)} /><span>{value.iuranPaid ? 'Dibayar' : 'Belum dibayar'}</span></label></td>
-                <td className="px-4 py-3"><label className="flex items-center gap-2"><input type="checkbox" disabled={!value.included} checked={Boolean(value.sukadukaPaid)} onChange={(event) => setMemberValue(key, 'sukadukaPaid', event.target.checked)} /><span>{value.sukadukaPaid ? 'Dibayar' : 'Belum dibayar'}</span></label></td>
-                <td className="px-4 py-3">{currency(member.Sisa_Hutang_Iuran)}</td><td className="px-4 py-3">{currency(member.Sisa_Hutang_Sukaduka)}</td>
+                <td className="px-4 py-3"><label className="flex items-center gap-2"><input type="checkbox" disabled={!value.included} checked={Boolean(isIuran ? value.iuranPaid : value.sukadukaPaid)} onChange={(event) => setMemberValue(key, isIuran ? 'iuranPaid' : 'sukadukaPaid', event.target.checked)} /><span>{(isIuran ? value.iuranPaid : value.sukadukaPaid) ? 'Dibayar' : 'Belum dibayar'}</span></label></td>
+                <td className="px-4 py-3">{currency(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka)}</td>
               </tr>
             })}</tbody>
           </table>
         </div>
       </fieldset>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><p className="text-[11px] text-[#68776b]">Tunggakan sebelumnya tetap tercatat; setoran sangkep hanya membayar tagihan sangkep ini.</p><div className="flex gap-2"><button type="button" onClick={onBack} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Kembali</button><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={submit} disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba simpan ulang' : 'Simpan sangkep'}</button></div></footer>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eceee6] p-4 sm:px-6"><p className="text-[11px] text-[#68776b]">Tunggakan {isIuran ? 'iuran' : 'sukaduka'} sebelumnya tetap tercatat; pembayaran hanya untuk tagihan sangkep ini.</p><div className="flex gap-2"><button type="button" onClick={onBack} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Kembali</button><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold">Batal</button><button onClick={submit} disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba simpan ulang' : 'Simpan sangkep'}</button></div></footer>
     </section>
   </div>
 }
@@ -1744,11 +1756,11 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
   }
 
   const submissionUncertain = Boolean(pendingSubmission.current)
-  if (sangkepMode) return <SangkepModal members={members} onClose={onClose} onBack={() => setSangkepMode(false)} onSave={onSave} />
+  if (sangkepMode) return <SangkepModal members={members} module={module} onClose={onClose} onBack={() => setSangkepMode(false)} onSave={onSave} />
 
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <section className="flex max-h-[94vh] w-full max-w-6xl flex-col rounded-t-lg bg-white shadow-xl sm:rounded-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><div className="flex items-center gap-2">{isIuran && <button onClick={() => setSangkepMode(true)} disabled={busy || submissionUncertain} className="rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] disabled:opacity-50">Catat sangkep</button>}<button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div></header>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e7dd] p-4 sm:px-6"><div><h2 className="font-display text-lg font-extrabold">Input basket {isIuran ? 'iuran' : 'sukaduka'}</h2><p className="mt-1 text-xs text-[#849084]">{isIuran ? 'Isi banyak anggota sekaligus, atau unggah template Excel.' : 'Tagihan baru menambah saldo; alokasi pembayaran melunasi tunggakan sebelumnya dan tagihan baru.'}</p></div><div className="flex items-center gap-2"><button onClick={() => setSangkepMode(true)} disabled={busy || submissionUncertain} className="rounded-md border border-[#d9e1d5] px-3 py-2 text-xs font-semibold text-[#4e7053] disabled:opacity-50">Catat sangkep {isIuran ? 'iuran' : 'sukaduka'}</button><button onClick={onClose} disabled={busy} className="rounded p-1.5 text-[#7d8b7e] disabled:opacity-50" aria-label="Tutup"><X size={18} /></button></div></header>
       <fieldset disabled={busy || submissionUncertain} className="contents">
       <div className="flex flex-wrap items-end gap-3 border-b border-[#eceee6] p-4 sm:px-6">
         <label className="text-[11px] font-semibold">Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} mt-1`} /></label>
@@ -1973,9 +1985,10 @@ function BatchLedgerModal({ module, members, onClose, onSave }) {
   </div>
 }
 
-function RecordModal({ page, editing, members, contacts, assets, rentalRows, busy, onClose, onSave, onSaveIuran, onSaveSukaduka, onSaveRental, onSaveActivity }) {
+function RecordModal({ page, editing, members: availableMembers, contacts, assets, rentalRows, busy, onClose, onSave, onSaveIuran, onSaveSukaduka, onSaveRental, onSaveActivity }) {
   const [submissionUncertain, setSubmissionUncertain] = useState(false)
   const [message, setMessage] = useState('')
+  const members = page.api === 'InventarisLog' ? assets.map((asset) => ({ ID: asset.id, Nama: asset.assetName })) : availableMembers
   async function submit(event) {
     const form = event.currentTarget
     try { await onSave(event) }
@@ -2182,7 +2195,7 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
   async function submit(event) {
     event.preventDefault()
     if (!valid) return
-    try { await onSave({ ...form, id: transactionId.current, title: form.title.trim(), photoFile, photoUrl: editing?.photoUrl || '' }) }
+    try { await onSave({ ...form, youtubeUrl: form.mediaType === 'youtube' ? `https://www.youtube.com/watch?v=${youtubeEmbedUrl(form.youtubeUrl).split('/').pop()}` : '', id: transactionId.current, title: form.title.trim(), photoFile, photoUrl: editing?.photoUrl || '' }) }
     catch (error) {
       if (error.uncertain) setSubmissionUncertain(true)
       setMessage(error.message || 'Status dokumentasi belum dapat dipastikan.')
@@ -2197,7 +2210,7 @@ function ActivityMediaModal({ editing, busy, onClose, onSave }) {
       <label><span className="mb-1.5 block text-[11px] font-semibold">Tanggal kegiatan</span><input type="date" required value={form.eventDate} onChange={(event) => setValue('eventDate', event.target.value)} className={inputClass} /></label>
       <label><span className="mb-1.5 block text-[11px] font-semibold">Jenis media</span><select value={form.mediaType} onChange={(event) => setValue('mediaType', event.target.value)} className={inputClass}><option value="photo">Foto kegiatan</option><option value="youtube">Video YouTube</option></select></label>
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Keterangan</span><textarea rows="4" value={form.description} onChange={(event) => setValue('description', event.target.value)} className={`${inputClass} resize-y`} /></label>
-      {form.mediaType === 'photo' ? <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Foto kegiatan {editing?.photoUrl && <span className="font-normal text-[#777]">(unggah baru untuk mengganti)</span>}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setPhotoFile(event.target.files?.[0] || null)} className={`${inputClass} file:mr-3 file:rounded file:border-0 file:bg-[#fff1f2] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#b5122a]`} /><span className="mt-1 block text-[10px] text-[#888]">JPG, PNG, WEBP, GIF · maks. 5 MB · Folder Drive: Foto Kegiatan</span></label> : <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">URL video YouTube</span><input type="url" required placeholder="https://www.youtube.com/watch?v=..." value={form.youtubeUrl} onChange={(event) => setValue('youtubeUrl', event.target.value)} className={inputClass} /></label>}
+      {form.mediaType === 'photo' ? <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Foto kegiatan {editing?.photoUrl && <span className="font-normal text-[#777]">(unggah baru untuk mengganti)</span>}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setPhotoFile(event.target.files?.[0] || null)} className={`${inputClass} file:mr-3 file:rounded file:border-0 file:bg-[#fff1f2] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#b5122a]`} /><span className="mt-1 block text-[10px] text-[#888]">JPG, PNG, WEBP, GIF · maks. 5 MB · Folder Drive: Foto Kegiatan</span></label> : <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Link video YouTube</span><input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} required placeholder="Tempel link YouTube dari aplikasi atau browser" value={form.youtubeUrl} onChange={(event) => setValue('youtubeUrl', event.target.value)} className={inputClass} /></label>}
       <label><span className="mb-1.5 block text-[11px] font-semibold">Publikasi</span><select value={form.visibility} onChange={(event) => setValue('visibility', event.target.value)} className={inputClass}><option>Publik</option><option>Draft</option></select></label>
       <p className="self-center text-[10px] text-[#777]">{form.visibility === 'Publik' ? 'Tampil di galeri publik.' : 'Hanya dapat dilihat pengelola.'}</p>
       {!valid && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Lengkapi judul/tanggal dan pilih foto atau URL YouTube yang valid.</p>}

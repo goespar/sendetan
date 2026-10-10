@@ -892,8 +892,20 @@ function validateActivityMedia_(record) {
   if (record.mediaType === 'photo' && !record.photoUrl) throw new Error('Foto kegiatan harus diunggah terlebih dahulu.');
   if (record.mediaType === 'youtube') {
     let host = '';
-    try { host = new URL(String(record.youtubeUrl || '')).hostname.toLowerCase(); } catch (error) {}
-    if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'].indexOf(host) === -1) throw new Error('Masukkan URL video YouTube yang valid.');
+    let videoId = '';
+    let source = String(record.youtubeUrl || '').trim();
+    if (!/^[a-z][a-z\d+.-]*:\/\//i.test(source)) source = 'https://' + source.replace(/^\/\//, '');
+    try {
+      const url = new URL(source);
+      host = url.hostname.toLowerCase().replace(/^www\./, '');
+      if (host === 'youtu.be') videoId = url.pathname.split('/').filter(Boolean)[0] || '';
+      else if (['youtube.com', 'm.youtube.com', 'music.youtube.com'].indexOf(host) !== -1) {
+        const pathMatch = url.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/);
+        videoId = url.searchParams.get('v') || (pathMatch ? pathMatch[1] : '');
+      }
+    } catch (error) {}
+    if (!/^[\w-]{11}$/.test(videoId)) throw new Error('Masukkan URL video YouTube yang valid.');
+    record.youtubeUrl = 'https://www.youtube.com/watch?v=' + videoId;
   }
   if (['Publik', 'Draft'].indexOf(record.visibility || 'Publik') === -1) throw new Error('Visibilitas media tidak valid.');
   record.visibility = record.visibility || 'Publik';
