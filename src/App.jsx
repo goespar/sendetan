@@ -130,7 +130,13 @@ function App() {
   const [role, setRole] = useState(savedSession ? (localStorage.getItem('takora-role') || 'Bendahara') : 'Publik')
   const [token, setToken] = useState(localStorage.getItem('takora-token') || '')
   const [userName, setUserName] = useState(savedSession ? (localStorage.getItem('takora-name') || 'I Made Sudarma') : 'Anggota')
-  const [active, setActive] = useState(() => sessionStorage.getItem('takora-active') || 'dashboard')
+  const [active, setActiveState] = useState(() => sessionStorage.getItem('takora-active') || 'dashboard')
+  function setActive(nextActive) {
+    const destination = typeof nextActive === 'function' ? nextActive(active) : nextActive
+    if (destination === active) return
+    window.history.pushState({ takoraActive: destination }, '', window.location.href)
+    setActiveState(destination)
+  }
   const [rows, setRows] = useState(() => Object.fromEntries(Object.keys(initialRows).map((key) => [key, []])))
   const [masterMembers, setMasterMembers] = useState([])
   const [contacts, setContacts] = useState([])
@@ -185,9 +191,22 @@ function App() {
   }, [active])
 
   useEffect(() => {
-    const returnToDashboard = () => setActive('dashboard')
+    const initialActive = active
+    window.history.replaceState({ ...window.history.state, takoraActive: 'dashboard' }, '', window.location.href)
+    if (initialActive !== 'dashboard') {
+      window.history.pushState({ takoraActive: initialActive }, '', window.location.href)
+    }
+    const handlePopState = (event) => {
+      const destination = event.state?.takoraActive
+      setActiveState(typeof destination === 'string' ? destination : 'dashboard')
+    }
+    const returnToDashboard = () => window.history.back()
+    window.addEventListener('popstate', handlePopState)
     window.addEventListener('takora:return-dashboard', returnToDashboard)
-    return () => window.removeEventListener('takora:return-dashboard', returnToDashboard)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('takora:return-dashboard', returnToDashboard)
+    }
   }, [])
 
   useEffect(() => {
