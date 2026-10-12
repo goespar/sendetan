@@ -818,25 +818,6 @@ function App() {
       }
     }
 
-    const menuPuniaByEvent = new Map()
-    const addPunia = (eventName, amount) => {
-      if (!eventName || !Number(amount)) return
-      menuPuniaByEvent.set(eventName, Number(menuPuniaByEvent.get(eventName) || 0) + Number(amount))
-    }
-
-    if (isDemo) {
-      ;(rows.punia || []).filter((row) => matchesDateFilter(row, dashboardFilter) && ['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType)).forEach((row) => {
-        const eventName = String(row.eventName || '').trim()
-        addPunia(eventName, Number(row.amount || 0))
-      })
-    } else {
-      ;(summary?.donations || summary?.public?.donations || []).forEach((row) => {
-        const eventName = String(row.eventName || '').trim()
-        if (!eventName || row.module !== 'Dana Punia' || row.donationType === 'Barang') return
-        addPunia(eventName, Number(row.amount || 0))
-      })
-    }
-
     const baseEvents = isDemo
       ? Object.values((rows.piodalan || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((events, row) => {
         const eventName = String(row.eventName || '').trim()
@@ -857,15 +838,8 @@ function App() {
     const iuranIncome = Number(summary?.modules?.iuran?.incoming || 0)
       || (rows.iuran || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((total, row) => total + Number(row.cashPhysical || 0), 0)
     const eventsByName = new Map(baseEvents.map((event) => [String(event.eventName || '').trim(), normalizeEvent(event)]))
-    menuPuniaByEvent.forEach((amount, eventName) => {
-      if (!eventsByName.has(eventName)) eventsByName.set(eventName, normalizeEvent({ eventName }))
-      const event = eventsByName.get(eventName)
-      event.income += amount
-      event.balance = event.income - event.expenses
-    })
     const filteredEvents = baseEvents
       .map((event) => eventsByName.get(String(event.eventName || '').trim()))
-      .concat([...eventsByName.entries()].filter(([eventName]) => !baseEvents.some((event) => String(event.eventName || '').trim() === eventName)).map(([, event]) => event))
       .filter((event) => {
         const total = event.income + event.expenses + event.goodsValue
         const isPlaceholder = /buda wage|budawage|klau/i.test(event.eventName) && total === 0
