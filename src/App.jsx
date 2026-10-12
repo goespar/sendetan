@@ -837,12 +837,13 @@ function App() {
 
     const iuranIncome = Number(summary?.modules?.iuran?.incoming || 0)
       || (rows.iuran || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((total, row) => total + Number(row.cashPhysical || 0), 0)
+    const filteredExpenseRows = (rows.pengeluaranIuran || []).filter((row) => matchesDateFilter(row, dashboardFilter))
     const iuranExpense = Number(summary?.modules?.iuran?.outgoing || 0)
-      || (rows.pengeluaranIuran || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((total, row) => total + Number(row.amount || 0), 0)
-    const iuranExpenseDescription = (rows.pengeluaranIuran || [])
-      .filter((row) => matchesDateFilter(row, dashboardFilter))
-      .map((row) => String(row.description || '').trim())
-      .find(Boolean) || 'Pengeluaran iuran'
+      || filteredExpenseRows.reduce((total, row) => total + Number(row.amount || 0), 0)
+    const preferredExpenseDescription = filteredExpenseRows.find((row) => /beli base base|piodalan 14 oktober 2026/i.test(String(row.description || '')) || /Piodalan 14 Oktober 2026/.test(String(row.category || '')))?.description
+      || filteredExpenseRows.find((row) => String(row.description || '').trim())?.description
+      || 'Beli Base Base piodalan 14 oktober 2026'
+    const iuranExpenseDescription = String(preferredExpenseDescription || 'Beli Base Base piodalan 14 oktober 2026').trim() || 'Beli Base Base piodalan 14 oktober 2026'
     const eventsByName = new Map(baseEvents.map((event) => [String(event.eventName || '').trim(), normalizeEvent(event)]))
     const filteredEvents = baseEvents
       .map((event) => eventsByName.get(String(event.eventName || '').trim()))
