@@ -18,12 +18,13 @@ const signatories = [
   { title: 'Sekretaris', name: 'I GEDE AGUS SUPARDIANA' },
   { title: 'Bendahara', name: 'KOMANG YASMADIASA' },
 ]
-const FINANCE_MODULES_UI = ['iuran', 'pengeluaranIuran', 'kasUmum', 'sesari', 'sukaduka', 'punia', 'piodalan']
+const FINANCE_MODULES_UI = ['iuran', 'pengeluaranIuran', 'mutasiKas', 'kasUmum', 'sesari', 'sukaduka', 'punia', 'piodalan']
 const ORGANIZATION_MODULES_UI = ['aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan']
 const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'UTAMA' },
   { id: 'iuran', label: 'Iuran anggota', icon: CircleDollarSign, group: 'KEUANGAN' },
   { id: 'pengeluaranIuran', label: 'Pengeluaran iuran', icon: ArrowUpRight, group: 'KEUANGAN' },
+  { id: 'mutasiKas', label: 'Mutasi kas', icon: RotateCcw, group: 'KEUANGAN' },
   { id: 'kasUmum', label: 'Kas Umum', icon: Wallet, group: 'KEUANGAN' },
   { id: 'sesari', label: 'Sesari', icon: HandCoins, group: 'KEUANGAN' },
   { id: 'sukaduka', label: 'Sukaduka', icon: HeartHandshake, group: 'KEUANGAN' },
@@ -41,15 +42,16 @@ const navigation = [
   { id: 'backup', label: 'Backup', icon: Download, group: 'PENGATURAN' },
 ]
 const permission = {
-  Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'kasUmum', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users', 'backup'],
-  Ketua: ['dashboard', 'iuran', 'pengeluaranIuran', 'kasUmum', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
-  Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'kasUmum', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
+  Admin: ['dashboard', 'iuran', 'pengeluaranIuran', 'mutasiKas', 'kasUmum', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan', 'users', 'backup'],
+  Ketua: ['dashboard', 'iuran', 'pengeluaranIuran', 'mutasiKas', 'kasUmum', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
+  Bendahara: ['dashboard', 'iuran', 'pengeluaranIuran', 'mutasiKas', 'kasUmum', 'sesari', 'sukaduka', 'kewajiban', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Sekretaris: ['dashboard', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi', 'kegiatan', 'laporan'],
   Publik: ['dashboard', 'kegiatan'],
 }
 const modules = {
   iuran: { title: 'Iuran anggota', desc: 'Rekap pembayaran berulang, tunggakan per periode, dan kewajiban kembalian.', api: 'TRANSAKSI_IURAN', fields: [], columns: [['date', 'Tanggal'], ['memberName', 'Anggota'], ['periodId', 'Periode'], ['target', 'Target'], ['allocatedContribution', 'Uang untuk iuran'], ['cashPhysical', 'Uang diterima'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['arrears', 'Sisa iuran saat itu'], ['refundDebt', 'Sisa kembalian'], ['currentArrears', 'Hutang iuran kini'], ['currentRefundDebt', 'Hutang kembalian kini']] },
   pengeluaranIuran: { title: 'Pengeluaran iuran', desc: 'Catat belanja dan pembayaran yang diambil dari kas iuran.', api: 'PengeluaranIuran', fields: [['date', 'Tanggal pengeluaran', 'date'], ['category', 'Kategori', 'select:Piodalan 14 Oktober 2026|Operasional|Kegiatan|Konsumsi|Perlengkapan|Lainnya'], ['description', 'Uraian pengeluaran', 'text'], ['payee', 'Penerima pembayaran', 'text'], ['amount', 'Nominal', 'number']], columns: [['date', 'Tanggal'], ['category', 'Kategori'], ['description', 'Uraian'], ['payee', 'Penerima'], ['amount', 'Nominal']] },
+  mutasiKas: { title: 'Mutasi antar kas', desc: 'Pindahkan saldo antarpos tanpa dihitung sebagai penerimaan atau pengeluaran organisasi.', api: 'MutasiKas', fields: [['date', 'Tanggal mutasi', 'date'], ['fromModule', 'Kas asal', 'select:Iuran|Sukaduka|Sesari|Kas Umum|Punia tunai|Sewa alat|Piodalan'], ['toModule', 'Kas tujuan', 'select:Iuran|Sukaduka|Sesari|Kas Umum|Punia tunai|Sewa alat|Piodalan'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['fromModule', 'Kas asal'], ['toModule', 'Kas tujuan'], ['amount', 'Nominal'], ['description', 'Keterangan']] },
   kasUmum: { title: 'Kas Umum', desc: 'Catat pemasukan dan pengeluaran di luar modul keuangan lainnya.', api: 'KasUmum', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Kategori', 'select:Bunga bank|Hibah / bantuan|Donasi umum|Operasional|ATK|Konsumsi|Transportasi|Hosting / aplikasi|Lainnya'], ['description', 'Uraian transaksi', 'text'], ['amount', 'Nominal', 'number']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Uraian'], ['amount', 'Nominal']] },
   sesari: { title: 'Sesari', desc: 'Arus dana sesari persembahyangan.', api: 'Sesari', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Sumber / kategori', 'text'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   sukaduka: { title: 'Sukaduka', desc: 'Tagihan dan pembayaran per anggota dengan saldo tunggakan otomatis.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['chargeAmount', 'Tagihan baru'], ['amount', 'Dialokasikan'], ['arrears', 'Sisa tunggakan'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
@@ -67,6 +69,7 @@ const modules = {
 const initialRows = {
   iuran: [],
   pengeluaranIuran: [],
+  mutasiKas: [],
   kasUmum: [],
   sesari: [],
   sukaduka: [],
@@ -441,6 +444,18 @@ function App() {
     if (active === 'piodalan' && ['Punia uang', 'Punia barang', 'Wijilan / Setoran wajib'].includes(values.category) && !String(values.donor || '').trim()) {
       setNotice('Nama penyumbang wajib diisi untuk transaksi punia piodalan.')
       return
+    }
+    if (active === 'mutasiKas') {
+      const moduleNames = Object.values(moduleLabels)
+      const amount = Number(values.amount)
+      if (!moduleNames.includes(values.fromModule) || !moduleNames.includes(values.toModule) || values.fromModule === values.toModule) {
+        setNotice('Pilih kas asal dan tujuan yang berbeda.')
+        return
+      }
+      if (!Number.isSafeInteger(amount) || amount <= 0 || !String(values.description || '').trim()) {
+        setNotice('Nominal mutasi harus rupiah bulat lebih dari nol dan keterangan wajib diisi.')
+        return
+      }
     }
     if (active === 'aset' && formData?.get('photoFile')?.size) {
       try {
@@ -835,15 +850,6 @@ function App() {
       }, {}))
       : (summary?.piodalanReport || summary?.public?.piodalanReport || [])
 
-    const iuranIncome = Number(summary?.modules?.iuran?.incoming || 0)
-      || (rows.iuran || []).filter((row) => matchesDateFilter(row, dashboardFilter)).reduce((total, row) => total + Number(row.cashPhysical || 0), 0)
-    const filteredExpenseRows = (rows.pengeluaranIuran || []).filter((row) => matchesDateFilter(row, dashboardFilter))
-    const iuranExpense = Number(summary?.modules?.iuran?.outgoing || 0)
-      || filteredExpenseRows.reduce((total, row) => total + Number(row.amount || 0), 0)
-    const preferredExpenseDescription = filteredExpenseRows.find((row) => /beli base base|piodalan 14 oktober 2026/i.test(String(row.description || '')) || /Piodalan 14 Oktober 2026/.test(String(row.category || '')))?.description
-      || filteredExpenseRows.find((row) => String(row.description || '').trim())?.description
-      || 'Beli Base Base piodalan 14 oktober 2026'
-    const iuranExpenseDescription = String(preferredExpenseDescription || 'Beli Base Base piodalan 14 oktober 2026').trim() || 'Beli Base Base piodalan 14 oktober 2026'
     const eventsByName = new Map(baseEvents.map((event) => [String(event.eventName || '').trim(), normalizeEvent(event)]))
     const filteredEvents = baseEvents
       .map((event) => eventsByName.get(String(event.eventName || '').trim()))
@@ -853,11 +859,8 @@ function App() {
         return Boolean(event.eventName) && !isPlaceholder && total > 0
       })
 
-    if (iuranIncome > 0) filteredEvents.push({ eventName: 'Iuran anggota', income: iuranIncome, expenses: 0, goodsValue: 0, balance: iuranIncome })
-    if (iuranExpense > 0) filteredEvents.push({ eventName: iuranExpenseDescription, income: 0, expenses: iuranExpense, goodsValue: 0, balance: -iuranExpense })
-
     return filteredEvents.sort((left, right) => left.eventName.localeCompare(right.eventName, 'id'))
-  }, [rows.iuran, rows.piodalan, rows.pengeluaranIuran, summary, dashboardFilter, isDemo])
+  }, [rows.piodalan, summary, dashboardFilter, isDemo])
   const demoDashboard = useMemo(() => {
     const entries = []
     function add(row, category, activity, direction, amount, source = '') {
@@ -909,6 +912,14 @@ function App() {
       if (entry.category === 'Piodalan') modules.piodalan[field] += entry.amount
       if (entry.category === 'Sewa alat') modules.sewa[field] += entry.amount
       if (entry.incoming && entry.source) sourceTotals[entry.source] += entry.amount
+    })
+    ;(rows.mutasiKas || []).filter((row) => matchesDateFilter(row, dashboardFilter)).forEach((row) => {
+      const fromKey = Object.keys(moduleLabels).find((key) => moduleLabels[key] === row.fromModule)
+      const toKey = Object.keys(moduleLabels).find((key) => moduleLabels[key] === row.toModule)
+      const amount = Number(row.amount) || 0
+      if (amount <= 0 || !modules[fromKey] || !modules[toKey] || fromKey === toKey) return
+      modules[fromKey].outgoing += amount
+      modules[toKey].incoming += amount
     })
     Object.values(modules).forEach((module) => { module.balance = module.incoming - module.outgoing })
     const sourceTotal = Object.values(sourceTotals).reduce((sum, amount) => sum + amount, 0)

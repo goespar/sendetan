@@ -7,6 +7,7 @@ const SHEETS = {
   SaldoAwal: ['id', 'module', 'amount', 'date', 'notes', 'updatedBy', 'updatedAt'],
   TRANSAKSI_IURAN: ['id', 'date', 'periodId', 'memberId', 'memberName', 'target', 'allocatedContribution', 'cashPhysical', 'changeDue', 'changePaid', 'openingArrears', 'arrears', 'openingRefundDebt', 'refundDebtAdded', 'refundDebt', 'notes', 'createdBy', 'createdAt', 'updatedAt', 'chargeAmount', 'sangkepId'],
   PengeluaranIuran: ['id', 'date', 'category', 'description', 'amount', 'payee', 'createdBy', 'createdAt', 'updatedAt'],
+  MutasiKas: ['id', 'date', 'fromModule', 'toModule', 'amount', 'description', 'createdBy', 'createdAt', 'updatedAt'],
   KasUmum: ['id', 'date', 'direction', 'category', 'description', 'amount', 'createdBy', 'createdAt', 'updatedAt'],
   Sesari: ['id', 'date', 'direction', 'category', 'amount', 'description', 'createdBy', 'createdAt'],
   Sukaduka: ['id', 'date', 'direction', 'recipient', 'purpose', 'amount', 'notes', 'createdBy', 'createdAt', 'memberId', 'memberName', 'cashPhysical', 'changeDue', 'changePaid', 'refundDebtAdded', 'refundDebt', 'arrears', 'proofPhotoUrl', 'chargeAmount', 'openingArrears', 'sangkepId'],
@@ -21,7 +22,8 @@ const SHEETS = {
   AuditLog: ['id', 'timestamp', 'userId', 'username', 'action', 'module', 'recordId', 'details'],
 };
 
-const FINANCE_MODULES = ['IuranPeriode', 'Sangkep', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'KasUmum', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan'];
+const FINANCE_MODULES = ['IuranPeriode', 'Sangkep', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'MutasiKas', 'KasUmum', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan'];
+const TRANSFER_MODULE_KEYS = { Iuran: 'iuran', Sukaduka: 'sukaduka', Sesari: 'sesari', 'Kas Umum': 'kasUmum', 'Punia tunai': 'punia', 'Sewa alat': 'sewa', Piodalan: 'piodalan' };
 const SECRETARY_MODULES = ['Anggota', 'Aset', 'InventarisLog', 'SewaAset', 'Notulensi', 'KegiatanMedia'];
 const PUBLIC_ROLES = ['Publik'];
 const SESSION_TTL_SECONDS = 21600;
@@ -733,6 +735,26 @@ function batchCreateRecords_(module, records, user) {
   return { records: cleanRows };
 }
 
+function validateCashTransfer_(record) {
+  const date = String(record.date || '').trim();
+  const amount = Number(record.amount);
+  const description = String(record.description || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00').getTime())) {
+    throw new Error('Tanggal mutasi kas tidak valid.');
+  }
+  if (!Object.prototype.hasOwnProperty.call(TRANSFER_MODULE_KEYS, record.fromModule) || !Object.prototype.hasOwnProperty.call(TRANSFER_MODULE_KEYS, record.toModule)) {
+    throw new Error('Pos asal dan tujuan mutasi kas tidak valid.');
+  }
+  if (record.fromModule === record.toModule) throw new Error('Pos asal dan tujuan mutasi harus berbeda.');
+  if (!Number.isFinite(amount) || amount <= 0 || Math.floor(amount) !== amount) {
+    throw new Error('Nominal mutasi harus berupa angka rupiah bulat lebih dari nol.');
+  }
+  if (!description) throw new Error('Keterangan mutasi kas wajib diisi.');
+  record.date = date;
+  record.amount = amount;
+  record.description = description;
+}
+
 function validatePuniaRecord_(record, rowNumber) {
   if (!record.date || !String(record.donor || '').trim()) throw new Error('Tanggal dan nama pemberi wajib diisi pada baris ' + rowNumber + '.');
   if (['Uang Tunai', 'Wijilan / Setoran wajib', 'Barang'].indexOf(record.donationType) === -1) throw new Error('Jenis punia tidak valid pada baris ' + rowNumber + '.');
@@ -940,6 +962,7 @@ function createRecord_(module, record, user) {
   clean.createdAt = clean.createdAt || new Date().toISOString();
   if (module === 'SewaAset') validateRentalAvailability_(clean);
   if (module === 'PengeluaranIuran') validateIuranExpense_(clean);
+  if (module === 'MutasiKas') validateCashTransfer_(clean);
   if (module === 'Punia') validatePuniaRecord_(clean, 1);
   if (module === 'Piodalan') {
     if (clean.category === 'Wijilan / Setoran wajib') attachActiveWijilanMember_(clean);
@@ -992,6 +1015,7 @@ function updateRecord_(module, record, user, internal) {
   }
   if (module === 'SewaAset') validateRentalAvailability_(clean, clean.id);
   if (module === 'PengeluaranIuran') validateIuranExpense_(clean);
+  if (module === 'MutasiKas') validateCashTransfer_(clean);
   if (module === 'Punia') validatePuniaRecord_(clean, 1);
   if (module === 'Piodalan') {
     if (clean.category === 'Wijilan / Setoran wajib') attachActiveWijilanMember_(clean);
@@ -1748,7 +1772,7 @@ function invalidateDataCaches_() {
 }
 
 function summarySnapshot_() {
-  const names = ['KasUmum', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'Aset', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'Anggota', 'MASTER_ANGGOTA', 'SaldoAwal'];
+  const names = ['KasUmum', 'Sesari', 'Sukaduka', 'Punia', 'Piodalan', 'Aset', 'SewaAset', 'TRANSAKSI_IURAN', 'PengeluaranIuran', 'MutasiKas', 'Anggota', 'MASTER_ANGGOTA', 'SaldoAwal'];
   const snapshot = {};
   names.forEach(function (name) { snapshot[name] = readRecords_(name); });
   return snapshot;
@@ -2115,6 +2139,17 @@ function moduleBalances_(snapshot, suppliedMembers) {
     sewa: balance(rentalIn, rentalOut, 0),
     piodalan: balance(eventIn, eventOut, 0),
   };
+  summaryRows_(snapshot, 'MutasiKas').forEach(function (record) {
+    const amount = Number(record.amount) || 0;
+    const source = TRANSFER_MODULE_KEYS[record.fromModule];
+    const destination = TRANSFER_MODULE_KEYS[record.toModule];
+    if (amount <= 0 || source === destination || !Object.prototype.hasOwnProperty.call(modules, source) || !Object.prototype.hasOwnProperty.call(modules, destination)) return;
+    modules[source].outgoing += amount;
+    modules[destination].incoming += amount;
+  });
+  Object.keys(modules).forEach(function (key) {
+    modules[key].balance = modules[key].incoming - modules[key].outgoing;
+  });
   return { modules: modules, outstanding: { arrears: arrears, sukadukaArrears: sukadukaArrears, refundDebt: refundDebt }, refundDebt: refundDebt };
 }
 
