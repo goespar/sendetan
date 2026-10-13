@@ -778,7 +778,7 @@ function validatePiodalanRecord_(record, rowNumber) {
   if (!record.date || !String(record.eventName || '').trim() || !record.category || !record.direction) {
     throw new Error('Tanggal, nama piodalan, kategori, dan arus wajib diisi pada baris ' + rowNumber + '.');
   }
-  if (['Saldo awal', 'Punia uang', 'Punia barang', 'Wijilan / Setoran wajib', 'Belanja', 'Sesari piodalan'].indexOf(record.category) === -1) {
+  if (['Saldo awal', 'Punia uang', 'Punia barang', 'Wijilan / Setoran wajib', 'Belanja', 'Sesari piodalan', 'Lain-lain'].indexOf(record.category) === -1) {
     throw new Error('Kategori piodalan tidak valid pada baris ' + rowNumber + '.');
   }
   if (['Masuk', 'Keluar'].indexOf(record.direction) === -1) throw new Error('Arus kas tidak valid pada baris ' + rowNumber + '.');
@@ -2033,7 +2033,7 @@ function piodalanReport_(snapshot) {
   summaryRows_(snapshot, 'Piodalan').forEach(function (row) {
     const eventName = String(row.eventName || '').trim();
     if (!eventName) return;
-    if (!events[eventName]) events[eventName] = { eventName: eventName, income: 0, expenses: 0, goodsValue: 0 };
+    if (!events[eventName]) events[eventName] = { eventName: eventName, income: 0, transferIncome: 0, expenses: 0, goodsValue: 0 };
     const event = events[eventName];
     const amount = Number(row.amount) || 0;
     if (row.category === 'Punia barang') {
@@ -2044,9 +2044,16 @@ function piodalanReport_(snapshot) {
       event.expenses += amount;
     }
   });
+  summaryRows_(snapshot, 'MutasiKas').forEach(function (record) {
+    if (record.toModule !== 'Piodalan') return;
+    const source = String(record.fromModule || 'kas lain').trim();
+    const eventName = 'Mutasi internal dari ' + source;
+    if (!events[eventName]) events[eventName] = { eventName: eventName, income: 0, transferIncome: 0, expenses: 0, goodsValue: 0 };
+    events[eventName].transferIncome += Number(record.amount) || 0;
+  });
   return Object.keys(events).map(function (eventName) {
     const event = events[eventName];
-    event.balance = event.income - event.expenses;
+    event.balance = event.income + event.transferIncome - event.expenses;
     return event;
   }).sort(function (left, right) { return left.eventName.localeCompare(right.eventName, 'id'); });
 }

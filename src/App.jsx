@@ -176,7 +176,7 @@ function App() {
     ? { title: 'Backup data aplikasi', desc: 'Unduh salinan data aplikasi dalam format JSON.' }
     : active === 'kewajiban'
     ? { title: 'Rekap kewajiban anggota', desc: 'Status iuran, Sukaduka, Wijilan, dan input harian per anggota.', api: 'memberDues', duesData: memberDuesData }
-    : modules[active]
+    : modules[active] ? { ...modules[active], transferRows: rows.mutasiKas || [] } : undefined
   const currentRows = rows[active] || []
 
   useEffect(() => {
@@ -243,8 +243,11 @@ function App() {
     if (active === 'dashboard' || active === 'laporan' || active === 'kegiatan' || active === 'kewajiban' || active === 'backup' || active === 'users' && role !== 'Admin') return
     if (!isDemo && token && page) {
       setLoading(true)
-      request('list', { module: page.api }, token)
-        .then((result) => setRows((previous) => ({ ...previous, [active]: result.data || [] })))
+      const needsTransferRows = ['iuran', 'sukaduka', 'sesari', 'kasUmum', 'punia', 'piodalan', 'sewa'].includes(active)
+      const listRequests = [request('list', { module: page.api }, token)]
+      if (needsTransferRows) listRequests.push(request('list', { module: 'MutasiKas' }, token))
+      Promise.all(listRequests)
+        .then(([result, transfers]) => setRows((previous) => ({ ...previous, [active]: result.data || [], ...(transfers ? { mutasiKas: transfers.data || [] } : {}) })))
         .catch((error) => setNotice(error.message))
         .finally(() => setLoading(false))
     }
@@ -822,11 +825,13 @@ function App() {
     const normalizeEvent = (event) => {
       const eventName = String(event?.eventName || '').trim()
       const income = Number(event?.income || 0)
+      const transferIncome = Number(event?.transferIncome || 0)
       const expenses = Number(event?.expenses || 0)
       const goodsValue = Number(event?.goodsValue || 0)
       return {
         eventName,
         income,
+        transferIncome,
         expenses,
         goodsValue,
         balance: Number(event?.balance ?? income - expenses),
@@ -850,17 +855,27 @@ function App() {
       }, {}))
       : (summary?.piodalanReport || summary?.public?.piodalanReport || [])
 
-    const eventsByName = new Map(baseEvents.map((event) => [String(event.eventName || '').trim(), normalizeEvent(event)]))
-    const filteredEvents = baseEvents
+    const transferEvents = isDemo
+      ? Object.values((rows.mutasiKas || []).filter((row) => row.toModule === 'Piodalan' && matchesDateFilter(row, dashboardFilter)).reduce((events, row) => {
+        const eventName = `Mutasi internal dari ${row.fromModule || 'kas lain'}`
+        const event = events[eventName] || { eventName, income: 0, transferIncome: 0, expenses: 0, goodsValue: 0 }
+        event.transferIncome += Number(row.amount || 0)
+        events[eventName] = event
+        return events
+      }, {}))
+      : []
+    const reportEvents = [...baseEvents, ...transferEvents]
+    const eventsByName = new Map(reportEvents.map((event) => [String(event.eventName || '').trim(), normalizeEvent(event)]))
+    const filteredEvents = reportEvents
       .map((event) => eventsByName.get(String(event.eventName || '').trim()))
       .filter((event) => {
-        const total = event.income + event.expenses + event.goodsValue
+        const total = event.income + event.transferIncome + event.expenses + event.goodsValue
         const isPlaceholder = /buda wage|budawage|klau/i.test(event.eventName) && total === 0
         return Boolean(event.eventName) && !isPlaceholder && total > 0
       })
 
     return filteredEvents.sort((left, right) => left.eventName.localeCompare(right.eventName, 'id'))
-  }, [rows.piodalan, summary, dashboardFilter, isDemo])
+  }, [rows.piodalan, rows.mutasiKas, summary, dashboardFilter, isDemo])
   const demoDashboard = useMemo(() => {
     const entries = []
     function add(row, category, activity, direction, amount, source = '') {
@@ -1096,10 +1111,11 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
   const donutTotal = donutBalances.reduce((sum, item) => sum + item.value, 0)
   const piodalanTotals = piodalanReport.reduce((totals, item) => ({
     income: totals.income + Number(item.income || 0),
+    transferIncome: totals.transferIncome + Number(item.transferIncome || 0),
     expenses: totals.expenses + Number(item.expenses || 0),
     balance: totals.balance + Number(item.balance || 0),
     goodsValue: totals.goodsValue + Number(item.goodsValue || 0),
-  }), { income: 0, expenses: 0, balance: 0, goodsValue: 0 })
+  }), { income: 0, transferIncome: 0, expenses: 0, balance: 0, goodsValue: 0 })
   return <div className="animate-rise flex flex-col" data-demo={demo}>
     <div className="order-1 mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-[#79877b]">Om Swastyastu, <span className="font-semibold text-[#48644d]">{publicMode ? 'Semeton Sendetan' : roleNames[role]}</span></p><p className="mt-1 text-xs text-[#9aa399]">{publicMode ? 'Ringkasan transparansi dana organisasi.' : 'Berikut ringkasan posisi kas dan aktivitas organisasi.'}</p></div><div className="flex flex-wrap items-center gap-2 self-start rounded-md border border-[#e2e5dc] bg-white p-2 sm:self-auto"><CalendarDays size={14} className="ml-1 text-[#6e7f71]" /><label className="sr-only" htmlFor="dashboard-year">Filter tahun</label><select id="dashboard-year" aria-label="Filter tahun" value={dashboardFilter.year} onChange={(event) => onDashboardFilterChange('year', event.target.value)} className="rounded border border-[#e6e8df] bg-white px-2 py-1.5 text-xs"><option value="">Semua tahun</option>{Array.from({ length: 11 }, (_, index) => new Date().getFullYear() - index).map((year) => <option key={year} value={year}>{year}</option>)}</select><label className="sr-only" htmlFor="dashboard-month">Filter bulan</label><select id="dashboard-month" aria-label="Filter bulan" value={dashboardFilter.month} onChange={(event) => onDashboardFilterChange('month', event.target.value)} className="rounded border border-[#e6e8df] bg-white px-2 py-1.5 text-xs"><option value="">Semua bulan</option>{['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}</select><label className="sr-only" htmlFor="dashboard-day">Filter tanggal</label><select id="dashboard-day" aria-label="Filter tanggal" value={dashboardFilter.day} onChange={(event) => onDashboardFilterChange('day', event.target.value)} className="rounded border border-[#e6e8df] bg-white px-2 py-1.5 text-xs"><option value="">Semua tanggal</option>{Array.from({ length: 31 }, (_, index) => index + 1).map((day) => <option key={day} value={String(day).padStart(2, '0')}>{day}</option>)}</select></div></div>
     <div className={`order-2 grid grid-cols-1 gap-3 sm:grid-cols-2 ${visibleCards.length === 3 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
@@ -1114,10 +1130,10 @@ function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanRe
       <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama barang</th><th className="px-4 py-3 text-right">Jumlah</th><th className="px-4 py-3 text-right">Tersedia kini</th><th className="px-4 py-3">Sedang disewa oleh</th><th className="px-4 py-3 text-right">Harga beli</th><th className="px-4 py-3 text-right">Sewa Semeton</th><th className="px-4 py-3 text-right">Sewa luar</th><th className="px-4 py-3">Kondisi</th><th className="px-4 py-3 text-center">Foto</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">{assets.length ? assets.map((asset) => <tr key={asset.id}><td className="px-4 py-3 font-semibold text-[#3c5043]">{asset.assetName || '-'}</td><td className="px-4 py-3 text-right">{Number(asset.quantity || 0)}</td><td className="px-4 py-3 text-right font-semibold">{Number(asset.available || 0)}</td><td className="px-4 py-3">{asset.currentRentals?.length ? asset.currentRentals.map((rental) => `${rental.renter} (${rental.quantity})`).join(', ') : '-'}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.purchasePrice)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.rentalRateSemeton || asset.rentalRate)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{currency(asset.rentalRateLuar || asset.rentalRate)}</td><td className="px-4 py-3">{asset.condition || '-'}</td><td className="px-4 py-2 text-center">{asset.photoUrl ? <a href={asset.photoUrl} target="_blank" rel="noreferrer" className="inline-flex" aria-label={`Lihat foto ${asset.assetName}`}><img src={asset.photoUrl} alt={asset.assetName || 'Foto aset'} loading="lazy" className="h-10 w-14 rounded border border-[#e6e7dd] object-cover" /></a> : '-'}</td></tr>) : <tr><td colSpan="9" className="px-4 py-8 text-center text-[#849084]">Belum ada data aset.</td></tr>}</tbody></table></div>
     </section>
     <section className="order-5 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Laporan keuangan Piodalan</h2><p className="mt-1 text-[11px] text-[#929c91]">Punia tunai masuk dalam pemasukan kas; punia barang dicatat sebagai nonkas.</p></div><span className="text-[10px] text-[#849084]">{piodalanReport.length} acara</span></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama piodalan</th><th className="px-4 py-3 text-right">Pemasukan kas</th><th className="px-4 py-3 text-right">Pengeluaran</th><th className="px-4 py-3 text-right">Saldo kas</th><th className="px-4 py-3 text-right">Punia barang (nonkas)</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">
-        {piodalanReport.length ? piodalanReport.map((event) => <tr key={event.eventName}><td className="px-4 py-3 font-semibold text-[#3c5043]">{event.eventName}</td><td className="px-4 py-3 text-right">{currency(event.income)}</td><td className="px-4 py-3 text-right">{currency(event.expenses)}</td><td className="px-4 py-3 text-right font-semibold">{currency(event.balance)}</td><td className="px-4 py-3 text-right">{currency(event.goodsValue)}</td></tr>) : <tr><td colSpan="5" className="px-4 py-8 text-center text-[#849084]">Belum ada transaksi Piodalan yang tercatat.</td></tr>}
-      </tbody>{piodalanReport.length > 0 && <tfoot className="border-t border-[#e6e7dd] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3">Total</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.income)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.expenses)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.balance)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.goodsValue)}</td></tr></tfoot>}</table></div>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Laporan keuangan Piodalan</h2><p className="mt-1 text-[11px] text-[#929c91]">Mutasi internal menambah saldo kas, bukan pemasukan dari luar; punia barang dicatat sebagai nonkas.</p></div><span className="text-[10px] text-[#849084]">{piodalanReport.length} acara</span></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="bg-[#fafaf6] text-[9px] font-bold uppercase text-[#99a197]"><tr><th className="px-4 py-3">Nama piodalan</th><th className="px-4 py-3 text-right">Pemasukan kas</th><th className="px-4 py-3 text-right">Mutasi internal</th><th className="px-4 py-3 text-right">Pengeluaran</th><th className="px-4 py-3 text-right">Saldo kas</th><th className="px-4 py-3 text-right">Punia barang (nonkas)</th></tr></thead><tbody className="divide-y divide-[#eff0ea]">
+        {piodalanReport.length ? piodalanReport.map((event) => <tr key={event.eventName}><td className="px-4 py-3 font-semibold text-[#3c5043]">{event.eventName}</td><td className="px-4 py-3 text-right">{currency(event.income)}</td><td className="px-4 py-3 text-right">{currency(event.transferIncome)}</td><td className="px-4 py-3 text-right">{currency(event.expenses)}</td><td className="px-4 py-3 text-right font-semibold">{currency(event.balance)}</td><td className="px-4 py-3 text-right">{currency(event.goodsValue)}</td></tr>) : <tr><td colSpan="6" className="px-4 py-8 text-center text-[#849084]">Belum ada transaksi Piodalan yang tercatat.</td></tr>}
+      </tbody>{piodalanReport.length > 0 && <tfoot className="border-t border-[#e6e7dd] bg-[#fafaf6] font-bold"><tr><td className="px-4 py-3">Total</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.income)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.transferIncome)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.expenses)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.balance)}</td><td className="px-4 py-3 text-right">{currency(piodalanTotals.goodsValue)}</td></tr></tfoot>}</table></div>
     </section>
     <section className="order-6 mt-5 overflow-hidden rounded-md border border-[#e6e7dd] bg-white">
       <div className="flex items-end justify-between gap-3 border-b border-[#eceee6] px-4 py-4 sm:px-5"><div><h2 className="font-display text-sm font-extrabold">Punia uang dan barang</h2><p className="mt-1 text-[11px] text-[#929c91]">Nama pemberi dan sumbangan yang tercatat · terbaru 20 entri</p></div><span className="text-[10px] text-[#849084]">Publik</span></div>
@@ -1207,8 +1223,12 @@ function ModulePage({ active, page, rows, query, setQuery, loading, writable, bu
   if (page.api === 'memberDues') return <MemberDuesPage data={page.duesData} loading={loading} />
   const hasCashSummary = ['iuran', 'sesari', 'kasUmum', 'sukaduka', 'punia', 'piodalan', 'sewa'].includes(active)
   const exportableModules = ['iuran', 'sukaduka', 'pengeluaranIuran', 'kasUmum', 'sesari', 'punia', 'piodalan', 'aset', 'sewa', 'inventaris', 'anggota', 'notulensi']
-  const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0)
-  const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0)
+  const moduleTransferRows = (page.transferRows || []).filter((row) => (!periodFilter || String(row.date || '').slice(0, 7) === periodFilter) && (!query || JSON.stringify(row).toLowerCase().includes(query.toLowerCase())))
+  const moduleName = moduleLabels[active]
+  const transferIn = moduleTransferRows.filter((row) => row.toModule === moduleName).reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const transferOut = moduleTransferRows.filter((row) => row.fromModule === moduleName).reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const cashIn = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.cashPhysical || 0) : active === 'sukaduka' ? (row.direction === 'Masuk' ? Number(row.cashPhysical || row.amount || 0) : 0) : active === 'sewa' ? Number(row.rentalIncome || 0) : active === 'punia' ? (['Uang Tunai', 'Wijilan / Setoran wajib'].includes(row.donationType) ? Number(row.amount || 0) : 0) : row.direction === 'Masuk' && row.category !== 'Punia barang' ? Number(row.amount || 0) : 0), 0) + transferIn
+  const cashOut = rows.reduce((sum, row) => sum + (active === 'iuran' ? Number(row.changePaid || 0) : active === 'sewa' ? Number(row.maintenanceCost || 0) : active === 'sukaduka' ? Number(row.direction === 'Keluar' ? row.amount || 0 : row.changePaid || 0) : row.direction === 'Keluar' ? Number(row.amount || 0) : 0), 0) + transferOut
   const memberNumbers = new Map(masterMembers.map((member) => [String(member.ID), String(member.memberNo || member.ID)]))
   const paymentGroups = new Map(masterMembers.map((member) => [String(member.ID), {
     id: String(member.ID),
