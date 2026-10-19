@@ -4,7 +4,7 @@ import {
   Check, ChevronDown, CircleDollarSign, ClipboardList, FileText, HandCoins,
   HeartHandshake, Landmark, LayoutDashboard, LogOut, Menu, Package, Plus,
   Search, Settings2, ShieldCheck, Sparkles, Trash2, TrendingUp, Users, Wallet, Download, Printer,
-  X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen, RotateCcw,
+  X, Pencil, Camera, BookOpenCheck, MessageCircle, PanelLeftClose, PanelLeftOpen, RotateCcw, CloudUpload,
 } from 'lucide-react'
 import logo from '../logo takora-optimized.png'
 import { backendConfigured, isDemo, request, uploadPhoto } from './api.js'
@@ -49,12 +49,12 @@ const permission = {
   Publik: ['dashboard', 'kegiatan'],
 }
 const modules = {
-  iuran: { title: 'Iuran anggota', desc: 'Rekap pembayaran berulang, tunggakan per periode, dan kewajiban kembalian.', api: 'TRANSAKSI_IURAN', fields: [], columns: [['date', 'Tanggal'], ['memberName', 'Anggota'], ['periodId', 'Periode'], ['target', 'Target'], ['allocatedContribution', 'Uang untuk iuran'], ['cashPhysical', 'Uang diterima'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['arrears', 'Sisa iuran saat itu'], ['refundDebt', 'Sisa kembalian'], ['currentArrears', 'Hutang iuran kini'], ['currentRefundDebt', 'Hutang kembalian kini']] },
+  iuran: { title: 'Iuran anggota', desc: 'Rekap pembayaran berulang, tunggakan per periode, dan saldo kredit anggota.', api: 'TRANSAKSI_IURAN', fields: [], columns: [['date', 'Tanggal'], ['memberName', 'Anggota'], ['periodId', 'Periode'], ['target', 'Target'], ['allocatedContribution', 'Uang untuk iuran'], ['cashPhysical', 'Uang diterima'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['arrears', 'Sisa iuran saat itu'], ['refundDebt', 'Sisa kembalian'], ['currentArrears', 'Hutang iuran kini'], ['currentRefundDebt', 'Hutang kembalian kini']] },
   pengeluaranIuran: { title: 'Pengeluaran iuran', desc: 'Catat belanja dan pembayaran yang diambil dari kas iuran.', api: 'PengeluaranIuran', fields: [['date', 'Tanggal pengeluaran', 'date'], ['category', 'Kategori', 'select:Piodalan 14 Oktober 2026|Operasional|Kegiatan|Konsumsi|Perlengkapan|Lainnya'], ['description', 'Uraian pengeluaran', 'text'], ['payee', 'Penerima pembayaran', 'text'], ['amount', 'Nominal', 'number']], columns: [['date', 'Tanggal'], ['category', 'Kategori'], ['description', 'Uraian'], ['payee', 'Penerima'], ['amount', 'Nominal']] },
   mutasiKas: { title: 'Mutasi antar kas', desc: 'Pindahkan saldo antarpos tanpa dihitung sebagai penerimaan atau pengeluaran organisasi.', api: 'MutasiKas', fields: [['date', 'Tanggal mutasi', 'date'], ['fromModule', 'Kas asal', 'select:Iuran|Sukaduka|Sesari|Kas Umum|Punia tunai|Sewa alat|Piodalan'], ['toModule', 'Kas tujuan', 'select:Iuran|Sukaduka|Sesari|Kas Umum|Punia tunai|Sewa alat|Piodalan'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['fromModule', 'Kas asal'], ['toModule', 'Kas tujuan'], ['amount', 'Nominal'], ['description', 'Keterangan']] },
   kasUmum: { title: 'Kas Umum', desc: 'Catat pemasukan dan pengeluaran di luar modul keuangan lainnya.', api: 'KasUmum', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Kategori', 'select:Bunga bank|Hibah / bantuan|Donasi umum|Operasional|ATK|Konsumsi|Transportasi|Hosting / aplikasi|Lainnya'], ['description', 'Uraian transaksi', 'text'], ['amount', 'Nominal', 'number']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Uraian'], ['amount', 'Nominal']] },
   sesari: { title: 'Sesari', desc: 'Arus dana sesari persembahyangan.', api: 'Sesari', fields: [['date', 'Tanggal transaksi', 'date'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['category', 'Sumber / kategori', 'text'], ['amount', 'Nominal', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['category', 'Kategori'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
-  sukaduka: { title: 'Sukaduka', desc: 'Tagihan dan pembayaran per anggota dengan saldo tunggakan otomatis.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['chargeAmount', 'Tagihan baru'], ['amount', 'Dialokasikan'], ['arrears', 'Sisa tunggakan'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
+  sukaduka: { title: 'Sukaduka', desc: 'Tagihan dan pembayaran per anggota dengan saldo tunggakan otomatis.', api: 'Sukaduka', fields: [], columns: [['date', 'Tanggal'], ['periodId', 'Periode'], ['direction', 'Arus'], ['memberName', 'Anggota'], ['recipient', 'Penerima / penyetor'], ['purpose', 'Peruntukan'], ['chargeAmount', 'Tagihan baru'], ['amount', 'Dialokasikan'], ['arrears', 'Sisa tunggakan'], ['cashPhysical', 'Uang fisik'], ['changeDue', 'Kembalian'], ['changePaid', 'Dibayarkan'], ['refundDebt', 'Hutang kembalian'], ['proofPhotoUrl', 'Bukti']] },
   punia: { title: 'Dana punia', desc: 'Donasi uang, Wijilan atau setoran wajib piodalan, dan barang.', api: 'Punia', fields: [['date', 'Tanggal transaksi', 'date'], ['donor', 'Nama pemberi', 'text'], ['donationType', 'Jenis punia', 'select:Uang Tunai|Wijilan / Setoran wajib|Barang'], ['eventName', 'Nama piodalan (opsional)', 'text'], ['itemName', 'Nama barang (jika barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['amount', 'Nominal / nilai barang', 'number'], ['notes', 'Catatan', 'text']], columns: [['date', 'Tanggal'], ['donor', 'Pemberi'], ['donationType', 'Jenis'], ['eventName', 'Piodalan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['amount', 'Nilai'], ['notes', 'Catatan']] },
   piodalan: { title: 'Kas piodalan', desc: 'Buku kas khusus kepanitiaan piodalan.', api: 'Piodalan', fields: [['date', 'Tanggal transaksi', 'date'], ['eventName', 'Nama piodalan', 'text'], ['category', 'Jenis transaksi', 'select:Saldo awal|Punia uang|Punia barang|Wijilan / Setoran wajib|Belanja|Sesari piodalan|Lain-lain'], ['donor', 'Nama penyumbang (untuk punia)', 'text'], ['memberId', 'Anggota (khusus Wijilan)', 'member'], ['chargeAmount', 'Tagihan Wijilan', 'number'], ['itemName', 'Nama barang (punia barang)', 'text'], ['quantity', 'Jumlah barang', 'number'], ['unit', 'Satuan (contoh: kg, lusin, bungkus)', 'text'], ['direction', 'Arus kas', 'select:Masuk|Keluar'], ['amount', 'Nominal dibayar / kas', 'number'], ['description', 'Keterangan', 'text']], columns: [['date', 'Tanggal'], ['eventName', 'Piodalan'], ['category', 'Kategori'], ['donor', 'Penyumbang / anggota'], ['chargeAmount', 'Tagihan Wijilan'], ['itemName', 'Barang'], ['quantity', 'Jumlah'], ['unit', 'Satuan'], ['direction', 'Arus'], ['description', 'Keterangan'], ['amount', 'Nominal']] },
   aset: { title: 'Aset & sewa alat', desc: 'Daftar alat, jumlah, dua tarif sewa, foto, dan kondisi.', api: 'Aset', fields: [['assetName', 'Nama barang', 'text'], ['category', 'Kategori', 'text'], ['quantity', 'Jumlah item dimiliki', 'number'], ['condition', 'Kondisi', 'select:Baik|Perlu perawatan|Rusak'], ['purchasePrice', 'Harga saat beli / item', 'number'], ['rentalRateSemeton', 'Tarif Semeton / item / hari', 'number'], ['rentalRateLuar', 'Tarif orang luar / item / hari', 'number'], ['photoFile', 'Foto barang', 'file'], ['photoUrl', 'URL foto (otomatis)', 'text'], ['notes', 'Catatan', 'text']], columns: [['assetName', 'Nama barang'], ['category', 'Kategori'], ['quantity', 'Jumlah'], ['available', 'Tersedia kini'], ['currentRenter', 'Sedang disewa oleh'], ['purchasePrice', 'Harga beli'], ['rentalRateSemeton', 'Sewa Semeton'], ['rentalRateLuar', 'Sewa luar'], ['condition', 'Kondisi'], ['photoUrl', 'Foto']] },
@@ -113,8 +113,22 @@ function formatTemplate(template, values) {
   return template.replace(/\{([a-z_]+)\}/g, (placeholder, key) => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : placeholder)
 }
 const currency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0)
+const formatAmountInput = (value) => String(value || '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 const createTransactionId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
 const readableDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+function memberCreditUsage(member, module, allocated) {
+  const iuranCredit = Number(member?.Saldo_Kredit_Iuran) || 0
+  const sukadukaCredit = Number(member?.Saldo_Kredit_Sukaduka) || 0
+  let same = module === 'iuran' ? iuranCredit : sukadukaCredit
+  let other = module === 'iuran' ? sukadukaCredit : iuranCredit
+  const sameUsed = Math.min(Math.max(0, allocated), same)
+  const otherUsed = Math.min(Math.max(0, allocated - sameUsed), other)
+  return {
+    iuran: module === 'iuran' ? sameUsed : otherUsed,
+    sukaduka: module === 'sukaduka' ? sameUsed : otherUsed,
+    total: sameUsed + otherUsed,
+  }
+}
 function PrintLetterhead({ title, detail }) {
   return <header className="print-heading"><img src={logo} alt="Logo SENDETAN TELAGA BETENG" className="print-logo" /><div className="print-heading-copy"><h1>SENDETAN TELAGA BETENG</h1><p>{organizationAddress}</p><h2>{title}</h2>{detail && <p>{detail}</p>}</div></header>
 }
@@ -167,6 +181,7 @@ function App() {
   const [dashboardHidden, setDashboardHidden] = useState(localStorage.getItem('takora-dashboard-hidden') === 'true')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(localStorage.getItem('takora-sidebar-collapsed') === 'true')
   const [login, setLogin] = useState({ username: '', password: '', role: 'Bendahara' })
+  const dedicatedInputPayments = new URLSearchParams(window.location.search).get('page') === 'input-payments'
 
   const allowed = permission[role] || permission.Publik
   const showSidebar = authenticated && role !== 'Publik'
@@ -975,6 +990,16 @@ function App() {
     { label: 'Tunggakan iuran', value: 0, icon: Activity, trend: 'Menunggu data' },
   ])
 
+  if (dedicatedInputPayments) {
+    return <CombinedPaymentPage
+      authenticated={authenticated}
+      role={role}
+      token={token}
+      onOpenLogin={() => setLoginOpen(true)}
+      loginModal={loginOpen && <LoginModal login={login} setLogin={setLogin} busy={Boolean(busyAction)} onClose={() => { if (!operationRef.current) setLoginOpen(false) }} onSubmit={(event) => runExclusive('login', () => signIn(event))} demo={isDemo} />}
+    />
+  }
+
   return (
     <div className="tridatu-theme min-h-screen bg-[#f6f5ee] text-[#243a31]">
       {showSidebar && <>
@@ -995,6 +1020,7 @@ function App() {
             if (!items.length) return null
             return <div key={group} className="mb-5">
               <p className={`mb-2 px-3 text-[9px] font-bold tracking-[.14em] text-[#a0a89e] ${sidebarCollapsed ? 'lg:hidden' : ''}`}>{group}</p>
+              {group === 'KEUANGAN' && ['Admin', 'Bendahara'].includes(role) && <button onClick={() => { const url = new URL(window.location.href); url.searchParams.set('page', 'input-payments'); window.open(url.toString(), '_blank', 'noopener,noreferrer') }} className="mb-1 flex w-full items-center gap-3 rounded-md border border-[#dce7d8] bg-[#f1f6ed] px-3 py-[10px] text-left text-[13px] font-semibold text-[#355d3f] transition-colors hover:bg-[#e8f0e3]"><HandCoins size={17} strokeWidth={1.8} /><span>Input Iuran &amp; Sukaduka</span><span className="ml-auto rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-[#638367]">HP</span></button>}
               <div className="space-y-1">{items.map((item) => {
                 const Icon = item.icon
                 return <button key={item.id} title={sidebarCollapsed ? item.label : undefined} onClick={() => { setActive(item.id); setMobileOpen(false); setQuery(''); setPeriodFilter('') }} className={`flex w-full items-center gap-3 rounded-md py-[10px] text-left text-[13px] font-medium transition-colors ${sidebarCollapsed ? 'px-3 lg:justify-center lg:px-0' : 'px-3'} ${active === item.id ? 'bg-[#fff1f2] text-[#b5122a]' : 'text-[#68766b] hover:bg-[#f0f1e9] hover:text-[#315d3c]'}`}>
@@ -1094,6 +1120,475 @@ function App() {
       {notice && <div role="status" className="fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-40px)] items-center gap-2 rounded-md bg-[#244332] px-4 py-3 text-sm font-medium text-white shadow-lg"><Check size={16} />{notice}<button type="button" onClick={() => setNotice('')} className="ml-1 rounded p-1 hover:bg-white/15" aria-label="Tutup notifikasi"><X size={15} /></button></div>}
     </div>
   )
+}
+
+function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginModal }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const draftStorageKey = 'takora-combined-payment-draft-v1'
+  const [members, setMembers] = useState([])
+  const [periodCharges, setPeriodCharges] = useState({ iuran: {}, sukaduka: {} })
+  const [values, setValues] = useState({})
+  const [date, setDate] = useState(today)
+  const periodId = date.slice(0, 7)
+  const [activeMemberId, setActiveMemberId] = useState('')
+  const [modalValues, setModalValues] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [uncertain, setUncertain] = useState(false)
+  const [recoveryDraft, setRecoveryDraft] = useState(null)
+  const [recoveryChecked, setRecoveryChecked] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const pendingSubmission = useRef(null)
+  const canEnter = authenticated && ['Admin', 'Bendahara'].includes(role)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftStorageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed?.version === 1 && (
+          parsed.values && Object.values(parsed.values).some((value) => value?.hasInput)
+          || parsed.modalValues && parsed.activeMemberId
+          || parsed.pendingSubmission
+        )) {
+          setRecoveryDraft(parsed)
+        }
+      }
+    } catch (error) {
+      setMessage(`Draf lokal tidak dapat dibaca: ${error.message}`)
+    } finally {
+      setRecoveryChecked(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine)
+    window.addEventListener('online', updateOnlineStatus)
+    window.addEventListener('offline', updateOnlineStatus)
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus)
+      window.removeEventListener('offline', updateOnlineStatus)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!canEnter || !token) {
+      setMembers([])
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setLoadError('')
+    request('combinedPaymentContext', { periodId }, token)
+      .then((result) => {
+        if (cancelled) return
+        const nextMembers = result.members || []
+        setMembers(nextMembers)
+        if (!pendingSubmission.current) setPeriodCharges(result.charges || { iuran: {}, sukaduka: {} })
+        setLoadError('')
+        setValues((previous) => Object.fromEntries(nextMembers.map((member) => [String(member.ID), previous[String(member.ID)] || {
+          iuran: '', sukaduka: '', chargeAmount: '', cashPhysical: '', changePaid: '', purpose: '', notes: '',
+        }])))
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setLoadError(error.message || 'Data pembayaran gagal dimuat.')
+        setMessage(error.message || 'Data pembayaran gagal dimuat.')
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [canEnter, token, periodId])
+
+  function updateModal(field, value) {
+    setModalValues((previous) => ({ ...previous, [field]: value }))
+  }
+
+  function updateModalAmount(field, inputValue) {
+    updateModal(field, inputValue.replace(/\D/g, ''))
+  }
+
+  function openMember(member) {
+    const key = String(member.ID)
+    const existing = values[key]
+    const dues = getDues(member)
+    setModalValues(existing?.hasInput ? { ...existing } : {
+      iuran: String(dues.iuran),
+      sukaduka: String(dues.sukaduka),
+      cashPhysical: '', changePaid: '', purpose: '', notes: '',
+    })
+    setActiveMemberId(key)
+    setMessage('')
+  }
+
+  function saveMemberDraft() {
+    const member = members.find((entry) => String(entry.ID) === activeMemberId)
+    if (!member || !modalValues) return
+    const currentPlan = getPlan(member, modalValues)
+    const draft = currentPlan.cashPhysical === 0 && currentPlan.cashRequired > 0
+      ? { ...modalValues, cashPhysical: String(currentPlan.cashRequired) }
+      : modalValues
+    const plan = getPlan(member, draft)
+    if (plan.iuran + plan.sukaduka <= 0) {
+      setValues((previous) => ({ ...previous, [activeMemberId]: { ...draft, hasInput: false } }))
+      setActiveMemberId('')
+      setModalValues(null)
+      return
+    }
+    if (plan.cashPhysical < plan.cashRequired || plan.changePaid > plan.changeDue) {
+      setMessage(`Uang fisik ${currency(plan.cashPhysical)} belum mencukupi atau kembalian fisik melebihi uang lebih. Minimal uang fisik ${currency(plan.cashRequired)}.`)
+      return
+    }
+    setValues((previous) => ({ ...previous, [activeMemberId]: { ...draft, hasInput: true } }))
+    setMessage('')
+    setActiveMemberId('')
+    setModalValues(null)
+  }
+
+  function getPlan(member, value = {}) {
+    const iuran = Number(value.iuran) || 0
+    const sukaduka = Number(value.sukaduka) || 0
+    const dues = getDues(member)
+    const iuranCredit = memberCreditUsage(member, 'iuran', iuran)
+    const afterIuran = {
+      Saldo_Kredit_Iuran: Math.max(0, (Number(member.Saldo_Kredit_Iuran) || 0) - iuranCredit.iuran),
+      Saldo_Kredit_Sukaduka: Math.max(0, (Number(member.Saldo_Kredit_Sukaduka) || 0) - iuranCredit.sukaduka),
+    }
+    const sukadukaCredit = memberCreditUsage(afterIuran, 'sukaduka', sukaduka)
+    const cashRequired = Math.max(0, iuran - iuranCredit.total) + Math.max(0, sukaduka - sukadukaCredit.total)
+    const cashPhysical = Number(value.cashPhysical) || 0
+    const changeDue = Math.max(0, cashPhysical - cashRequired)
+    return {
+      iuran, sukaduka, iuranDue: dues.iuran, sukadukaDue: dues.sukaduka,
+      iuranCharge: dues.iuranCharge, sukadukaCharge: dues.sukadukaCharge,
+      iuranCredit, sukadukaCredit, cashRequired, cashPhysical, changeDue,
+      changePaid: Number(value.changePaid) || 0,
+    }
+  }
+
+  function getDues(member) {
+    const key = String(member.ID)
+    const iuranCharge = periodCharges.iuran[key] ? 0 : 10000
+    const sukadukaCharge = periodCharges.sukaduka[key] ? 0 : 5000
+    return {
+      iuranCharge,
+      sukadukaCharge,
+      iuran: Math.max(0, Number(member.Sisa_Hutang_Iuran) || 0) + iuranCharge,
+      sukaduka: Math.max(0, Number(member.Sisa_Hutang_Sukaduka) || 0) + sukadukaCharge,
+    }
+  }
+
+  const selectedMembers = members.filter((member) => {
+    const value = values[String(member.ID)] || {}
+    return Number(value.iuran) > 0 || Number(value.sukaduka) > 0
+  })
+  const hasUnsavedDraft = selectedMembers.length > 0 || Boolean(activeMemberId && modalValues) || Boolean(pendingSubmission.current)
+
+  useEffect(() => {
+    if (!recoveryChecked || recoveryDraft) return
+    try {
+      if (!hasUnsavedDraft) {
+        localStorage.removeItem(draftStorageKey)
+        return
+      }
+      localStorage.setItem(draftStorageKey, JSON.stringify({
+        version: 1,
+        date,
+        members,
+        periodCharges,
+        values,
+        activeMemberId,
+        modalValues,
+        pendingSubmission: pendingSubmission.current,
+        uncertain,
+        savedAt: new Date().toISOString(),
+      }))
+    } catch (error) {
+      setMessage(`Draf belum bisa disimpan di perangkat: ${error.message}`)
+    }
+  }, [recoveryChecked, recoveryDraft, hasUnsavedDraft, date, members, periodCharges, values, activeMemberId, modalValues, busy, uncertain])
+
+  useEffect(() => {
+    if (!hasUnsavedDraft) return undefined
+    const warnBeforeLeaving = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [hasUnsavedDraft])
+
+  function restoreDraft() {
+    let draft = recoveryDraft
+    if (!draft) {
+      try {
+        draft = JSON.parse(localStorage.getItem(draftStorageKey) || 'null')
+      } catch (error) {
+        setMessage(`Draf lokal tidak dapat dipulihkan: ${error.message}`)
+        return
+      }
+    }
+    if (!draft) {
+      setMessage('Tidak ada draf pembayaran untuk dipulihkan.')
+      return
+    }
+    setMembers(Array.isArray(draft.members) ? draft.members : [])
+    const oldPeriodCharges = draft.periodCharges?.iuran || {}
+    const restoredValues = { ...(draft.values || {}) }
+    const restoredModalValues = draft.modalValues ? { ...draft.modalValues } : null
+    members.forEach((member) => {
+      const key = String(member.ID)
+      const oldCharge = oldPeriodCharges[key]
+      const previousMonthlyCharge = oldCharge === true ? 10000 : Math.min(10000, Math.max(0, Number(oldCharge) || 0))
+      const previousDue = Math.max(0, Number(member.Sisa_Hutang_Iuran) || 0) + Math.max(0, 10000 - previousMonthlyCharge)
+      const currentDue = getDues(member).iuran
+      if (Number(restoredValues[key]?.iuran) === previousDue) {
+        restoredValues[key] = { ...restoredValues[key], iuran: String(currentDue) }
+      }
+      if (key === draft.activeMemberId && Number(restoredModalValues?.iuran) === previousDue) {
+        restoredModalValues.iuran = String(currentDue)
+      }
+    })
+    setValues(restoredValues)
+    if (draft.date) setDate(draft.date)
+    setActiveMemberId(draft.activeMemberId || '')
+    setModalValues(restoredModalValues)
+    pendingSubmission.current = draft.pendingSubmission || null
+    setUncertain(Boolean(draft.pendingSubmission || draft.uncertain))
+    setRecoveryDraft(null)
+    setMessage(draft.pendingSubmission
+      ? 'Draf dipulihkan. Status pengiriman sebelumnya belum pasti; kirim ulang hanya dengan data yang sama.'
+      : 'Draf pembayaran berhasil dipulihkan dari perangkat.')
+  }
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(draftStorageKey)
+    } catch (error) {
+      setMessage(`Draf belum bisa dihapus dari perangkat: ${error.message}`)
+      return
+    }
+    setRecoveryDraft(null)
+    setValues({})
+    setActiveMemberId('')
+    setModalValues(null)
+    pendingSubmission.current = null
+    setUncertain(false)
+    setMessage('Draf pembayaran dibuang.')
+  }
+
+  const totals = selectedMembers.reduce((sum, member) => {
+    const plan = getPlan(member, values[String(member.ID)])
+    sum.iuran += plan.iuran
+    sum.sukaduka += plan.sukaduka
+    sum.cashRequired += plan.cashRequired
+    sum.cashPhysical += plan.cashPhysical
+    return sum
+  }, { iuran: 0, sukaduka: 0, cashRequired: 0, cashPhysical: 0 })
+  const activeMember = members.find((member) => String(member.ID) === activeMemberId)
+  const modalPlan = activeMember && modalValues ? getPlan(activeMember, modalValues) : null
+
+  async function submit() {
+    if (busy) return
+    if (!canEnter) {
+      onOpenLogin()
+      return
+    }
+    let records
+    try {
+      if (!selectedMembers.length) throw new Error('Isi nominal iuran atau Sukaduka untuk minimal satu anggota.')
+      records = selectedMembers.map((member) => {
+        const value = values[String(member.ID)] || {}
+        const plan = getPlan(member, value)
+        if (!date || !periodId || plan.cashPhysical < plan.cashRequired || plan.changePaid > plan.changeDue) {
+          throw new Error(`Periksa tanggal, uang fisik, dan kembalian untuk ${member.Nama}. Minimal uang fisik ${currency(plan.cashRequired)}.`)
+        }
+        const firstModule = plan.iuran > 0 ? 'iuran' : 'sukaduka'
+        const extraCash = plan.cashPhysical - plan.cashRequired
+        const entry = { memberId: member.ID }
+        if (plan.iuran > 0) {
+          entry.iuran = {
+            memberId: member.ID, memberName: member.Nama, date, periodId,
+            allocatedContribution: plan.iuran, chargeAmount: plan.iuranCharge,
+            monthlyCharge: plan.iuranCharge > 0,
+            cashPhysical: Math.max(0, plan.iuran - plan.iuranCredit.total) + extraCash,
+            changePaid: firstModule === 'iuran' ? plan.changePaid : 0,
+            notes: value.notes || '',
+          }
+        }
+        if (plan.sukaduka > 0) {
+          entry.sukaduka = {
+            memberId: member.ID, memberName: member.Nama, date, periodId,
+            amount: plan.sukaduka, chargeAmount: plan.sukadukaCharge,
+            monthlyCharge: plan.sukadukaCharge > 0,
+            cashPhysical: Math.max(0, plan.sukaduka - plan.sukadukaCredit.total) + (firstModule === 'sukaduka' ? extraCash : 0),
+            changePaid: firstModule === 'sukaduka' ? plan.changePaid : 0,
+            purpose: String(value.purpose || '').trim(),
+            notes: value.notes || '',
+          }
+        }
+        return entry
+      })
+    } catch (error) {
+      setMessage(error.message || 'Periksa data pembayaran.')
+      return
+    }
+    const fingerprint = JSON.stringify({ date, periodId, records })
+    const pending = pendingSubmission.current
+    if (pending && pending.fingerprint !== fingerprint) {
+      setMessage('Pengiriman sebelumnya belum dapat dipastikan. Kirim ulang data yang sama tanpa mengubah isian.')
+      return
+    }
+    const submitted = pending?.records || records.map((record) => ({
+      ...record,
+      ...(record.iuran ? { iuran: { ...record.iuran, id: createTransactionId('IU') } } : {}),
+      ...(record.sukaduka ? { sukaduka: { ...record.sukaduka, id: createTransactionId('SK') } } : {}),
+    }))
+    pendingSubmission.current = { fingerprint, records: submitted }
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await request('batchCombinedPayments', { records: submitted }, token)
+      const updatedMembers = result.members || []
+      setMembers((previous) => previous.map((member) => {
+        const updated = updatedMembers.find((entry) => String(entry.ID) === String(member.ID))
+        return updated ? { ...member, ...updated } : member
+      }))
+      setPeriodCharges((previous) => {
+        const next = { iuran: { ...previous.iuran }, sukaduka: { ...previous.sukaduka } }
+        submitted.forEach((record) => {
+          const memberId = String(record.memberId)
+          if (record.iuran?.monthlyCharge) next.iuran[memberId] = true
+          if (record.sukaduka?.monthlyCharge) next.sukaduka[memberId] = true
+        })
+        return next
+      })
+      setValues((previous) => Object.fromEntries(Object.keys(previous).map((memberId) => [memberId, {
+        ...previous[memberId], iuran: '', sukaduka: '', cashPhysical: '', changePaid: '', hasInput: false,
+      }])))
+      pendingSubmission.current = null
+      setUncertain(false)
+      setMessage(`Berhasil menyimpan pembayaran untuk ${submitted.length} anggota.`)
+    } catch (error) {
+      setUncertain(Boolean(error.uncertain))
+      if (!error.uncertain) pendingSubmission.current = null
+      setMessage(error.message || 'Pembayaran gagal disimpan.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <div className="min-h-screen bg-slate-50 pb-36 text-slate-800">
+    <header className="sticky top-0 z-20 rounded-b-3xl bg-[#0d9488] px-4 pb-6 pt-8 text-white shadow-lg sm:px-6">
+      <div className="flex items-center justify-between gap-3">
+        <div><h1 className="text-base font-extrabold tracking-tight">INPUT IURAN &amp; SUKADUKA</h1><label className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-teal-50">Tanggal:<input aria-label="Tanggal input" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="border-0 bg-transparent p-0 text-[11px] font-semibold text-white outline-none" disabled={busy || uncertain || selectedMembers.length > 0} /></label></div>
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20"><Users size={18} /></span>
+      </div>
+    </header>
+    <main className="space-y-3 px-3 py-3 sm:px-5">
+      {recoveryDraft && <section role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+        <p className="font-bold">{isOnline ? 'Draf pembayaran sebelumnya ditemukan.' : 'Anda sedang offline; draf pembayaran tersimpan di perangkat.'}</p>
+        <p className="mt-1">Tanggal draf: {recoveryDraft.date || 'tidak diketahui'}. {recoveryDraft.pendingSubmission ? 'Status kiriman sebelumnya belum pasti; saat dipulihkan, ID transaksi yang sama akan dipakai untuk mencegah duplikasi.' : ''} Pilih pulihkan untuk melanjutkan atau buang untuk menghapus.</p>
+        <div className="mt-2 flex gap-2"><button type="button" onClick={restoreDraft} disabled={loading} className="rounded-lg bg-amber-800 px-3 py-2 font-bold text-white disabled:opacity-50">Pulihkan data</button><button type="button" onClick={discardDraft} className="rounded-lg border border-amber-400 bg-white px-3 py-2 font-bold">Buang data</button></div>
+      </section>}
+      {!isOnline && !recoveryDraft && <section role="status" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+        <p className="font-semibold">Koneksi internet terputus. Draf yang sudah diisi tersimpan di perangkat; pembayaran belum dikirim ke Spreadsheet.</p>
+        <div className="mt-2 flex gap-2"><button type="button" onClick={restoreDraft} className="rounded-lg bg-rose-700 px-3 py-2 font-bold text-white">Pulihkan data</button><button type="button" onClick={discardDraft} className="rounded-lg border border-rose-300 bg-white px-3 py-2 font-bold">Buang data</button></div>
+      </section>}
+      {!authenticated ? <section className="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-sm"><p className="text-sm font-semibold">Masuk untuk mencatat pembayaran</p><button onClick={onOpenLogin} className="mt-4 rounded-xl bg-[#0d9488] px-5 py-3 text-sm font-bold text-white">Masuk</button></section>
+        : !['Admin', 'Bendahara'].includes(role) ? <section className="rounded-2xl bg-white p-6 text-center text-sm">Akun ini tidak memiliki izin input pembayaran.</section>
+          : !backendConfigured ? <section role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">URL Apps Script belum diatur. Pembayaran tidak dapat disimpan.</section>
+            : loading ? <section className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">Memuat MASTER_ANGGOTA...</section>
+              : loadError ? <section role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><p className="font-bold">Data anggota belum bisa dimuat dari Apps Script.</p><p className="mt-1">{loadError}</p>{/aksi tidak dikenal/i.test(loadError) && <p className="mt-2">Backend yang terpasang belum mendukung halaman input gabungan ini. Salin `Code.gs` terbaru ke Apps Script, jalankan `setupSheets()`, deploy versi Web App baru, lalu muat ulang halaman.</p>}</section>
+              : members.length ? members.map((member, index) => {
+                const key = String(member.ID)
+                const value = values[key] || {}
+                const hasInput = Boolean(value.hasInput)
+                const paidIuran = hasInput ? Number(value.iuran) || 0 : 0
+                const paidSukaduka = hasInput ? Number(value.sukaduka) || 0 : 0
+                const plan = getPlan(member, value)
+                const iuranDue = plan.iuranDue
+                const sukadukaDue = plan.sukadukaDue
+                const returnShortfall = hasInput ? Math.max(0, plan.changeDue - plan.changePaid) : 0
+                const iuranLeft = iuranDue - paidIuran
+                const sukadukaLeft = sukadukaDue - paidSukaduka
+                const creditTotal = (Number(member.Saldo_Kredit_Iuran) || 0) + (Number(member.Saldo_Kredit_Sukaduka) || 0)
+                return <article key={key} className={`flex flex-col rounded-2xl border bg-white p-3.5 shadow-sm transition-colors ${hasInput ? 'border-teal-300 bg-teal-50/30' : 'border-slate-100'}`}>
+                  <div className="mb-2 flex items-center justify-between border-b border-slate-50 pb-2">
+                    <div className="flex items-start gap-2.5 pr-2"><span className="mt-0.5 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">{index + 1}</span><div><h2 className="text-[13px] font-extrabold leading-snug uppercase">{member.Nama}</h2>{creditTotal > 0 && <p className="mt-0.5 text-[9px] font-semibold text-teal-700">Saldo kredit {currency(creditTotal)}</p>}</div></div>
+                    <button type="button" aria-label={`Input pembayaran ${member.Nama}`} onClick={() => openMember(member)} disabled={busy || uncertain} className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-50 ${hasInput ? 'bg-[#0d9488] text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-teal-100 hover:text-teal-700'}`}>{hasInput ? <Check size={17} /> : <Pencil size={16} />}</button>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-[11px]"><span className="font-medium text-slate-500">Iuran <span className="ml-1 text-[9px] text-slate-400">(Tagihan: {currency(iuranDue)})</span></span><span className={`font-bold ${paidIuran ? 'text-teal-700' : 'text-slate-400'}`}>{currency(paidIuran)}</span></div>
+                    <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-[11px]"><span className="font-medium text-slate-500">Suka Duka <span className="ml-1 text-[9px] text-slate-400">(Tagihan: {currency(sukadukaDue)})</span></span><span className={`font-bold ${paidSukaduka ? 'text-teal-700' : 'text-slate-400'}`}>{currency(paidSukaduka)}</span></div>
+                    {hasInput && <p className="mt-0.5 px-1 text-[10px] text-slate-400">Uang {currency(value.cashPhysical)} · Kembalian {currency(value.changePaid)}</p>}
+                    {returnShortfall > 0 && <p className="mt-0.5 px-1 text-[11px] font-bold text-red-600">⚠ Kurang pengembalian {currency(returnShortfall)} · otomatis menjadi saldo kredit</p>}
+                    {hasInput && (iuranLeft > 0 || sukadukaLeft > 0) && <p className="px-1 text-[10px] font-bold text-rose-600">Masih ada tunggakan {currency(Math.max(0, iuranLeft) + Math.max(0, sukadukaLeft))}</p>}
+                  </div>
+                </article>
+              }) : <section className="rounded-2xl border border-slate-100 bg-white p-6 text-center text-sm text-slate-500">MASTER_ANGGOTA belum memiliki anggota.</section>}
+    </main>
+    {canEnter && <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-3 pb-[max(env(safe-area-inset-bottom),12px)] shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.12)] backdrop-blur">
+      <div className="mb-3 flex items-center justify-between">
+        <div><p className="text-[9px] font-bold uppercase text-slate-500">Total kas terkumpul</p><p className="text-xl font-black text-[#0d9488]">{currency(totals.iuran + totals.sukaduka)}</p></div>
+        <div className="text-right text-xs font-medium text-slate-500"><p>Iuran: <b className="text-slate-800">{currency(totals.iuran)}</b></p><p>Suka Duka: <b className="text-slate-800">{currency(totals.sukaduka)}</b></p></div>
+      </div>
+      <button type="button" onClick={submit} disabled={busy || loading || !selectedMembers.length || !backendConfigured} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-800 py-3.5 text-sm font-extrabold text-white shadow-lg transition-transform active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
+        <CloudUpload size={17} /> {busy ? 'Menyimpan...' : uncertain ? 'Coba simpan ulang' : 'Simpan ke Spreadsheet'}
+      </button>
+      {message && <p role="status" className={`mt-2 text-center text-[11px] font-semibold ${message.startsWith('Berhasil') ? 'text-teal-700' : 'text-rose-600'}`}>{message}</p>}
+    </footer>}
+    {activeMember && modalValues && modalPlan && <div className="fixed inset-0 z-40 flex flex-col justify-end bg-slate-900/60" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) { setActiveMemberId(''); setModalValues(null); setMessage('') } }}>
+      <section className="max-h-[95vh] w-full rounded-t-3xl bg-white p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-2xl">
+        <div className="mb-4 flex shrink-0 items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">{activeMember.Nama}</h2><p className="text-xs text-slate-500">Satu uang untuk Iuran &amp; Suka Duka sekaligus</p></div><button type="button" onClick={() => { setActiveMemberId(''); setModalValues(null); setMessage('') }} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-label="Tutup input"><X size={17} /></button></div>
+        <div className="max-h-[calc(95vh-132px)] space-y-4 overflow-y-auto pb-4">
+          <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+            <span className="absolute inset-y-0 left-0 w-1.5 bg-teal-500" />
+            <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black uppercase"><CircleDollarSign size={15} className="text-teal-600" /> Iuran</h3>
+            <div className="mb-2 grid grid-cols-2 gap-3">
+              <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-2.5"><span className="mb-1 text-[10px] font-bold uppercase text-slate-500">Tagihan wajib</span><span className="text-sm font-bold">{currency(modalPlan.iuranDue)}</span></div>
+              <label className="rounded-xl border border-blue-200 bg-blue-50 p-2.5"><span className="mb-1 block text-[10px] font-bold uppercase text-blue-600">Total dibayar</span><input type="text" inputMode="numeric" placeholder="0" value={formatAmountInput(modalValues.iuran)} onChange={(event) => updateModalAmount('iuran', event.target.value)} className="w-full bg-transparent text-sm font-bold text-blue-800 outline-none" /></label>
+            </div>
+            <div className="flex items-center justify-between px-1 text-[11px] text-slate-500"><span>Sisa Iuran</span><div className="flex items-center gap-2"><span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${modalPlan.iuran > modalPlan.iuranDue ? 'bg-amber-400 text-slate-900' : modalPlan.iuran < modalPlan.iuranDue ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>{modalPlan.iuran > modalPlan.iuranDue ? 'LEBIH' : modalPlan.iuran < modalPlan.iuranDue ? 'KURANG' : 'LUNAS'}</span><b className="text-slate-800">{currency(modalPlan.iuranDue - modalPlan.iuran)}</b></div></div>
+          </section>
+          <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+            <span className="absolute inset-y-0 left-0 w-1.5 bg-purple-500" />
+            <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black uppercase"><HeartHandshake size={15} className="text-purple-500" /> Suka Duka</h3>
+            <div className="mb-2 grid grid-cols-2 gap-3">
+              <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-2.5"><span className="mb-1 text-[10px] font-bold uppercase text-slate-500">Tagihan wajib</span><span className="text-sm font-bold">{currency(modalPlan.sukadukaDue)}</span></div>
+              <label className="rounded-xl border border-blue-200 bg-blue-50 p-2.5"><span className="mb-1 block text-[10px] font-bold uppercase text-blue-600">Total dibayar</span><input type="text" inputMode="numeric" placeholder="0" value={formatAmountInput(modalValues.sukaduka)} onChange={(event) => updateModalAmount('sukaduka', event.target.value)} className="w-full bg-transparent text-sm font-bold text-blue-800 outline-none" /></label>
+            </div>
+            <div className="flex items-center justify-between px-1 text-[11px] text-slate-500"><span>Sisa Suka Duka</span><div className="flex items-center gap-2"><span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${modalPlan.sukaduka > modalPlan.sukadukaDue ? 'bg-amber-400 text-slate-900' : modalPlan.sukaduka < modalPlan.sukadukaDue ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>{modalPlan.sukaduka > modalPlan.sukadukaDue ? 'LEBIH' : modalPlan.sukaduka < modalPlan.sukadukaDue ? 'KURANG' : 'LUNAS'}</span><b className="text-slate-800">{currency(modalPlan.sukadukaDue - modalPlan.sukaduka)}</b></div></div>
+            <label className="mt-3 block text-[10px] font-bold uppercase text-slate-500">Peruntukan · opsional<input type="text" placeholder="Keterangan bila diperlukan" value={modalValues.purpose || ''} onChange={(event) => updateModal('purpose', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium outline-none focus:border-purple-400" /></label>
+          </section>
+          <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+            <span className="absolute inset-y-0 left-0 w-1.5 bg-orange-500" />
+            <h3 className="mb-3 flex items-center gap-2 text-[13px] font-black uppercase"><HandCoins size={15} className="text-orange-500" /> Uang &amp; Kembalian</h3>
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5"><span className="text-[10px] font-bold uppercase text-slate-500">Total yang harus dibayar</span><b className="text-sm">{currency(modalPlan.iuran + modalPlan.sukaduka)}</b></div>
+            <p className="mb-3 rounded-lg border border-teal-100 bg-teal-50 px-2.5 py-2 text-[10px] text-teal-800">Saldo kredit bersama {currency((Number(activeMember.Saldo_Kredit_Iuran) || 0) + (Number(activeMember.Saldo_Kredit_Sukaduka) || 0))} · dipakai {currency(modalPlan.iuranCredit.total + modalPlan.sukadukaCredit.total)} · uang fisik minimal {currency(modalPlan.cashRequired)}</p>
+            <div className="mb-2 grid grid-cols-2 gap-3">
+              <label className="rounded-xl border border-orange-200 bg-orange-50 p-2.5"><span className="mb-1 block text-[10px] font-bold uppercase text-orange-600">Uang dikasih</span><input type="text" inputMode="numeric" placeholder="0" value={formatAmountInput(modalValues.cashPhysical)} onChange={(event) => updateModalAmount('cashPhysical', event.target.value)} className="w-full bg-transparent text-sm font-bold text-orange-800 outline-none" /></label>
+              <label className="rounded-xl border border-green-200 bg-green-50 p-2.5"><span className="mb-1 block text-[10px] font-bold uppercase text-green-700">Kembalian fisik</span><input type="text" inputMode="numeric" placeholder="0" value={formatAmountInput(modalValues.changePaid)} onChange={(event) => updateModalAmount('changePaid', event.target.value)} className="w-full bg-transparent text-sm font-bold text-green-800 outline-none" /></label>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {[20000, 50000, 100000].map((amount) => <button key={amount} type="button" onClick={() => updateModal('cashPhysical', String(amount))} className="rounded-lg bg-orange-100 px-3 py-1.5 text-[11px] font-bold text-orange-700">{amount.toLocaleString('id-ID')}</button>)}
+              <button type="button" onClick={() => updateModal('cashPhysical', String(modalPlan.cashRequired))} className="rounded-lg bg-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-700">Uang Pas</button>
+              <button type="button" onClick={() => updateModal('changePaid', String(modalPlan.changeDue))} className="rounded-lg bg-green-100 px-3 py-1.5 text-[11px] font-bold text-green-700">Kembalian Sesuai</button>
+            </div>
+            <div className="space-y-2 rounded-xl bg-slate-800 p-3 text-white shadow-inner">
+              <div className="flex items-center justify-between border-b border-slate-700 pb-1.5"><span className="text-[10px] text-slate-400">Kembalian seharusnya</span><b className="text-xs">{currency(modalPlan.cashPhysical - modalPlan.cashRequired)}</b></div>
+              <div className="flex items-center justify-between"><span className="text-[10px] text-slate-400">{modalPlan.cashPhysical < modalPlan.cashRequired ? 'Kekurangan uang fisik' : 'Saldo kredit baru'}</span><b className="text-xs">{currency(modalPlan.cashPhysical < modalPlan.cashRequired ? modalPlan.cashRequired - modalPlan.cashPhysical : Math.max(0, modalPlan.changeDue - modalPlan.changePaid))}</b></div>
+            </div>
+            {modalPlan.changeDue > modalPlan.changePaid && <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] font-bold text-rose-700">Pengembalian masih kurang {currency(modalPlan.changeDue - modalPlan.changePaid)}; jumlah ini otomatis dicatat sebagai saldo kredit anggota.</p>}
+          </section>
+          {message && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{message}</p>}
+        </div>
+        <button type="button" onClick={saveMemberDraft} className="mt-2 w-full rounded-xl bg-[#0d9488] py-4 text-sm font-extrabold text-white shadow-lg active:scale-[.98]">Simpan Semua Pembayaran</button>
+      </section>
+    </div>}
+    {loginModal}
+  </div>
 }
 
 function Dashboard({ role, cards, analytics, galleryItems, donations, piodalanReport, assets, dashboardFilter, onDashboardFilterChange, onOpenOpeningBalance, onOpenGallery, demo }) {
@@ -1801,8 +2296,12 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
         const amount = Number(value.amount)
         const chargeAmount = Number(value.chargeAmount) || 0
         const cashPhysical = Number(value.cashPhysical) || 0
+        const creditUse = memberCreditUsage(member, isIuran ? 'iuran' : 'sukaduka', amount)
+        const cashRequired = Math.max(0, amount - creditUse.total)
+        const changeDue = Math.max(0, cashPhysical - cashRequired)
+        const changePaid = Number(value.changePaid) || 0
         const paymentDate = value.date || date
-        if (!paymentDate || amount < 0 || cashPhysical < amount || (isIuran && amount <= 0) || (!isIuran && amount + chargeAmount <= 0)) throw new Error(`Periksa nominal dan uang fisik untuk ${member.Nama}.`)
+        if (!paymentDate || amount < 0 || cashPhysical < cashRequired || changePaid > changeDue || (isIuran && amount <= 0) || (!isIuran && amount + chargeAmount <= 0)) throw new Error(`Periksa nominal, saldo kredit, uang fisik, dan kembalian untuk ${member.Nama}.`)
         return isIuran
           ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
           : { memberId: member.ID, memberName: member.Nama, date: paymentDate, chargeAmount, amount, cashPhysical, changePaid: Number(value.changePaid) || 0, purpose: String(value.purpose || '').trim(), notes: value.notes || '' }
@@ -1846,14 +2345,18 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
         <label className="min-w-[180px] flex-1 text-[11px] font-semibold">Cari anggota<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nama atau ID" className={`${inputClass} mt-1`} /></label>
         <button onClick={exportTemplate} className="flex items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]"><FileText size={15} /> Unduh format Excel</button>
         <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]"><Plus size={15} /> Unggah Excel<input type="file" accept=".xlsx,.xls" onChange={importWorkbook} className="hidden" /></label>
-        <button onClick={() => setValues((previous) => Object.fromEntries(members.map((member) => { const due = Number(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka) || 0; return [String(member.ID), { ...previous[String(member.ID)], amount: due || '', cashPhysical: due || '' }] })))} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]">Isi sesuai tunggakan</button>
+        <button onClick={() => setValues((previous) => Object.fromEntries(members.map((member) => { const due = Number(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka) || 0; const credit = memberCreditUsage(member, isIuran ? 'iuran' : 'sukaduka', due).total; return [String(member.ID), { ...previous[String(member.ID)], amount: due || '', cashPhysical: Math.max(0, due - credit) || '', changePaid: '' }] })))} className="rounded-md border border-[#d9e1d5] px-3 py-2.5 text-xs font-semibold text-[#4e7053]">Isi sesuai tunggakan</button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[900px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[10px] uppercase text-[#89958a]"><tr><th className="px-4 py-3">Anggota</th><th className="px-3 py-3">Saldo tunggakan</th>{!isIuran && <th className="px-3 py-3">Tagihan baru</th>}<th className="px-3 py-3">Dialokasikan</th><th className="px-3 py-3">Uang fisik</th><th className="px-3 py-3">Kembalian diberikan</th>{!isIuran && <th className="px-3 py-3">Peruntukan</th>}<th className="px-3 py-3">Catatan</th></tr></thead>
+        <table className="w-full min-w-[1050px] text-left text-xs"><thead className="sticky top-0 bg-[#fafaf6] text-[10px] uppercase text-[#89958a]"><tr><th className="px-4 py-3">Anggota</th><th className="px-3 py-3">Tunggakan / kredit</th>{!isIuran && <th className="px-3 py-3">Tagihan baru</th>}<th className="px-3 py-3">Dialokasikan</th><th className="px-3 py-3">Uang fisik</th><th className="px-3 py-3">Kembalian diberikan</th>{!isIuran && <th className="px-3 py-3">Peruntukan</th>}<th className="px-3 py-3">Catatan</th></tr></thead>
           <tbody className="divide-y divide-[#eff0ea]">{visibleMembers.map((member) => {
             const key = String(member.ID)
             const value = values[key] || {}
-            return <tr key={key}><td className="px-4 py-2.5"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td><td className="px-3 py-2.5">{currency(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka)}</td>{!isIuran && <td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.chargeAmount || ''} onChange={(event) => setField(key, 'chargeAmount', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.amount || ''} onChange={(event) => setField(key, 'amount', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.cashPhysical || ''} onChange={(event) => setField(key, 'cashPhysical', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.changePaid || ''} onChange={(event) => setField(key, 'changePaid', event.target.value)} className={inputClass} /></td>{!isIuran && <td className="px-3 py-2.5"><input aria-label={`Peruntukan sukaduka untuk ${member.Nama} (opsional)`} placeholder="Opsional" value={value.purpose || ''} onChange={(event) => setField(key, 'purpose', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input value={value.notes || ''} onChange={(event) => setField(key, 'notes', event.target.value)} className={inputClass} /></td></tr>
+            const allocated = Number(value.amount) || 0
+            const creditUse = memberCreditUsage(member, isIuran ? 'iuran' : 'sukaduka', allocated)
+            const cashRequired = Math.max(0, allocated - creditUse.total)
+            const changeDue = Math.max(0, (Number(value.cashPhysical) || 0) - cashRequired)
+            return <tr key={key}><td className="px-4 py-2.5"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td><td className="px-3 py-2.5"><div>{currency(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka)}</div><div className="mt-0.5 text-[10px] text-[#68836b]">Kredit {currency((Number(member.Saldo_Kredit_Iuran) || 0) + (Number(member.Saldo_Kredit_Sukaduka) || 0))}</div></td>{!isIuran && <td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.chargeAmount || ''} onChange={(event) => setField(key, 'chargeAmount', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.amount || ''} onChange={(event) => setField(key, 'amount', event.target.value)} className={inputClass} /><span className="mt-1 block text-[10px] text-[#849084]">Tunai min. {currency(cashRequired)}</span></td><td className="px-3 py-2.5"><input type="number" min={cashRequired} step="1" value={value.cashPhysical || ''} onChange={(event) => setField(key, 'cashPhysical', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" max={changeDue} step="1" value={value.changePaid || ''} onChange={(event) => setField(key, 'changePaid', event.target.value)} className={inputClass} /></td>{!isIuran && <td className="px-3 py-2.5"><input aria-label={`Peruntukan sukaduka untuk ${member.Nama} (opsional)`} placeholder="Opsional" value={value.purpose || ''} onChange={(event) => setField(key, 'purpose', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input value={value.notes || ''} onChange={(event) => setField(key, 'notes', event.target.value)} className={inputClass} /></td></tr>
           })}</tbody>
         </table>
       </div>
@@ -2148,14 +2651,20 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
   const amount = Number(form.amount) || 0
   const chargeAmount = Number(form.chargeAmount) || 0
   const cash = Number(form.cashPhysical) || 0
-  const changeDue = Math.max(0, cash - amount)
   const changePaid = Number(form.changePaid) || 0
-  const openingRefundDebt = Math.max(0, Number(member?.Sisa_Hutang_Kembalian || 0) - Number(editing?.refundDebtAdded || 0))
+  const openingCredits = member ? {
+    Saldo_Kredit_Iuran: Math.max(0, Number(member.Saldo_Kredit_Iuran || 0) + Number(editing?.creditAppliedIuran || 0)),
+    Saldo_Kredit_Sukaduka: Math.max(0, Number(member.Saldo_Kredit_Sukaduka || 0) + Number(editing?.creditAppliedSukaduka || 0) - Number(editing?.creditAdded || 0)),
+  } : null
+  const creditUse = memberCreditUsage(openingCredits, 'sukaduka', amount)
+  const cashRequired = Math.max(0, amount - creditUse.total)
+  const changeDue = Math.max(0, cash - cashRequired)
+  const remainingCredit = Math.max(0, Number(openingCredits?.Saldo_Kredit_Iuran || 0) + Number(openingCredits?.Saldo_Kredit_Sukaduka || 0) - creditUse.total + changeDue - changePaid)
   const editingTracksArrears = editing && editing.chargeAmount !== '' && editing.chargeAmount !== undefined && editing.chargeAmount !== null
   const openingArrears = Math.max(0, Number(member?.Sisa_Hutang_Sukaduka || 0) - (editingTracksArrears ? Number(editing.chargeAmount || 0) - Number(editing.amount || 0) : 0))
   const totalDue = openingArrears + chargeAmount
   const endingArrears = Math.max(0, totalDue - amount)
-  const valid = Boolean(form.date) && (form.direction === 'Keluar' ? Boolean(form.recipient) && amount > 0 : Boolean(member) && chargeAmount >= 0 && amount >= 0 && amount + chargeAmount > 0 && cash >= amount && changePaid <= openingRefundDebt + changeDue)
+  const valid = Boolean(form.date) && (form.direction === 'Keluar' ? Boolean(form.recipient) && amount > 0 : Boolean(member) && chargeAmount >= 0 && amount >= 0 && amount + chargeAmount > 0 && cash >= cashRequired && changePaid <= changeDue)
   const inputClass = 'w-full rounded-md border border-[#e1e5dc] bg-white px-3 py-2.5 text-xs text-[#344a3a] outline-none focus:border-[#789578]'
   const readonlyClass = `${inputClass} bg-[#f5f6f1] font-semibold text-[#809080]`
 
@@ -2174,8 +2683,10 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
       cashPhysical: incoming ? cash : 0,
       changeDue: incoming ? changeDue : 0,
       changePaid: incoming ? changePaid : 0,
-      refundDebtAdded: incoming ? changeDue - changePaid : 0,
-      refundDebt: incoming ? openingRefundDebt + changeDue - changePaid : 0,
+      creditAppliedIuran: incoming ? creditUse.iuran : 0,
+      creditAppliedSukaduka: incoming ? creditUse.sukaduka : 0,
+      creditAdded: incoming ? Math.max(0, changeDue - changePaid) : 0,
+      creditBalance: incoming ? remainingCredit : undefined,
       notes: form.notes,
       proofFile,
     }) ; setSubmissionUncertain(false) } catch (error) {
@@ -2198,10 +2709,11 @@ function SukadukaModal({ members, editing, busy, onClose, onSave }) {
         <label><span className="mb-1.5 block text-[11px] font-semibold">Tagihan sukaduka baru</span><input type="number" min="0" step="1" value={form.chargeAmount} onChange={(event) => setValue('chargeAmount', event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Total tunggakan yang bisa dibayar</span><input readOnly value={totalDue} className={`${inputClass} bg-[#f5f6f1]`} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Setoran sukaduka</span><input type="number" min="0" step="1" value={form.amount} onChange={(event) => setValue('amount', event.target.value)} className={inputClass} /></label>
-        <label><span className="mb-1.5 block text-[11px] font-semibold">Uang fisik diterima</span><input type="number" min={amount} step="1" value={form.cashPhysical} onChange={(event) => setValue('cashPhysical', event.target.value)} className={inputClass} /></label>
+        <div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] px-3 py-2.5 text-[10px] text-[#788579] sm:col-span-2">Saldo kredit bersama: <b>{currency((Number(openingCredits?.Saldo_Kredit_Iuran) || 0) + (Number(openingCredits?.Saldo_Kredit_Sukaduka) || 0))}</b> · dipakai: <b>{currency(creditUse.total)}</b></div>
+        <label><span className="mb-1.5 block text-[11px] font-semibold">Uang fisik diterima (minimal {currency(cashRequired)})</span><input type="number" min={cashRequired} step="1" value={form.cashPhysical} onChange={(event) => setValue('cashPhysical', event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian seharusnya</span><input readOnly value={changeDue} className={readonlyClass} /></label>
-        <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian diberikan</span><input type="number" min="0" max={openingRefundDebt + changeDue} step="1" value={form.changePaid} onChange={(event) => setValue('changePaid', event.target.value)} className={inputClass} /></label>
-        <label><span className="mb-1.5 block text-[11px] font-semibold">Sisa hutang kembalian</span><input readOnly value={openingRefundDebt + changeDue - changePaid} className={readonlyClass} /></label>
+        <label><span className="mb-1.5 block text-[11px] font-semibold">Kembalian fisik diberikan</span><input type="number" min="0" max={changeDue} step="1" value={form.changePaid} onChange={(event) => setValue('changePaid', event.target.value)} className={inputClass} /></label>
+        <label><span className="mb-1.5 block text-[11px] font-semibold">Saldo kredit setelah transaksi</span><input readOnly value={remainingCredit} className={readonlyClass} /></label>
         <label><span className="mb-1.5 block text-[11px] font-semibold">Sisa tunggakan sukaduka</span><input readOnly value={endingArrears} className={readonlyClass} /></label>
       </> : <label><span className="mb-1.5 block text-[11px] font-semibold">Penerima dana</span><input required value={form.recipient} onChange={(event) => setValue('recipient', event.target.value)} className={inputClass} /></label>}
       <label className="sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold">Catatan / peruntukan</span><input value={form.purpose} onChange={(event) => setValue('purpose', event.target.value)} className={inputClass} /></label>
@@ -2494,17 +3006,21 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
   const pendingRecord = useRef(null)
   const selectedMember = members.find((member) => String(member.ID) === String(form.memberId))
   const target = editing
-    ? Number(selectedMember?.Sisa_Hutang_Iuran || 0) + Number(editing.allocatedContribution || 0)
+    ? Number(selectedMember?.Sisa_Hutang_Iuran || 0) + Number(editing.allocatedContribution || 0) - Number(editing.chargeAmount || 0)
     : Number(selectedMember?.Sisa_Hutang_Iuran || 0)
-  const openingRefundDebt = Math.max(0, Number(selectedMember?.Sisa_Hutang_Kembalian || 0) - Number(editing?.refundDebtAdded || 0))
+  const openingCredits = selectedMember ? {
+    Saldo_Kredit_Iuran: Math.max(0, Number(selectedMember.Saldo_Kredit_Iuran || 0) + Number(editing?.creditAppliedIuran || 0) - Number(editing?.creditAdded || 0)),
+    Saldo_Kredit_Sukaduka: Math.max(0, Number(selectedMember.Saldo_Kredit_Sukaduka || 0) + Number(editing?.creditAppliedSukaduka || 0)),
+  } : null
   const allocation = Number(form.allocatedContribution) || 0
   const cashReceived = Number(form.cashPhysical) || 0
-  const changeDue = Math.max(0, cashReceived - allocation)
+  const creditUse = memberCreditUsage(openingCredits, 'iuran', allocation)
+  const cashRequired = Math.max(0, allocation - creditUse.total)
+  const changeDue = Math.max(0, cashReceived - cashRequired)
   const changePaid = Number(form.changePaid) || 0
-  const refundDebt = Math.max(0, openingRefundDebt + changeDue - changePaid)
-  const refundDebtAdded = refundDebt - openingRefundDebt
+  const remainingCredit = Math.max(0, Number(openingCredits?.Saldo_Kredit_Iuran || 0) + Number(openingCredits?.Saldo_Kredit_Sukaduka || 0) - creditUse.total + changeDue - changePaid)
   const arrears = Math.max(0, target - allocation)
-  const valid = Boolean(selectedMember) && cashReceived >= allocation && changePaid <= openingRefundDebt + changeDue
+  const valid = Boolean(selectedMember) && cashReceived >= cashRequired && changePaid <= changeDue
 
   function update(key, value) {
     setForm((previous) => ({ ...previous, [key]: value }))
@@ -2527,9 +3043,10 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
       changePaid,
       openingArrears: target,
       arrears,
-      openingRefundDebt,
-      refundDebtAdded,
-      refundDebt,
+      creditAppliedIuran: creditUse.iuran,
+      creditAppliedSukaduka: creditUse.sukaduka,
+      creditAdded: Math.max(0, changeDue - changePaid),
+      creditBalance: remainingCredit,
       notes: form.notes,
       }
       pendingRecord.current = record
@@ -2558,17 +3075,17 @@ function IuranModal({ members, editing, busy, onClose, onSave }) {
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Tanggal transaksi</span><input type="date" required value={form.date} onChange={(event) => update('date', event.target.value)} className={inputClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Periode</span><input type="month" required value={form.periodId} onChange={(event) => update('periodId', event.target.value)} className={inputClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Nama anggota</span><select required value={form.memberId} onChange={(event) => setForm((previous) => ({ ...previous, memberId: event.target.value, allocatedContribution: 0, cashPhysical: 0, changePaid: 0 }))} disabled={!members.length || Boolean(editing)} className={inputClass}><option value="" disabled>{members.length ? 'Pilih anggota dari master' : 'Data MASTER_ANGGOTA belum tersedia'}</option>{members.map((member) => <option key={member.ID} value={member.ID}>{member.Nama}</option>)}</select></label>
-        {selectedMember && <div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] px-3 py-2.5 text-[10px] text-[#788579] sm:col-span-2">Hutang kembalian sebelumnya: <b>{currency(selectedMember.Sisa_Hutang_Kembalian)}</b></div>}
+        {selectedMember && <div className="rounded-md border border-[#e6e7dd] bg-[#fffefa] px-3 py-2.5 text-[10px] text-[#788579] sm:col-span-2">Saldo kredit bersama: <b>{currency((Number(openingCredits.Saldo_Kredit_Iuran) || 0) + (Number(openingCredits.Saldo_Kredit_Sukaduka) || 0))}</b> · dipakai: <b>{currency(creditUse.total)}</b></div>}
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Tunggakan sebelum setor</span><input readOnly value={target} className={readOnlyClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Setoran iuran</span><input type="number" min="0" step="1" required value={form.allocatedContribution} onChange={(event) => update('allocatedContribution', event.target.value)} className={inputClass} /></label>
-        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Uang fisik diterima</span><input type="number" min={allocation} step="1" required value={form.cashPhysical} onChange={(event) => update('cashPhysical', event.target.value)} className={inputClass} /></label>
+        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Uang fisik diterima (minimal {currency(cashRequired)})</span><input type="number" min={cashRequired} step="1" required value={form.cashPhysical} onChange={(event) => update('cashPhysical', event.target.value)} className={inputClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Kembalian seharusnya</span><input readOnly value={changeDue} className={readOnlyClass} /></label>
-        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Kembalian diberikan</span><input type="number" min="0" max={openingRefundDebt + changeDue} step="1" required value={form.changePaid} onChange={(event) => update('changePaid', event.target.value)} className={inputClass} /></label>
-        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang kembalian</span><input readOnly value={openingRefundDebt + refundDebtAdded} className={readOnlyClass} /></label>
+        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Kembalian fisik diberikan</span><input type="number" min="0" max={changeDue} step="1" required value={form.changePaid} onChange={(event) => update('changePaid', event.target.value)} className={inputClass} /></label>
+        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Saldo kredit setelah transaksi</span><input readOnly value={remainingCredit} className={readOnlyClass} /></label>
         <label className="block"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Sisa hutang iuran (akhir)</span><input readOnly value={arrears} className={readOnlyClass} /></label>
         <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-semibold text-[#637367]">Catatan</span><input value={form.notes} onChange={(event) => update('notes', event.target.value)} className={inputClass} /></label>
         </fieldset>
-        {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan uang fisik mencukupi setoran serta kembalian yang diberikan.</p>}
+        {!valid && selectedMember && <p className="text-[11px] font-medium text-[#b5122a] sm:col-span-2">Pastikan uang fisik minimal {currency(cashRequired)} dan kembalian tidak melebihi uang lebih transaksi.</p>}
         <div className="mt-2 flex justify-end gap-2 border-t border-[#eceee6] pt-4 sm:col-span-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-md border border-[#e1e5dc] px-4 py-2.5 text-xs font-semibold text-[#68776b] hover:bg-[#f7f8f4] disabled:opacity-50">{submissionUncertain ? 'Tutup & cek data' : 'Batal'}</button><button disabled={!valid || busy} className="rounded-md bg-[#355d3f] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#294d33] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Menyimpan...' : submissionUncertain ? 'Coba konfirmasi transaksi' : editing ? 'Simpan perubahan' : 'Simpan transaksi'}</button></div>
       </form>
     </div>

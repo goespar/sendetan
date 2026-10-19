@@ -8,7 +8,7 @@ export async function request(action, payload = {}, token = '') {
     throw new Error('Koneksi Google Sheets belum diatur. Isi VITE_APPS_SCRIPT_URL di .env.local dengan URL Apps Script berakhiran /exec.')
   }
   const mutation = [
-    'create', 'update', 'delete', 'batchPayments', 'batchSangkep', 'batchCreate',
+    'create', 'update', 'delete', 'batchPayments', 'batchCombinedPayments', 'batchSangkep', 'batchCreate',
     'adjustMemberBalance', 'adjustIuranBalance', 'adjustSukadukaBalance',
     'setOpeningBalances', 'closeBook', 'approveReport', 'restore',
   ].includes(action)
