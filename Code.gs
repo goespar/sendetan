@@ -542,7 +542,7 @@ function batchPayments_(module, records, user) {
       const chargeAmount = Number(record.chargeAmount) || 0;
       const openingArrears = balance.sukadukaArrears;
       const purpose = String(record.purpose || '').trim();
-      if (!purpose || ![amount, cash, changePaid, chargeAmount].every(Number.isFinite) || amount < 0 || chargeAmount < 0 || amount + chargeAmount <= 0 || cash < amount || changePaid < 0) throw new Error('Data pembayaran sukaduka tidak valid untuk ' + member.Nama + '.');
+      if (![amount, cash, changePaid, chargeAmount].every(Number.isFinite) || amount < 0 || chargeAmount < 0 || amount + chargeAmount <= 0 || cash < amount || changePaid < 0) throw new Error('Data pembayaran sukaduka tidak valid untuk ' + member.Nama + '.');
       const changeDue = cash - amount;
       if (changePaid > balance.refundDebt + changeDue) throw new Error('Kembalian yang diberikan melebihi kewajiban untuk ' + member.Nama + '.');
       const refundDebt = Math.max(0, balance.refundDebt + changeDue - changePaid);
