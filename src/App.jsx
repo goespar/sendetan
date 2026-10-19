@@ -1794,18 +1794,23 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
       return isIuran ? Number(value.amount) > 0 : Number(value.amount) > 0 || Number(value.chargeAmount) > 0
     })
     if (!selected.length) { setMessage('Masukkan nominal untuk minimal satu anggota.'); return }
-    const records = selected.map((member) => {
-      const value = values[String(member.ID)]
-      const amount = Number(value.amount)
-      const chargeAmount = Number(value.chargeAmount) || 0
-      const cashPhysical = Number(value.cashPhysical) || 0
-      const paymentDate = value.date || date
-      if (!paymentDate || amount < 0 || cashPhysical < amount || (isIuran && amount <= 0) || (!isIuran && amount + chargeAmount <= 0)) throw new Error(`Periksa nominal dan uang fisik untuk ${member.Nama}.`)
-      if (!isIuran && !String(value.purpose || '').trim()) throw new Error(`Peruntukan sukaduka wajib diisi untuk ${member.Nama}.`)
-      return isIuran
-        ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
-        : { memberId: member.ID, memberName: member.Nama, date: paymentDate, chargeAmount, amount, cashPhysical, changePaid: Number(value.changePaid) || 0, purpose: value.purpose, notes: value.notes || '' }
-    })
+    let records
+    try {
+      records = selected.map((member) => {
+        const value = values[String(member.ID)]
+        const amount = Number(value.amount)
+        const chargeAmount = Number(value.chargeAmount) || 0
+        const cashPhysical = Number(value.cashPhysical) || 0
+        const paymentDate = value.date || date
+        if (!paymentDate || amount < 0 || cashPhysical < amount || (isIuran && amount <= 0) || (!isIuran && amount + chargeAmount <= 0)) throw new Error(`Periksa nominal dan uang fisik untuk ${member.Nama}.`)
+        return isIuran
+          ? { memberId: member.ID, memberName: member.Nama, date: paymentDate, periodId: value.periodId || periodId, allocatedContribution: amount, cashPhysical, changePaid: Number(value.changePaid) || 0, notes: value.notes || '' }
+          : { memberId: member.ID, memberName: member.Nama, date: paymentDate, chargeAmount, amount, cashPhysical, changePaid: Number(value.changePaid) || 0, purpose: String(value.purpose || '').trim(), notes: value.notes || '' }
+      })
+    } catch (error) {
+      setMessage(error.message || 'Periksa kembali data pembayaran.')
+      return
+    }
     const fingerprint = JSON.stringify(records)
     const pending = pendingSubmission.current
     if (pending && pending.fingerprint !== fingerprint) {
@@ -1848,7 +1853,7 @@ function BatchPaymentModal({ module, members, onClose, onSave }) {
           <tbody className="divide-y divide-[#eff0ea]">{visibleMembers.map((member) => {
             const key = String(member.ID)
             const value = values[key] || {}
-            return <tr key={key}><td className="px-4 py-2.5"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td><td className="px-3 py-2.5">{currency(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka)}</td>{!isIuran && <td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.chargeAmount || ''} onChange={(event) => setField(key, 'chargeAmount', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.amount || ''} onChange={(event) => setField(key, 'amount', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.cashPhysical || ''} onChange={(event) => setField(key, 'cashPhysical', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.changePaid || ''} onChange={(event) => setField(key, 'changePaid', event.target.value)} className={inputClass} /></td>{!isIuran && <td className="px-3 py-2.5"><input value={value.purpose || ''} onChange={(event) => setField(key, 'purpose', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input value={value.notes || ''} onChange={(event) => setField(key, 'notes', event.target.value)} className={inputClass} /></td></tr>
+            return <tr key={key}><td className="px-4 py-2.5"><b>{member.Nama}</b><span className="ml-2 text-[10px] text-[#929c91]">{member.ID}</span></td><td className="px-3 py-2.5">{currency(isIuran ? member.Sisa_Hutang_Iuran : member.Sisa_Hutang_Sukaduka)}</td>{!isIuran && <td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.chargeAmount || ''} onChange={(event) => setField(key, 'chargeAmount', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.amount || ''} onChange={(event) => setField(key, 'amount', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.cashPhysical || ''} onChange={(event) => setField(key, 'cashPhysical', event.target.value)} className={inputClass} /></td><td className="px-3 py-2.5"><input type="number" min="0" step="1" value={value.changePaid || ''} onChange={(event) => setField(key, 'changePaid', event.target.value)} className={inputClass} /></td>{!isIuran && <td className="px-3 py-2.5"><input aria-label={`Peruntukan sukaduka untuk ${member.Nama} (opsional)`} placeholder="Opsional" value={value.purpose || ''} onChange={(event) => setField(key, 'purpose', event.target.value)} className={inputClass} /></td>}<td className="px-3 py-2.5"><input value={value.notes || ''} onChange={(event) => setField(key, 'notes', event.target.value)} className={inputClass} /></td></tr>
           })}</tbody>
         </table>
       </div>
