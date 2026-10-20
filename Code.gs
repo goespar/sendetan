@@ -427,8 +427,12 @@ function assertRole_(user, action, module) {
   const role = user && user.role;
   if (!role) throw new Error('Sesi tidak valid.');
   if (role === 'Admin') return;
-  if (action === 'summary' || action === 'list') {
-    if (action === 'list' && module === 'MASTER_ANGGOTA' && ['Ketua', 'Bendahara'].indexOf(role) !== -1) return;
+  if (action === 'summary') {
+    if (['Ketua', 'Bendahara', 'Sekretaris'].indexOf(role) !== -1) return;
+    throw new Error('Peran Anda tidak memiliki akses baca untuk dashboard.');
+  }
+  if (action === 'list') {
+    if (module === 'MASTER_ANGGOTA' && ['Ketua', 'Bendahara'].indexOf(role) !== -1) return;
     if (role === 'Ketua' || role === 'Bendahara' && (FINANCE_MODULES.indexOf(module) !== -1 || SECRETARY_MODULES.indexOf(module) !== -1) || role === 'Sekretaris' && SECRETARY_MODULES.indexOf(module) !== -1) return;
     throw new Error('Peran Anda tidak memiliki akses baca untuk data ini.');
   }
