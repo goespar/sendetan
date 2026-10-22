@@ -1268,9 +1268,8 @@ function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginMod
   }
 
   function getDues(member) {
-    const key = String(member.ID)
-    const iuranCharge = periodCharges.iuran[key] ? 0 : 10000
-    const sukadukaCharge = periodCharges.sukaduka[key] ? 0 : 5000
+    const iuranCharge = 10000
+    const sukadukaCharge = 5000
     return {
       iuranCharge,
       sukadukaCharge,
@@ -1282,6 +1281,11 @@ function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginMod
   const selectedMembers = members.filter((member) => {
     const value = values[String(member.ID)] || {}
     return Number(value.iuran) > 0 || Number(value.sukaduka) > 0
+  })
+  const processableMembers = members.filter((member) => {
+    const value = values[String(member.ID)] || {}
+    const dues = getDues(member)
+    return Number(value.iuran) > 0 || Number(value.sukaduka) > 0 || dues.iuranCharge > 0 || dues.sukadukaCharge > 0
   })
   const hasUnsavedDraft = selectedMembers.length > 0 || Boolean(activeMemberId && modalValues) || Boolean(pendingSubmission.current)
 
@@ -1397,8 +1401,8 @@ function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginMod
     }
     let records
     try {
-      if (!selectedMembers.length) throw new Error('Isi nominal iuran atau Sukaduka untuk minimal satu anggota.')
-      records = selectedMembers.map((member) => {
+      if (!processableMembers.length) throw new Error('Tidak ada pembayaran atau tagihan baru untuk disimpan pada periode ini.')
+      records = processableMembers.map((member) => {
         const value = values[String(member.ID)] || {}
         const plan = getPlan(member, value)
         if (!date || !periodId || plan.cashPhysical < plan.cashRequired || plan.changePaid > plan.changeDue) {
@@ -1407,21 +1411,21 @@ function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginMod
         const firstModule = plan.iuran > 0 ? 'iuran' : 'sukaduka'
         const extraCash = plan.cashPhysical - plan.cashRequired
         const entry = { memberId: member.ID }
-        if (plan.iuran > 0) {
+        if (plan.iuran > 0 || plan.iuranCharge > 0) {
           entry.iuran = {
             memberId: member.ID, memberName: member.Nama, date, periodId,
             allocatedContribution: plan.iuran, chargeAmount: plan.iuranCharge,
-            monthlyCharge: plan.iuranCharge > 0,
+            monthlyCharge: false,
             cashPhysical: Math.max(0, plan.iuran - plan.iuranCredit.total) + extraCash,
             changePaid: firstModule === 'iuran' ? plan.changePaid : 0,
             notes: value.notes || '',
           }
         }
-        if (plan.sukaduka > 0) {
+        if (plan.sukaduka > 0 || plan.sukadukaCharge > 0) {
           entry.sukaduka = {
             memberId: member.ID, memberName: member.Nama, date, periodId,
             amount: plan.sukaduka, chargeAmount: plan.sukadukaCharge,
-            monthlyCharge: plan.sukadukaCharge > 0,
+            monthlyCharge: false,
             cashPhysical: Math.max(0, plan.sukaduka - plan.sukadukaCredit.total) + (firstModule === 'sukaduka' ? extraCash : 0),
             changePaid: firstModule === 'sukaduka' ? plan.changePaid : 0,
             purpose: String(value.purpose || '').trim(),
@@ -1469,7 +1473,7 @@ function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginMod
       }])))
       pendingSubmission.current = null
       setUncertain(false)
-      setMessage(`Berhasil menyimpan pembayaran untuk ${submitted.length} anggota.`)
+      setMessage(`Berhasil menyimpan tagihan dan pembayaran untuk ${submitted.length} anggota.`)
     } catch (error) {
       setUncertain(Boolean(error.uncertain))
       if (!error.uncertain) pendingSubmission.current = null
@@ -1534,7 +1538,7 @@ function CombinedPaymentPage({ authenticated, role, token, onOpenLogin, loginMod
         <div><p className="text-[9px] font-bold uppercase text-slate-500">Total kas terkumpul</p><p className="text-xl font-black text-[#0d9488]">{currency(totals.iuran + totals.sukaduka)}</p></div>
         <div className="text-right text-xs font-medium text-slate-500"><p>Iuran: <b className="text-slate-800">{currency(totals.iuran)}</b></p><p>Suka Duka: <b className="text-slate-800">{currency(totals.sukaduka)}</b></p></div>
       </div>
-      <button type="button" onClick={submit} disabled={busy || loading || !selectedMembers.length || !backendConfigured} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-800 py-3.5 text-sm font-extrabold text-white shadow-lg transition-transform active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
+      <button type="button" onClick={submit} disabled={busy || loading || !processableMembers.length || !backendConfigured} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-800 py-3.5 text-sm font-extrabold text-white shadow-lg transition-transform active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
         <CloudUpload size={17} /> {busy ? 'Menyimpan...' : uncertain ? 'Coba simpan ulang' : 'Simpan ke Spreadsheet'}
       </button>
       {message && <p role="status" className={`mt-2 text-center text-[11px] font-semibold ${message.startsWith('Berhasil') ? 'text-teal-700' : 'text-rose-600'}`}>{message}</p>}

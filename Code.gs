@@ -539,6 +539,7 @@ function batchPayments_(module, records, user) {
     if (seen[memberId]) throw new Error('Anggota ' + member.Nama + ' tercantum lebih dari sekali. Gabungkan pembayarannya dalam satu baris.');
     seen[memberId] = true;
     const requestId = String(record.id || '').trim();
+    const monthlyCharge = record.monthlyCharge === true || String(record.monthlyCharge).toLowerCase() === 'true';
     if (requestId && seenIds[requestId]) throw new Error('ID transaksi yang sama tercantum lebih dari sekali.');
     if (requestId) seenIds[requestId] = true;
     const existing = requestId ? existingById[requestId] : null;
@@ -585,10 +586,9 @@ function batchPayments_(module, records, user) {
       const changePaid = Number(record.changePaid) || 0;
       const chargeAmount = Number(record.chargeAmount) || 0;
       const sangkepId = String(record.sangkepId || '');
-      const monthlyCharge = record.monthlyCharge === true || String(record.monthlyCharge).toLowerCase() === 'true';
       if (!/^\d{4}-\d{2}$/.test(periodId)) throw new Error('Periode tidak valid untuk ' + member.Nama + '.');
       if (![allocated, cash, changePaid, chargeAmount].every(Number.isFinite) || allocated < 0 || chargeAmount < 0
-        || (sangkepId ? chargeAmount <= 0 || allocated > chargeAmount : allocated <= 0)
+        || (sangkepId ? chargeAmount <= 0 || allocated > chargeAmount : allocated <= 0 && chargeAmount <= 0)
         || changePaid < 0) throw new Error('Nominal iuran tidak valid untuk ' + member.Nama + '.');
       if (!Object.prototype.hasOwnProperty.call(iuranChargesByPeriod, periodId)) {
         iuranChargesByPeriod[periodId] = iuranMonthlyChargesByPeriod_(periodId);
@@ -621,7 +621,6 @@ function batchPayments_(module, records, user) {
       const openingArrears = balance.sukadukaArrears;
       const purpose = String(record.purpose || '').trim();
       const periodId = String(record.periodId || '').trim();
-      const monthlyCharge = record.monthlyCharge === true || String(record.monthlyCharge).toLowerCase() === 'true';
       if (![amount, cash, changePaid, chargeAmount].every(Number.isFinite) || amount < 0 || chargeAmount < 0 || amount + chargeAmount <= 0 || changePaid < 0) throw new Error('Data pembayaran sukaduka tidak valid untuk ' + member.Nama + '.');
       if (periodId && !/^\d{4}-\d{2}$/.test(periodId)) throw new Error('Periode Sukaduka tidak valid untuk ' + member.Nama + '.');
       if (monthlyCharge && (!periodId || periodId !== String(record.date).slice(0, 7) || chargeAmount !== 5000)) {
